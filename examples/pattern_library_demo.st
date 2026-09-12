@@ -8,7 +8,7 @@ Pattern %GtrArp:
   16: 90@ c e g e 70@ c e g e
 
 Pattern %BassRiff:
-  16: 100@ c/2 r 80@ c/2 100@ g/2 r 80@ a/2 c/3
+  16: 100@ c*2 r 80@ c*2 100@ g*2 r 80@ a*2 c*3
 
 Guitar:
   %GtrArp %GtrArp

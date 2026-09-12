@@ -2,16 +2,16 @@ Tempo: 132 BPM
 Metrica: 4/4
 
 Pattern %WalkII:
-  8T: 90@ d/2 f/2 a/2 c/3
+  8T: 90@ d*2 f*2 a*2 c*3
 
 Pattern %WalkV:
-  8T: 90@ g/2 b/2 d/3 f/3
+  8T: 90@ g*2 b*2 d*3 f*3
 
 Pattern %WalkI:
-  8T: 90@ c/2 e/2 g/2 b/2
+  8T: 90@ c*2 e*2 g*2 b*2
 
 Pattern %WalkVI:
-  8T: 90@ a/2 c/3 e/3 g/3
+  8T: 90@ a*2 c*3 e*3 g*3
 
 Pattern %SwingRide:
   8T: 90@ ride r ride ride r ride ride r
