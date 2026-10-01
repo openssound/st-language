@@ -1,6 +1,6 @@
 # Questo file descrive SOLO la libreria ST-language (cartella st_language/):
 # la notazione di SoundText usabile da sola, con i comandi st-language,
-# stcheck, st2mid e st2musicxml. SoundText (l'applicazione) non si
+# stcheck, st2mid, st2musicxml e st2abc. SoundText (l'applicazione) non si
 # installa da qui: vedi README.md e requirements.txt.
 #
 #     pip install .                 # dalla cartella del repository
@@ -13,12 +13,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "st-language"
 version = "1.0.0"
-description = "ST-language: text music notation (notes, chords, drums, voices, lyrics) with MIDI and MusicXML export"
+description = "ST-language: text music notation (notes, chords, drums, voices, lyrics) with MIDI, MusicXML and ABC export"
 readme = "st_language/README.md"
 requires-python = ">=3.9"
 license = {text = "GPL-3.0-or-later"}
 authors = [{name = "Sergio Scolaro"}]
-keywords = ["music", "notation", "midi", "musicxml", "text", "chords"]
+keywords = ["music", "notation", "midi", "musicxml", "abc", "text", "chords"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
@@ -36,6 +36,7 @@ st-language = "st_language.cli:main"
 stcheck = "st_language.cli:check_main"
 st2mid = "st_language.cli:midi_main"
 st2musicxml = "st_language.cli:musicxml_main"
+st2abc = "st_language.cli:abc_main"
 
 [tool.setuptools]
 packages = ["st_language"]
