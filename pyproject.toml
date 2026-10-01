@@ -1,0 +1,44 @@
+# Questo file descrive SOLO la libreria ST-language (cartella st_language/):
+# la notazione di SoundText usabile da sola, con i comandi st-language,
+# stcheck, st2mid e st2musicxml. SoundText (l'applicazione) non si
+# installa da qui: vedi README.md e requirements.txt.
+#
+#     pip install .                 # dalla cartella del repository
+#     st-language check brano.st
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "st-language"
+version = "1.0.0"
+description = "ST-language: text music notation (notes, chords, drums, voices, lyrics) with MIDI and MusicXML export"
+readme = "st_language/README.md"
+requires-python = ">=3.9"
+license = {text = "GPL-3.0-or-later"}
+authors = [{name = "Sergio Scolaro"}]
+keywords = ["music", "notation", "midi", "musicxml", "text", "chords"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Topic :: Multimedia :: Sound/Audio :: MIDI",
+    "Intended Audience :: Developers",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Crsvss/soundtext"
+Specification = "https://github.com/Crsvss/soundtext/blob/main/docs/spec/ST-language.md"
+
+[project.scripts]
+st-language = "st_language.cli:main"
+stcheck = "st_language.cli:check_main"
+st2mid = "st_language.cli:midi_main"
+st2musicxml = "st_language.cli:musicxml_main"
+
+[tool.setuptools]
+packages = ["st_language"]
+
+[tool.setuptools.package-data]
+st_language = ["locales/*.json", "README.md"]
