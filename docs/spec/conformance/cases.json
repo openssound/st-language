@@ -1,5 +1,5 @@
 {
- "spec_version": "1.0",
+ "spec_version": "1.1",
  "cases": [
   {
    "id": "notes-basic",
@@ -871,6 +871,764 @@
       "velocity": 80,
       "letter": "e",
       "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "automations-set",
+   "input": "vol=90 c expr=64 d pan=-0.5 mod=30 rev=40.4 cho=20 e",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "vol",
+      "value": 90
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 64
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "pan",
+      "value": -0.5
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "mod",
+      "value": 30
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "rev",
+      "value": 40
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "cho",
+      "value": 20
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "automations-ramp",
+   "input": "vol=40 >> c d e vol=100 f",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "vol",
+      "value": 40
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 0.0,
+      "duration": 3.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "vol",
+      "value": 100,
+      "start_value": 40,
+      "curve": "lin"
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "automations-ramp-curve",
+   "input": "expr=20 >>exp 4c expr=127 pan=-1 <<s 2c pan=1",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 20
+     },
+     {
+      "start": 0.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.0,
+      "duration": 4.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 127,
+      "start_value": 20,
+      "curve": "exp"
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "pan",
+      "value": -1.0
+     },
+     {
+      "start": 4.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 2.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "pan",
+      "value": 1.0,
+      "start_value": -1.0,
+      "curve": "s"
+     }
+    ]
+   }
+  },
+  {
+   "id": "automations-overlapping-ramps",
+   "input": "vol=50 >> pan=0 >> c d pan=1 e vol=120",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "vol",
+      "value": 50
+     },
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "pan",
+      "value": 0.0
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "pan",
+      "value": 1.0,
+      "start_value": 0.0,
+      "curve": "lin"
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 0.0,
+      "duration": 3.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "vol",
+      "value": 120,
+      "start_value": 50,
+      "curve": "lin"
+     }
+    ]
+   }
+  },
+  {
+   "id": "automations-ramp-same-position",
+   "input": "mod=10 >> mod=90 c",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "mod",
+      "value": 10
+     },
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "mod",
+      "value": 90
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "automations-in-voices",
+   "input": "{ c vol=30 ; d d } expr=100 e<",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "vol",
+      "value": 30
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 100
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 100,
+      "start_value": 50,
+      "curve": "lin"
+     },
+     {
+      "start": 3.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 100
+     }
+    ]
+   }
+  },
+  {
+   "id": "ramp-curves-velocity",
+   "input": "20@ >>exp c d e f 100@ 60§ >>log g a b 120§ c",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 20,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 29,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 56,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "tempo_marker",
+      "velocity": 80,
+      "bpm": 60
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "tempo_marker",
+      "velocity": 80,
+      "bpm": 60
+     },
+     {
+      "start": 5.0,
+      "duration": 0.0,
+      "kind": "tempo_marker",
+      "velocity": 80,
+      "bpm": 105
+     },
+     {
+      "start": 6.0,
+      "duration": 0.0,
+      "kind": "tempo_marker",
+      "velocity": 80,
+      "bpm": 120
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "hairpins",
+   "input": "2c< d> e'2< [c e g]> 4: C7!< c>e<",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 127,
+      "start_value": 64,
+      "curve": "lin"
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 127
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 64,
+      "start_value": 127,
+      "curve": "lin"
+     },
+     {
+      "start": 3.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 127
+     },
+     {
+      "start": 3.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 2.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 127,
+      "start_value": 64,
+      "curve": "lin"
+     },
+     {
+      "start": 5.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 127
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "c",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "e",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "g",
+        "octave": 4
+       }
+      ]
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 64,
+      "start_value": 127,
+      "curve": "lin"
+     },
+     {
+      "start": 6.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 127
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C7",
+      "octave": 4,
+      "articulation": "staccato"
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 127,
+      "start_value": 64,
+      "curve": "lin"
+     },
+     {
+      "start": 7.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 127
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "slide",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slide_points": [
+       [
+        "e",
+        4
+       ]
+      ],
+      "slide_segment_durations": [
+       1.0,
+       0.0
+      ]
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 127,
+      "start_value": 64,
+      "curve": "lin"
+     },
+     {
+      "start": 8.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 127
+     }
+    ]
+   }
+  },
+  {
+   "id": "hairpins-follow-expression",
+   "input": "expr=100 2c< vol=60 >> d< e vol=90",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 100
+     },
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 100,
+      "start_value": 50,
+      "curve": "lin"
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 100
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "vol",
+      "value": 60
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 100,
+      "start_value": 50,
+      "curve": "lin"
+     },
+     {
+      "start": 3.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "expr",
+      "value": 100
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 2.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "vol",
+      "value": 90,
+      "start_value": 60,
+      "curve": "lin"
      }
     ]
    }
@@ -1926,6 +2684,55 @@
   {
    "id": "error-semicolon-outside-voices",
    "input": "c ; d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-automation-range",
+   "input": "vol=128 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-pan-range",
+   "input": "pan=-1.5 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-automation-ramp-not-closed",
+   "input": "vol=40 >> c d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-automation-ramp-in-voice-not-closed",
+   "input": "{ vol=40 >> c ; d } vol=90",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-hairpin-on-rest",
+   "input": "c r<",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-hairpin-in-expression-ramp",
+   "input": "expr=40 >> c< expr=120",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-unknown-curve",
+   "input": "p@ >>quad c f@",
    "expect": {
     "error": true
    }

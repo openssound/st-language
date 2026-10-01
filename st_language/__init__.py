@@ -26,7 +26,7 @@ from .notation import (  # noqa: F401
 )
 from .song import Clip, Part, Song, load_song, read_song, song_from_notation, text_to_song  # noqa: F401
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "BarIssue", "Clip", "Event", "NotationError", "Part", "Pattern", "Song", "check", "check_bar_lines",
