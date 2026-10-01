@@ -713,6 +713,9 @@ ordine di inizio:
 - le parti si uniscono con spazi; la fine di un box e' il suo inizio piu'
   la fine del suo ultimo evento.
 
+Il corpo di una traccia che ha dei box si ignora, quindi chi scrive il
+file lo lascia vuoto: basta l'intestazione, con il nome e lo strumento.
+
 ### 12.5 Solo e mute
 
 Le tracce udibili sono quelle non in mute; se almeno una traccia e' in
