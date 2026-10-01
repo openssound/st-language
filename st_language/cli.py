@@ -4,12 +4,13 @@ Comandi da terminale della libreria ST-language.
     st-language check brano.st          controlla la sintassi e gli avvisi
     st-language midi brano.st -o x.mid  esporta in MIDI
     st-language musicxml brano.st       esporta la partitura MusicXML
+    st-language abc brano.st            esporta in notazione ABC
     st-language events brano.st         gli eventi (JSON), per verifiche
 
 Un file senza tracce (solo notazione, anche '-' = standard input) e' un
 brano di una traccia: --instrument ne sceglie lo strumento, --tempo e
 --time il tempo e la metrica. Scorciatoie installate col pacchetto:
-stcheck, st2mid, st2musicxml.
+stcheck, st2mid, st2musicxml, st2abc.
 """
 
 import argparse
@@ -87,7 +88,7 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
     parser = argparse.ArgumentParser(prog="st-language" if command is None else None,
                                      description="ST-language " + __version__)
     if command is None:
-        parser.add_argument("command", choices=["check", "midi", "musicxml", "events"])
+        parser.add_argument("command", choices=["check", "midi", "musicxml", "abc", "events"])
     parser.add_argument("files", nargs="+", help=tr("file .st o di sola notazione ('-' = standard input)"))
     parser.add_argument("-o", "--output", help=tr("file di uscita (con un solo file in ingresso)"))
     parser.add_argument("--instrument", default="Piano", help=tr("strumento per i file di sola notazione"))
@@ -125,6 +126,10 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
             if command == "midi":
                 from .midi import song_to_midi
                 path = song_to_midi(song, _output(source, args.output, ".mid"), only_audible=not args.all_tracks)
+            elif command == "abc":
+                from .abc import export_project_to_abc
+                path = export_project_to_abc(song, _output(source, args.output, ".abc"),
+                                             only_audible=not args.all_tracks)
             else:
                 from .musicxml import export_project_to_musicxml
                 path = export_project_to_musicxml(song, _output(source, args.output, ".musicxml"),
@@ -148,6 +153,10 @@ def midi_main(argv=None) -> int:
 
 def musicxml_main(argv=None) -> int:
     return main(argv, command="musicxml")
+
+
+def abc_main(argv=None) -> int:
+    return main(argv, command="abc")
 
 
 if __name__ == "__main__":
