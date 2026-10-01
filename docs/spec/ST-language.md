@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 1.0** · Reference implementation: the `st_language` Python
+**Version 1.1** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -76,8 +76,9 @@ position, the first matching rule applies:
    no closing quote is an error.
 3. Optional digits followed by `[` start a **block** token that ends at
    the first following `]` (blocks do not nest); a `'` immediately after
-   the `]` extends the token with a note value (`[c e g]'2`). No `]` is
-   an error.
+   the `]` extends the token with a note value (`[c e g]'2`), and a
+   single `<` or `>` immediately after the `]` extends it with a hairpin
+   (`[c e g]<`). No `]` is an error.
 4. Optional digits followed by `(` start a **group** token that ends at
    the matching `)`; parentheses nest, and parentheses inside lyric
    strings do not count. No matching `)` is an error.
@@ -98,14 +99,17 @@ The grammar of each kind of token (EBNF; `digit` is 0-9, `letter` is
 A-Z or a-z, `word` is one or more letters, digits or `_`):
 
 ```ebnf
-token        = grid | velocity | tempo | ramp | sustain | bar-check | lyric
-             | pattern-ref | midi-ref | group | voices | sounding ;
+token        = grid | velocity | tempo | ramp | control | sustain | bar-check
+             | lyric | pattern-ref | midi-ref | group | voices | sounding ;
 
 grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
 dynamic      = "ppp" | "pp" | "p" | "mp" | "mf" | "f" | "ff" | "fff" ;
 tempo        = number "§" ;                                     (* 120§ *)
-ramp         = ">>" | "<<" ;
+ramp         = ( ">>" | "<<" ) [ curve ] ;                       (* >>  >>exp *)
+curve        = "lin" | "exp" | "log" | "s" ;
+control      = control-name "=" [ "-" ] number [ "." digit { digit } ] ;
+control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" ;   (* vol=80  pan=-0.5 *)
 sustain      = "SON" | "SOFF" ;
 bar-check    = "|" ;
 lyric        = '"' { any character except '"' } '"' ;
@@ -115,7 +119,9 @@ group        = [ number ] "(" { token } ")" ;                   (* 4(c d) *)
 voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } *)
 voice        = { token } ;
 
-sounding     = ( note | chord | percussion | rest | block | slide ) [ value ] ;
+sounding     = ( note | chord | percussion | rest | block | slide ) [ value ]
+               [ hairpin ] ;
+hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
 accidental   = "#" | "b" | "♭" | "-" ;
@@ -143,6 +149,9 @@ Notes on the grammar:
 - The **value** may come before or after the modifier: `c'8!` and `c!'8`
   are the same token meaning. It cannot follow a grid, velocity or other
   state command.
+- The **hairpin** is always the last character (`c'2!<`, `2c*4>`); a rest
+  with a hairpin is an error. A token ending in `<<` or `>>` is never a
+  hairpin.
 - In a **chord**, the quality is the *shortest* string that lets the
   rest of the token match, so a final `x` is the mute modifier
   (`Cmaj7x`). After a voicing style, a final `x` is the modifier if the
@@ -170,6 +179,7 @@ time, starting at 0) and a **current state**:
 | --- | --- | --- |
 | grid unit | 1 beat (as after `4:`) | grid tokens |
 | velocity | 80 | velocity tokens |
+| automation values | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0 | control tokens (section 7.5) |
 | default octave | given by the instrument (4 if none) | — |
 
 **Grid.** `N:` sets the unit to 4/N beats: `4:` quarter note, `8:`
@@ -297,18 +307,29 @@ marker in any track changes the tempo of the whole song.
 ### 7.3 Ramps
 
 `>>` or `<<` (both mean the same; the direction comes from the values)
-opens a **ramp**. The last state command before it MUST be a velocity
-or a tempo command (sounding tokens may stand in between, a grid command
-may not), otherwise it is an error. The ramp closes at the next command
-**of the same kind** (grid commands inside the ramp do not close it),
-and MUST be closed before a command of the other kind and before the end
-of the track.
+opens a **ramp**. The last state command before it MUST be a velocity,
+a tempo or a control command (sounding tokens may stand in between, a
+grid command may not), otherwise it is an error. A velocity or tempo
+ramp closes at the next command **of the same kind** (grid commands
+inside the ramp do not close it), and MUST be closed before a velocity
+or tempo command of the other kind and before the end of the track.
+Control ramps are described in section 7.5.
+
+An optional **curve** after the arrows gives the shape f(x) of the
+ramp, for x from 0 (start) to 1 (end):
+
+| Curve | f(x) | Use |
+| --- | --- | --- |
+| `lin` (default) | x | even change |
+| `exp` | x² | starts slowly, then speeds up (volume fades) |
+| `log` | 1 − (1 − x)² | starts fast, then slows down |
+| `s` | x² (3 − 2x) | smooth at both ends |
 
 - **Velocity ramp** (crescendo/diminuendo): let the events produced
-  between opening and closing be e₀…eₖ₋₁ (k events). Event i gets
-  `round(v₀ + (v₁ - v₀) × i / (k-1))` (with k = 1: the end value), where
-  v₀ is the velocity at the opening and v₁ the closing value, clamped to
-  1-127.
+  between opening and closing, except `control` events, be e₀…eₖ₋₁ (k
+  events). Event i gets `round(v₀ + (v₁ - v₀) × f(i / (k-1)))` (with
+  k = 1: the end value), where v₀ is the velocity at the opening and v₁
+  the closing value, clamped to 1-127.
 - **Tempo ramp** (accelerando/rallentando): for each of those events, a
   `tempo_marker` at its start with the interpolated tempo (same
   formula). With no events in between, a single marker with the end
@@ -318,6 +339,48 @@ of the track.
 
 `SON` and `SOFF` produce events of kind `sustain` (name `on`/`off`) at
 the cursor.
+
+### 7.5 Automations
+
+`name=N` sets an **automation value** of the track from the cursor on.
+Automations act on the whole instrument (in MIDI, its channel), not on
+single notes, and change continuously even during a held note:
+
+| Name | Meaning | Range | Initial |
+| --- | --- | --- | --- |
+| `vol` | volume | 0-127 | 100 |
+| `expr` | expression (volume inside the dynamic) | 0-127 | 127 |
+| `pan` | stereo position, −1 left, 0 centre, 1 right | −1..1 | 0 |
+| `mod` | modulation (vibrato) | 0-127 | 0 |
+| `rev` | reverb send | 0-127 | 0 |
+| `cho` | chorus send | 0-127 | 0 |
+
+A value outside the range is an error. `pan` keeps its decimals; the
+other values are rounded to the nearest integer (`vol=80.6` is 81).
+
+Without a ramp, `name=N` produces a `control` event at the cursor with
+`name`, `value` = N and duration 0. A ramp (section 7.3) right after it
+opens a **control ramp**: it is closed by the next command with the
+**same name**, which produces instead one `control` event from the
+opening position to the cursor (duration = the difference), with
+`start_value` = the value at the opening, `value` = N and `curve` (the
+default is `lin`). If the cursor has not moved, it is a plain value
+change (duration 0, no `start_value`). Ramps of different names are
+independent and may overlap; velocity and tempo commands do not close
+them. A control ramp still open at the end of the track (or of a voice)
+is an error.
+
+**Hairpins.** A final `<` on a sounding token is a crescendo on that
+event, `>` a diminuendo, made with the expression. Let E be the current
+`expr` value, H = round(E / 2), s and d the start and duration of the
+event. A hairpin produces, after the event:
+
+1. a `control` event `expr` at s, duration d, `start_value` H and
+   `value` E for `<` (E then H for `>`), curve `lin`;
+2. a `control` event `expr` at s + d, duration 0, `value` E (the
+   expression returns to its value).
+
+A hairpin inside an open `expr` ramp is an error.
 
 ---
 
@@ -347,13 +410,17 @@ parser without a library MUST report such a reference as an error.
 `{ v₁ ; v₂ ; … }` contains **voices** that start together at the cursor.
 Each voice is a token sequence interpreted on its own:
 
-- it starts with the current grid unit and velocity (and the default
-  octave); state changes inside a voice stay inside it;
+- it starts with the current grid unit, velocity and automation values
+  (and the default octave); state changes inside a voice stay inside it,
+  except automation values (section 7.5), which belong to the whole
+  track;
 - its events start at the block's position; voice k (counting from 1)
   of a block reached in voice v has voice number v + k - 1 (the top level
   is voice 1);
 - the block lasts as long as its longest voice; the cursor then advances
-  by that amount, and the state after the block is the state before it;
+  by that amount, and the state after the block is the state before it,
+  except that each automation value is the one of the control event,
+  in any voice, that ends last (the first voice wins a tie);
 - a block with only empty voices is an error.
 
 Voices may contain groups, pattern references, bar checks, lyrics and
@@ -489,8 +556,10 @@ conforming parser MUST report at least these errors:
 - velocity outside 1-127; grid with N = 0; note value other than 1, 2,
   4, 8, 16, 32, 64;
 - a note outside MIDI 0-127;
-- a ramp not after a velocity/tempo command, or not closed as required by
-  section 7.3;
+- a ramp not after a velocity, tempo or control command, or not closed
+  as required by sections 7.3 and 7.5;
+- an automation value outside its range; a hairpin on a rest or inside
+  an open `expr` ramp;
 - an undefined pattern, a too-deep or cyclic reference, an unresolvable
   MIDI reference;
 - an empty block `[]` or an empty voice block.
@@ -529,18 +598,21 @@ Interpreting a track produces a list of events. Each event has:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `kind` | string | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker` |
+| `kind` | string | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker`, `control` |
 | `start` | number | start, in beats from the beginning of the track |
-| `duration` | number | duration in beats (0 for `sustain` and `tempo_marker`) |
+| `duration` | number | duration in beats (0 for `sustain` and `tempo_marker`, and for `control` without a ramp) |
 | `velocity` | 1-127 | current velocity (default 80) |
 | `letter`, `octave` | | note pitch (`note`, first tap of `slide`) |
 | `symbol`, `voicing`, `bass`, `octave` | | chord (`chord`) |
-| `name` | string | drum name (`percussion`); `on`/`off` (`sustain`) |
+| `name` | string | drum name (`percussion`); `on`/`off` (`sustain`); automation name (`control`) |
 | `items` | list | atoms of a `block`: each with `kind` and its fields |
 | `articulation` | string | `staccato`, `mute`, `legato` |
 | `slide_points` | list | taps after the first (`slide`), as [letter, octave] |
 | `slide_segment_durations` | list | segment durations (`slide`) |
 | `bpm` | integer | tempo (`tempo_marker`) |
+| `value` | number | automation value (`control`; at the end of a ramp) |
+| `start_value` | number | value at the start of a ramp (`control`) |
+| `curve` | string | ramp curve: `lin`, `exp`, `log`, `s` (`control` ramps) |
 | `voice` | integer | voice number (1 outside voice blocks) |
 | `lyric` | string | syllable (sung events) |
 
@@ -637,6 +709,12 @@ audible track:
 - `slide` → the first pitch with pitch-bend ramps (bend range set to 24
   semitones via RPN 0);
 - `sustain` → CC 64; tempo markers and per-bar changes → set-tempo;
+- `control` → control change: `vol` CC 7 (× track volume / 100), `expr`
+  CC 11, `pan` CC 10 (`round(64 + 63 × value)`), `mod` CC 1, `rev` CC 91,
+  `cho` CC 93; a ramp is written as a series of values along its curve
+  (at most 128 points, at least 10 ticks apart, equal consecutive values
+  omitted). The score export draws ramps of `vol` and `expr` (hairpins
+  included) as crescendo/diminuendo wedges;
 - lyrics → *lyrics* meta events (syllables continuing a word without a
   trailing space, word ends with one; `_` not written).
 
@@ -655,6 +733,12 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**1.1** — automations (`vol=`, `expr=`, `pan=`, `mod=`, `rev=`,
+`cho=`, section 7.5) with their ramps, ramp curves (`>>exp`, `>>log`,
+`>>s`, section 7.3), hairpins on sounding tokens (`c<`, `c>`), the
+`control` event. Every valid 1.0 text is valid 1.1 text with the same
+events.
 
 **1.0** — first published version: notation, voices, note values,
 lyrics, bar checks, comments, song file format, conformance suite.

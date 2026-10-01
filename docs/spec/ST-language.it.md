@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 1.0** · Implementazione di riferimento: la libreria Python
+**Versione 1.1** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -79,7 +79,8 @@ la prima regola che si applica:
    successiva. Senza la virgoletta di chiusura e' un errore.
 3. Delle cifre facoltative seguite da `[` aprono un **blocco** che finisce
    alla prima `]` successiva (i blocchi non si annidano); un `'` subito
-   dopo la `]` aggiunge al token un valore di nota (`[c e g]'2`). Senza
+   dopo la `]` aggiunge al token un valore di nota (`[c e g]'2`), e un
+   solo `<` o `>` subito dopo la `]` una forcella (`[c e g]<`). Senza
    `]` e' un errore.
 4. Delle cifre facoltative seguite da `(` aprono un **gruppo** che finisce
    alla `)` corrispondente; le parentesi si annidano, e quelle dentro un
@@ -102,14 +103,17 @@ La grammatica di ogni tipo di token (EBNF; `digit` e' 0-9, `letter` e'
 A-Z o a-z, `word` sono una o piu' lettere, cifre o `_`):
 
 ```ebnf
-token        = grid | velocity | tempo | ramp | sustain | bar-check | lyric
-             | pattern-ref | midi-ref | group | voices | sounding ;
+token        = grid | velocity | tempo | ramp | control | sustain | bar-check
+             | lyric | pattern-ref | midi-ref | group | voices | sounding ;
 
 grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
 dynamic      = "ppp" | "pp" | "p" | "mp" | "mf" | "f" | "ff" | "fff" ;
 tempo        = number "§" ;                                     (* 120§ *)
-ramp         = ">>" | "<<" ;
+ramp         = ( ">>" | "<<" ) [ curve ] ;                       (* >>  >>exp *)
+curve        = "lin" | "exp" | "log" | "s" ;
+control      = control-name "=" [ "-" ] number [ "." digit { digit } ] ;
+control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" ;   (* vol=80  pan=-0.5 *)
 sustain      = "SON" | "SOFF" ;
 bar-check    = "|" ;
 lyric        = '"' { qualunque carattere tranne '"' } '"' ;
@@ -119,7 +123,9 @@ group        = [ number ] "(" { token } ")" ;                   (* 4(c d) *)
 voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } *)
 voice        = { token } ;
 
-sounding     = ( note | chord | percussion | rest | block | slide ) [ value ] ;
+sounding     = ( note | chord | percussion | rest | block | slide ) [ value ]
+               [ hairpin ] ;
+hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
 accidental   = "#" | "b" | "♭" | "-" ;
@@ -147,6 +153,9 @@ Note sulla grammatica:
 - Il **valore di nota** puo' stare prima o dopo il modificatore: `c'8!` e
   `c!'8` significano la stessa cosa. Non puo' seguire una griglia, una
   velocity o un altro comando di stato.
+- La **forcella** e' sempre l'ultimo carattere (`c'2!<`, `2c*4>`); una
+  pausa con la forcella e' un errore. Un token che finisce con `<<` o
+  `>>` non e' mai una forcella.
 - In un **accordo** la qualita' e' la stringa *piu' corta* che fa tornare
   il resto del token, quindi una `x` finale e' il modificatore di
   stoppato (`Cmaj7x`). Dopo uno stile di voicing, una `x` finale e' il
@@ -174,6 +183,7 @@ tempo corrente, che parte da 0) e uno **stato corrente**:
 | --- | --- | --- |
 | unita' di griglia | 1 quarto (come dopo `4:`) | comandi di griglia |
 | velocity | 80 | comandi di velocity |
+| valori delle automazioni | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0 | comandi di automazione (sezione 7.5) |
 | ottava di default | quella dello strumento (4 se manca) | — |
 
 **Griglia.** `N:` imposta l'unita' a 4/N quarti: `4:` semiminima, `8:`
@@ -307,17 +317,29 @@ marcatore in una traccia qualsiasi cambia il tempo di tutto il brano.
 
 `>>` o `<<` (equivalenti: la direzione viene dai valori) apre una
 **rampa**. L'ultimo comando di stato prima di essa DEVE essere una
-velocity o un tempo (possono esserci in mezzo token che suonano, non un
-comando di griglia), altrimenti e' un errore. La rampa si chiude al
-successivo comando **dello stesso tipo** (i comandi di griglia dentro la
-rampa non la chiudono), e DEVE essere chiusa prima di un comando
-dell'altro tipo e prima della fine della traccia.
+velocity, un tempo o un'automazione (possono esserci in mezzo token che
+suonano, non un comando di griglia), altrimenti e' un errore. Una rampa
+di velocity o di tempo si chiude al successivo comando **dello stesso
+tipo** (i comandi di griglia dentro la rampa non la chiudono), e DEVE
+essere chiusa prima di un comando di velocity o di tempo dell'altro tipo
+e prima della fine della traccia. Le rampe delle automazioni sono
+descritte nella sezione 7.5.
+
+Una **curva** facoltativa dopo le frecce da' la forma f(x) della rampa,
+per x da 0 (inizio) a 1 (fine):
+
+| Curva | f(x) | Uso |
+| --- | --- | --- |
+| `lin` (default) | x | cambio regolare |
+| `exp` | x² | parte piano, poi accelera (i fade dei volumi) |
+| `log` | 1 − (1 − x)² | parte veloce, poi rallenta |
+| `s` | x² (3 − 2x) | morbida all'inizio e alla fine |
 
 - **Rampa di velocity** (crescendo/diminuendo): siano e₀…eₖ₋₁ (k eventi)
-  gli eventi prodotti fra apertura e chiusura. L'evento i riceve
-  `round(v₀ + (v₁ - v₀) × i / (k-1))` (con k = 1: il valore finale), dove
-  v₀ e' la velocity all'apertura e v₁ il valore di chiusura, limitato a
-  1-127.
+  gli eventi prodotti fra apertura e chiusura, esclusi gli eventi
+  `control`. L'evento i riceve `round(v₀ + (v₁ - v₀) × f(i / (k-1)))`
+  (con k = 1: il valore finale), dove v₀ e' la velocity all'apertura e
+  v₁ il valore di chiusura, limitato a 1-127.
 - **Rampa di tempo** (accelerando/rallentando): per ciascuno di quegli
   eventi, un `tempo_marker` al suo inizio con il tempo interpolato (stessa
   formula). Senza eventi in mezzo, un solo marcatore con il valore finale
@@ -327,6 +349,50 @@ dell'altro tipo e prima della fine della traccia.
 
 `SON` e `SOFF` producono eventi di tipo `sustain` (nome `on`/`off`) nel
 punto del cursore.
+
+### 7.5 Automazioni
+
+`nome=N` imposta un **valore di automazione** della traccia dal cursore
+in poi. Le automazioni agiscono su tutto lo strumento (nel MIDI, sul suo
+canale), non sulle singole note, e cambiano con continuita' anche
+durante una nota tenuta:
+
+| Nome | Significato | Intervallo | Iniziale |
+| --- | --- | --- | --- |
+| `vol` | volume | 0-127 | 100 |
+| `expr` | espressione (il volume dentro la dinamica) | 0-127 | 127 |
+| `pan` | posizione stereo, −1 sinistra, 0 centro, 1 destra | −1..1 | 0 |
+| `mod` | modulazione (vibrato) | 0-127 | 0 |
+| `rev` | mandata al riverbero | 0-127 | 0 |
+| `cho` | mandata al chorus | 0-127 | 0 |
+
+Un valore fuori dall'intervallo e' un errore. `pan` tiene i decimali,
+gli altri valori sono arrotondati all'intero piu' vicino (`vol=80.6` e'
+81).
+
+Senza rampa, `nome=N` produce un evento `control` nel punto del cursore
+con `name`, `value` = N e durata 0. Una rampa (sezione 7.3) subito dopo
+apre una **rampa di automazione**: la chiude il successivo comando con
+lo **stesso nome**, che produce invece un solo evento `control` dalla
+posizione di apertura al cursore (durata = la differenza), con
+`start_value` = il valore all'apertura, `value` = N e `curve` (di
+default `lin`). Se il cursore non si e' mosso, e' un semplice cambio di
+valore (durata 0, senza `start_value`). Le rampe di nomi diversi sono
+indipendenti e possono sovrapporsi; i comandi di velocity e di tempo non
+le chiudono. Una rampa di automazione ancora aperta alla fine della
+traccia (o di una voce) e' un errore.
+
+**Forcelle.** Un `<` finale su un token che suona e' un crescendo su
+quell'evento, `>` un diminuendo, fatti con l'espressione. Siano E il
+valore corrente di `expr`, H = round(E / 2), s e d inizio e durata
+dell'evento. Una forcella produce, dopo l'evento:
+
+1. un evento `control` `expr` in s, durata d, `start_value` H e `value`
+   E per `<` (E poi H per `>`), curva `lin`;
+2. un evento `control` `expr` in s + d, durata 0, `value` E
+   (l'espressione torna al suo valore).
+
+Una forcella dentro una rampa di `expr` aperta e' un errore.
 
 ---
 
@@ -358,13 +424,17 @@ errore.
 `{ v₁ ; v₂ ; … }` contiene **voci** che partono insieme nel punto del
 cursore. Ogni voce e' una sequenza di token interpretata per conto suo:
 
-- parte con l'unita' di griglia e la velocity correnti (e l'ottava di
-  default); i cambi di stato dentro una voce restano li';
+- parte con l'unita' di griglia, la velocity e i valori delle
+  automazioni correnti (e l'ottava di default); i cambi di stato dentro
+  una voce restano li', tranne i valori delle automazioni (sezione 7.5),
+  che sono di tutta la traccia;
 - i suoi eventi partono dalla posizione del blocco; la voce k (contando
   da 1) di un blocco che si trova nella voce v ha numero v + k - 1 (il
   livello principale e' la voce 1);
 - il blocco dura quanto la voce piu' lunga; poi il cursore avanza di
-  tanto e lo stato dopo il blocco e' quello di prima;
+  tanto e lo stato dopo il blocco e' quello di prima, tranne che ogni
+  valore di automazione e' quello dell'evento `control`, in una voce
+  qualsiasi, che finisce per ultimo (a pari fine vince la voce prima);
 - un blocco con sole voci vuote e' un errore.
 
 Le voci possono contenere gruppi, riferimenti a pattern, controlli di
@@ -506,8 +576,10 @@ conforme DEVE segnalare almeno questi errori:
 - velocity fuori da 1-127; griglia con N = 0; valore di nota diverso da
   1, 2, 4, 8, 16, 32, 64;
 - una nota fuori dall'intervallo MIDI 0-127;
-- una rampa che non segue un comando di velocity/tempo, o non chiusa come
-  richiesto dalla sezione 7.3;
+- una rampa che non segue un comando di velocity, di tempo o di
+  automazione, o non chiusa come richiesto dalle sezioni 7.3 e 7.5;
+- un valore di automazione fuori dal suo intervallo; una forcella su una
+  pausa o dentro una rampa di `expr` aperta;
 - un pattern non definito, un riferimento troppo profondo o ciclico, un
   riferimento MIDI che non si risolve;
 - un blocco vuoto `[]` o un blocco di voci vuoto.
@@ -549,18 +621,21 @@ ha:
 
 | Campo | Tipo | Significato |
 | --- | --- | --- |
-| `kind` | stringa | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker` |
+| `kind` | stringa | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker`, `control` |
 | `start` | numero | inizio, in quarti dall'inizio della traccia |
-| `duration` | numero | durata in quarti (0 per `sustain` e `tempo_marker`) |
+| `duration` | numero | durata in quarti (0 per `sustain` e `tempo_marker`, e per `control` senza rampa) |
 | `velocity` | 1-127 | velocity corrente (di default 80) |
 | `letter`, `octave` | | altezza della nota (`note`, prima tappa di `slide`) |
 | `symbol`, `voicing`, `bass`, `octave` | | accordo (`chord`) |
-| `name` | stringa | nome della percussione (`percussion`); `on`/`off` (`sustain`) |
+| `name` | stringa | nome della percussione (`percussion`); `on`/`off` (`sustain`); nome dell'automazione (`control`) |
 | `items` | elenco | atomi di un `block`: ciascuno con `kind` e i suoi campi |
 | `articulation` | stringa | `staccato`, `mute`, `legato` |
 | `slide_points` | elenco | tappe dopo la prima (`slide`), come [lettera, ottava] |
 | `slide_segment_durations` | elenco | durate dei segmenti (`slide`) |
 | `bpm` | intero | tempo (`tempo_marker`) |
+| `value` | numero | valore dell'automazione (`control`; alla fine di una rampa) |
+| `start_value` | numero | valore all'inizio di una rampa (`control`) |
+| `curve` | stringa | curva della rampa: `lin`, `exp`, `log`, `s` (rampe `control`) |
 | `voice` | intero | numero di voce (1 fuori dai blocchi di voci) |
 | `lyric` | stringa | sillaba (eventi cantati) |
 
@@ -662,6 +737,13 @@ una traccia per ogni traccia udibile:
 - `slide` → la prima altezza con rampe di pitch bend (ampiezza 24
   semitoni impostata con l'RPN 0);
 - `sustain` → CC 64; marcatori di tempo e cambi per battuta → set-tempo;
+- `control` → control change: `vol` CC 7 (× volume della traccia / 100),
+  `expr` CC 11, `pan` CC 10 (`round(64 + 63 × valore)`), `mod` CC 1,
+  `rev` CC 91, `cho` CC 93; una rampa si scrive come una serie di valori
+  lungo la sua curva (al piu' 128 punti, distanti almeno 10 tick, senza
+  ripetere valori uguali consecutivi). L'esportazione in partitura
+  disegna le rampe di `vol` e di `expr` (forcelle comprese) come forcelle
+  di crescendo/diminuendo;
 - testo cantato → eventi meta *lyrics* (le sillabe che continuano una
   parola senza spazio dopo, le fini di parola con uno spazio; `_` non si
   scrive).
@@ -682,6 +764,12 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**1.1** — automazioni (`vol=`, `expr=`, `pan=`, `mod=`, `rev=`,
+`cho=`, sezione 7.5) con le loro rampe, curve delle rampe (`>>exp`,
+`>>log`, `>>s`, sezione 7.3), forcelle sui token che suonano (`c<`,
+`c>`), l'evento `control`. Ogni testo valido 1.0 e' valido anche in 1.1,
+con gli stessi eventi.
 
 **1.0** — prima versione pubblicata: notazione, voci, valori di nota,
 testo cantato, controlli di battuta, commenti, formato dei file di
