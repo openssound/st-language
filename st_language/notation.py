@@ -124,9 +124,11 @@ def tokenize_spans(text: str) -> List[Tuple[str, int, int]]:
 
     def _with_value(k: int) -> int:
         """Fine di un blocco [...] col suo eventuale valore di nota
-        attaccato ('[c e g]'2)."""
+        attaccato ('[c e g]'2) o della forcella ('[c e g]<')."""
         if k < n and text[k] == "'":
             return _plain_end(k)
+        if k < n and text[k] in "<>" and (k + 1 >= n or text[k + 1] not in "<>"):
+            return k + 1
         return k
 
     while i < n:
@@ -381,14 +383,20 @@ def split_chord_slash(slash_val: Optional[str]):
 
 def split_note_value(tok: str) -> Tuple[str, str]:
     """(token senza valore di nota, valore come scritto: "'8." o "").
-    c*4'8. -> ('c*4', "'8."); c'8! -> ('c!', "'8")."""
+    c*4'8. -> ('c*4', "'8."); c'8! -> ('c!', "'8"); c'2< -> ('c', "'2<");
+    2c< -> ('2c', "<")."""
     if tok.startswith(LYRIC_QUOTE):
         return tok, ""
+    # Forcella in fondo (c'2<, 2c*4>): fa parte del "valore" restituito,
+    # cosi' chi ricompone il token (trasposizione, congelamento) la conserva.
+    hairpin = ""
+    if len(tok) > 1 and tok[-1] in "<>" and tok[-2] not in "<>":
+        tok, hairpin = tok[:-1], tok[-1]
     m = RE_NOTE_VALUE.match(tok)
     if not m:
-        return tok, ""
+        return tok, hairpin
     base, number, tuplet, dots, articulation = m.groups()
-    return base + articulation, f"'{number}{tuplet}{dots}"
+    return base + articulation, f"'{number}{tuplet}{dots}{hairpin}"
 
 
 def note_value_beats(value: str) -> Fraction:
@@ -410,8 +418,27 @@ def is_lyric(tok: str) -> bool:
 
 # Tempo istantaneo inline in una traccia: 120§
 RE_TEMPO_SET = re.compile(r"^(\d+)§$")
-RE_RAMP_UP = re.compile(r"^>>$")
-RE_RAMP_DOWN = re.compile(r"^<<$")
+# Rampe: '>>' o '<<' (equivalenti), con la forma della curva facoltativa:
+# lin (di default), exp (parte piano e accelera: i fade dei volumi), log
+# (parte veloce e rallenta), s (morbida a inizio e fine).
+RE_RAMP_UP = re.compile(r"^>>(lin|exp|log|s)?$")
+RE_RAMP_DOWN = re.compile(r"^<<(lin|exp|log|s)?$")
+RAMP_CURVES = {
+    "lin": lambda x: x,
+    "exp": lambda x: x * x,
+    "log": lambda x: 1 - (1 - x) * (1 - x),
+    "s": lambda x: x * x * (3 - 2 * x),
+}
+
+# Automazioni continue della traccia (controlli MIDI del canale): volume
+# (CC7), espressione (CC11, la dinamica dentro le note tenute), pan (CC10,
+# da -1 sinistra a 1 destra), modulazione (CC1, vibrato), mandate a
+# riverbero (CC91) e chorus (CC93). 'vol=60' imposta il valore da li' in
+# poi; 'vol=40 >> ... vol=100' va da 40 a 100 nel tempo fra i due comandi.
+RE_CONTROL = re.compile(r"^(vol|expr|pan|mod|rev|cho)=(-?\d+(?:\.\d+)?)$")
+CONTROL_RANGES = {"vol": (0, 127), "expr": (0, 127), "pan": (-1, 1), "mod": (0, 127),
+                  "rev": (0, 127), "cho": (0, 127)}
+CONTROL_DEFAULTS = {"vol": 100, "expr": 127, "pan": 0, "mod": 0, "rev": 0, "cho": 0}
 
 
 # ---------------------------------------------------------------------------
@@ -450,6 +477,12 @@ class Event:
     # Sillaba del testo cantato ("Ma-": la parola continua; "_": la nota
     # prolunga la sillaba precedente), vedi la sezione testo cantato.
     lyric: Optional[str] = None
+    # per kind='control' (automazioni, vedi RE_CONTROL): name e' il
+    # parametro (vol, expr, pan, mod, rev, cho), value il valore (di arrivo,
+    # per una rampa); una rampa ha duration > 0, start_value e la curva.
+    value: Optional[float] = None
+    start_value: Optional[float] = None
+    curve: Optional[str] = None
 
 
 @dataclass
@@ -691,7 +724,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                          ranges: Optional[List[Tuple[Fraction, Fraction]]] = None,
                          initial_velocity: int = 80, voice: int = 1,
                          extras: Optional[dict] = None,
-                         pending_lyrics: Optional[List["Event"]] = None
+                         pending_lyrics: Optional[List["Event"]] = None,
+                         initial_controls: Optional[Dict[str, float]] = None
                          ) -> Tuple[List[Event], Fraction, Fraction]:
     """Come parse_tokens, ma ritorna anche la posizione finale esatta (in
     beat, Fraction) e la griglia attiva alla fine. Griglia e posizione sono
@@ -728,12 +762,34 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
     # lista e' quella del chiamante per la prima voce di un blocco { ; }
     # (le note prima del blocco aspettano lo stesso testo).
     lyric_targets: List[Event] = pending_lyrics if pending_lyrics is not None else []
+    # Automazioni: valore corrente di ogni controllo e rampe aperte
+    # ({nome: (inizio, valore di partenza, curva)}), indipendenti fra loro.
+    controls: Dict[str, float] = dict(initial_controls or CONTROL_DEFAULTS)
+    pending_controls: Dict[str, tuple] = {}
+
+    def _control(start: Fraction, name: str, value, duration: Fraction = Fraction(0),
+                 start_value=None, curve=None) -> None:
+        events.append(Event(start=float(start), duration=float(duration), kind="control", name=name,
+                            value=value, start_value=start_value, curve=curve, voice=voice))
+
+    def _hairpin(sign: str, start: Fraction, duration: Fraction, tok: str) -> None:
+        """Forcella su una nota: l'espressione sale (<) dalla meta' al valore
+        corrente, o scende (>) alla meta', durante la nota; dopo torna quella."""
+        if "expr" in pending_controls:
+            raise NotationError(tr("Forcella ('<' o '>') dentro una rampa di espressione (expr=): "
+                                   "chiudi prima la rampa"), tok)
+        full = controls["expr"]
+        half = round(full / 2)
+        a, b = (half, full) if sign == "<" else (full, half)
+        _control(start, "expr", b, duration, a, "lin")
+        _control(start + duration, "expr", full)
 
     def _finalize_ramp(end_value):
         nonlocal pending_ramp
         start_value = pending_ramp["start_value"]
         start_index = pending_ramp["start_index"]
-        affected = events[start_index:]
+        # le automazioni (vol=, forcelle...) scritte dentro la rampa non contano
+        affected = [ev for ev in events[start_index:] if ev.kind != "control"]
         n = len(affected)
         if n == 0 and pending_ramp["kind"] == "tempo":
             # Nessun evento dentro la rampa ('120§ >> 140§ c'): non c'e'
@@ -746,8 +802,9 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
         # in caso di rampa di tempo posizionata esattamente sulla stessa
         # battuta del marcatore di apertura ne sovrascriverebbe il valore
         # (stesso tick, valore diverso) nella mappa di tempo globale.
+        shape = RAMP_CURVES[pending_ramp.get("curve") or "lin"]
         for i, ev in enumerate(affected):
-            frac = i / (n - 1) if n > 1 else 1.0
+            frac = shape(i / (n - 1) if n > 1 else 1.0)
             if pending_ramp["kind"] == "velocity":
                 interp = round(start_value + (end_value - start_value) * frac)
                 ev.velocity = max(1, min(127, interp))
@@ -788,6 +845,9 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     raise NotationError(tr("Blocco di voci vuoto"), tok)
                 longest = Fraction(0)
                 checks = []
+                # Le automazioni valgono per tutto lo strumento (un canale
+                # MIDI): dopo il blocco resta l'ultimo valore scritto in una voce.
+                control_ends: List[tuple] = []
                 for k, voice_text in enumerate(voices):
                     voice_tokens = tokenize(voice_text)
                     voice_ranges: List[Tuple[Fraction, Fraction]] = []
@@ -797,14 +857,19 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     sub_events, sub_end, _ = _parse_tokens_exact(
                         voice_tokens, default_octave, grid_beats, lenient, voice_ranges,
                         initial_velocity=velocity, voice=voice + k, extras=None,
-                        pending_lyrics=lyric_targets if k == 0 else None)
+                        pending_lyrics=lyric_targets if k == 0 else None,
+                        initial_controls=controls)
                     for ev in sub_events:
                         ev.start += float(cursor)
+                        if ev.kind == "control":
+                            control_ends.append((ev.start + ev.duration, ev.name, ev.value))
                     events.extend(sub_events)
                     longest = max(longest, sub_end)
                     checks.append([a for t, (a, _) in zip(voice_tokens, voice_ranges) if t == BAR_CHECK])
                 if extras is not None and any(checks):
                     extras.setdefault("voice_bars", {})[index] = (cursor, checks)
+                for _end, name, value in sorted(control_ends, key=lambda c: c[0]):
+                    controls[name] = value
                 cursor += longest
                 continue
 
@@ -842,13 +907,41 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 last_state_kind = "tempo"
                 continue
 
-            if RE_RAMP_UP.match(tok) or RE_RAMP_DOWN.match(tok):
+            m = RE_RAMP_UP.match(tok) or RE_RAMP_DOWN.match(tok)
+            if m:
+                curve = m.group(1) or "lin"
+                if last_state_kind and last_state_kind.startswith("control:"):
+                    name = last_state_kind.split(":", 1)[1]
+                    pending_controls[name] = (cursor, controls[name], curve)
+                    continue
                 if last_state_kind not in ("velocity", "tempo"):
                     raise NotationError(
-                        tr("'>>' / '<<' deve seguire un comando di velocity (N@) o di tempo (N§)"), tok
+                        tr("'>>' / '<<' deve seguire un comando di velocity (N@), di tempo (N§) "
+                           "o un'automazione (vol=, expr=, pan=, mod=, rev=, cho=)"), tok
                     )
                 start_value = tempo if last_state_kind == "tempo" else velocity
-                pending_ramp = {"kind": last_state_kind, "start_value": start_value, "start_index": len(events)}
+                pending_ramp = {"kind": last_state_kind, "start_value": start_value, "start_index": len(events),
+                                "curve": curve}
+                continue
+
+            m = RE_CONTROL.match(tok)
+            if m:
+                name, number = m.group(1), float(m.group(2))
+                low, high = CONTROL_RANGES[name]
+                if not low <= number <= high:
+                    raise NotationError(tr("Valore di '{name}' fuori dall'intervallo {low}..{high}",
+                                           name=name, low=low, high=high), tok)
+                value = number if name == "pan" else round(number)
+                if name in pending_controls:
+                    start, start_value, curve = pending_controls.pop(name)
+                    if cursor > start:
+                        _control(start, name, value, cursor - start, start_value, curve)
+                    else:
+                        _control(cursor, name, value)
+                else:
+                    _control(cursor, name, value)
+                controls[name] = value
+                last_state_kind = "control:" + name
                 continue
 
             if tok in ("SON", "SOFF"):
@@ -878,10 +971,16 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             # Da qui solo token che occupano tempo: col valore di nota
             # esplicito (c'8.) durano quello invece dell'unita' di griglia.
             tok, value = split_note_value(tok)
+            hairpin = value[-1] if value[-1:] in ("<", ">") else ""
+            if hairpin:
+                value = value[:-1]
             unit = note_value_beats(value) if value else grid_beats
+            note_start = cursor
 
             m = RE_REST.match(tok)
             if m:
+                if hairpin:
+                    raise NotationError(tr("Una pausa non puo' avere una forcella ('<' o '>')"), tok + hairpin)
                 mult = int(m.group(1)) if m.group(1) else 1
                 dur = unit * mult
                 _add(Event(start=float(cursor), duration=float(dur), kind="rest", velocity=velocity))
@@ -901,6 +1000,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     slide_segment_durations=[float(d) for d in segment_durations],
                 ))
                 cursor += dur
+                if hairpin:
+                    _hairpin(hairpin, note_start, dur, tokens[index])
                 continue
 
             if tok.startswith("[") or re.match(r"^\d+\[", tok):
@@ -917,6 +1018,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 _add(Event(start=float(cursor), duration=float(dur), kind="block",
                      velocity=velocity, items=items))
                 cursor += dur
+                if hairpin:
+                    _hairpin(hairpin, note_start, dur, tokens[index])
                 continue
 
             # nota / accordo / percussione singoli
@@ -935,6 +1038,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 _add(Event(start=start, duration=duration, kind="percussion", velocity=velocity,
                      name=atom["name"]))
             cursor += dur
+            if hairpin:
+                _hairpin(hairpin, note_start, dur, tokens[index])
         except (NotationError, ValueError):
             if not lenient:
                 raise
@@ -944,6 +1049,9 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             if ranges is not None:
                 ranges.append((before, cursor))
 
+    if pending_controls and not lenient:
+        raise NotationError(tr("Rampa di '{name}' aperta ma mai chiusa da un valore finale ({name}=N)",
+                               name=next(iter(pending_controls))))
     if pending_ramp and not lenient:
         anchor = "N§" if pending_ramp["kind"] == "tempo" else "N@"
         raise NotationError(tr("Rampa '>>' o '<<' aperta ma mai chiusa da un valore finale ({anchor})", anchor=anchor))

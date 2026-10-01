@@ -9,8 +9,10 @@ quella del tempo e della metrica.
 
 Accordi scritti col voicing dello strumento, blocchi, percussioni sul
 canale 10, dinamiche e rampe come velocity, articolazioni (staccato, mute,
-legato) come durata udibile, pedale (CC64), slide come pitch bend, tempo
-e metrica (anche i cambi), testo cantato come eventi "lyrics".
+legato) come durata udibile, pedale (CC64), slide come pitch bend,
+automazioni (vol=, expr=, pan=, mod=, rev=, cho= e le forcelle) come
+control change, tempo e metrica (anche i cambi), testo cantato come
+eventi "lyrics".
 
 Le funzioni che decidono note e canali sono le stesse dell'esportazione
 di SoundText (core.midi_export), che aggiunge il mixaggio dell'app
@@ -22,7 +24,7 @@ from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from .chords import apply_bass_note, parse_chord_symbol, pitch_to_midi, voice_chord
 from .instruments import DRUM_MIDI_CHANNEL, PERCUSSION_MAP, InstrumentProfile
-from .notation import Event
+from .notation import RAMP_CURVES, Event
 from .timing import RE_METRICA_VALUE, build_metrica_beat_map, build_tempo_beat_map
 
 if TYPE_CHECKING:          # solo per le annotazioni (nessun import circolare)
@@ -42,7 +44,7 @@ def _resolve_event_notes(ev: Event, instrument: InstrumentProfile) -> Tuple[List
     applicando il motore di voicing (SoundText Engine) quando necessario."""
     velocity = ev.velocity
 
-    if ev.kind in ("rest", "sustain", "tempo_marker"):
+    if ev.kind in ("rest", "sustain", "tempo_marker", "control"):
         return [], velocity
 
     if ev.kind == "note":
@@ -78,6 +80,47 @@ def _resolve_event_notes(ev: Event, instrument: InstrumentProfile) -> Tuple[List
         return sorted(set(notes)), velocity
 
     return [], velocity
+
+
+# Automazioni (eventi "control") -> numero del control change MIDI
+CONTROL_CC = {"vol": 7, "expr": 11, "pan": 10, "mod": 1, "rev": 91, "cho": 93}
+# Una rampa diventa al piu' tanti punti, uno ogni CONTROL_STEP_TICKS almeno
+CONTROL_MAX_POINTS = 128
+CONTROL_STEP_TICKS = 10
+
+
+def control_cc_value(name: str, value: float, volume_scale: float = 1.0) -> int:
+    """Valore MIDI (0-127) di un'automazione: pan da -1..1 a 1..127 (0 =
+    centro, 64); vol moltiplicato per volume_scale (il volume del mixer)."""
+    if name == "pan":
+        raw = 64 + value * 63
+    elif name == "vol":
+        raw = value * volume_scale
+    else:
+        raw = value
+    return max(0, min(127, round(raw)))
+
+
+def control_points(ev: Event, volume_scale: float = 1.0, ticks_per_beat: int = TICKS_PER_BEAT
+                   ) -> List[Tuple[float, int, int]]:
+    """I control change di un evento "control" come (beat, controller,
+    valore): un punto solo per un valore fisso, per una rampa i valori
+    lungo la curva (senza ripetere valori uguali consecutivi)."""
+    cc = CONTROL_CC[ev.name]
+    if ev.duration <= 0 or ev.start_value is None:
+        return [(ev.start, cc, control_cc_value(ev.name, ev.value, volume_scale))]
+    span = ev.duration * ticks_per_beat
+    steps = max(1, min(CONTROL_MAX_POINTS, int(span // CONTROL_STEP_TICKS)))
+    shape = RAMP_CURVES[ev.curve or "lin"]
+    points, last = [], None
+    for k in range(steps + 1):
+        x = k / steps
+        value = control_cc_value(ev.name, ev.start_value + (ev.value - ev.start_value) * shape(x),
+                                 volume_scale)
+        if value != last:
+            points.append((ev.start + ev.duration * x, cc, value))
+            last = value
+    return points
 
 
 _ARTICULATION_DURATION_FACTOR = {
@@ -233,6 +276,10 @@ def _part_events(part, events: List[Event], channel: int) -> List[Tuple[int, int
         if ev.lyric and ev.lyric != "_":
             text = ev.lyric[:-1] if ev.lyric.endswith("-") and len(ev.lyric) > 1 else ev.lyric + " "
             out.append((start, _CTRL, _meta(0x05, midi_text_bytes(text))))
+        if ev.kind == "control":
+            for beat, cc, value in control_points(ev, part.volume / 100.0):
+                out.append((tick(beat), _CTRL, bytes([0xB0 | channel, cc, value])))
+            continue
         if ev.kind == "sustain":
             sustain = ev.name == "on"
             out.append((start, _CTRL, bytes([0xB0 | channel, 64, 127 if sustain else 0])))

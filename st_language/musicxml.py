@@ -14,7 +14,8 @@ scrive quello che nel MIDI non c'e' ma in una partitura serve:
   - le sigle degli accordi (Am7, C/E...) sopra il pentagramma;
   - la tonalita' del progetto come armatura di chiave;
   - la metrica con le battute, i cambi di tempo e di metrica;
-  - le dinamiche (dalla velocity), le articolazioni e il pedale.
+  - le dinamiche (dalla velocity), le forcelle (dalle rampe di vol= ed expr=
+    e dalle forcelle sulle note), le articolazioni e il pedale.
 
 Ogni traccia diventa una parte; le voci dei blocchi { ; } diventano voci
 separate dello stesso pentagramma (gambi in su e in giu'), il testo
@@ -243,6 +244,40 @@ def _track_items(events: List[Event], instrument, flats: bool, grid: Optional[in
         if item.pitches or item.drums:
             items.append(item)
     return items, pedals
+
+
+def _track_wedges(events: List[Event], grid: Optional[int]) -> List[Tuple[Fraction, Fraction, str]]:
+    """Forcelle (inizio, fine, 'crescendo'/'diminuendo') dalle rampe di
+    volume e di espressione (vol=, expr=, forcelle sulle note)."""
+    wedges = []
+    for ev in events:
+        if (ev.kind == "control" and ev.name in ("vol", "expr") and ev.duration > 0
+                and ev.start_value is not None and ev.value != ev.start_value):
+            wedges.append((_frac(ev.start, grid), _frac(ev.start + ev.duration, grid),
+                           "crescendo" if ev.value > ev.start_value else "diminuendo"))
+    return sorted(wedges)
+
+
+def _wedge_directions(wedges: List[Tuple[Fraction, Fraction, str]], end: Fraction) -> List[_Direction]:
+    """Le forcelle come indicazioni sotto il pentagramma; quelle che si
+    sovrappongono hanno numeri diversi (attributo number, 1-6)."""
+    directions: List[_Direction] = []
+    busy: List[Tuple[Fraction, int]] = []      # (fine, numero) delle forcelle aperte
+    for start, stop, kind in wedges:
+        stop = min(stop, end)
+        if start >= stop:
+            continue
+        busy = [(e, n) for e, n in busy if e > start]
+        free = [n for n in range(1, 7) if n not in {n for _, n in busy}]
+        if not free:
+            continue
+        number = free[0]
+        busy.append((stop, number))
+        directions.append(_Direction(start, _direction_xml(
+            f'<wedge type="{kind}" number="{number}"/>', 1, placement="below")))
+        directions.append(_Direction(stop, _direction_xml(
+            f'<wedge type="stop" number="{number}"/>', 1, placement="below")))
+    return directions
 
 
 def _monophonic(items: List[_Item]) -> List[_Item]:
@@ -630,6 +665,8 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
         times += [t for t, _ in tempo_map]
         for items, pedals in parsed.values():
             times += [i.start for i in items] + [i.end for i in items] + [t for t, _ in pedals]
+        wedges = {t.name: _track_wedges(events_by_track[t.name], grid) for t in tracks}
+        times += [t for ws in wedges.values() for w in ws for t in w[:2]]
         divisions = _grid_divisions(times)
         if divisions:
             break
@@ -715,6 +752,8 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
         for t, kind in pedals:
             directions.append(_Direction(t, _direction_xml(
                 f'<pedal type="{kind}" line="yes"/>', len(clefs), placement="below")))
+        if not is_drums:
+            directions += _wedge_directions(wedges[track.name], end)
         directions.sort(key=lambda d: d.time)
 
         out.append(f'<part id="{pid}">')
@@ -755,6 +794,9 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
                     for entry in _staff_entries(voices[v], staff_dirs, m_start, m_len, num, den):
                         out.append(_entry_xml(entry, divisions, xml_voice, s,
                                               drum_ids_by_part.get(pid, {}), stem))
+                    if number == len(measures):
+                        # cio' che finisce col brano (una forcella) va dopo l'ultima nota
+                        out += [d.xml for d in staff_dirs if d.time >= m_end]
             if number == len(measures):
                 out.append('<barline location="right"><bar-style>light-heavy</bar-style></barline>')
             out.append("</measure>")
