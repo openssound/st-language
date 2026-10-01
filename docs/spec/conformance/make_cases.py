@@ -39,6 +39,16 @@ CASES = [
     ("tempo-markers", "120§ c d 90§ e", {}),
     ("tempo-ramp", "100§ >> c d e 140§ f", {}),
     ("sustain", "SON c d SOFF e", {}),
+    # --- automazioni, curve delle rampe, forcelle (1.1)
+    ("automations-set", "vol=90 c expr=64 d pan=-0.5 mod=30 rev=40.4 cho=20 e", {}),
+    ("automations-ramp", "vol=40 >> c d e vol=100 f", {}),
+    ("automations-ramp-curve", "expr=20 >>exp 4c expr=127 pan=-1 <<s 2c pan=1", {}),
+    ("automations-overlapping-ramps", "vol=50 >> pan=0 >> c d pan=1 e vol=120", {}),
+    ("automations-ramp-same-position", "mod=10 >> mod=90 c", {}),
+    ("automations-in-voices", "{ c vol=30 ; d d } expr=100 e<", {}),
+    ("ramp-curves-velocity", "20@ >>exp c d e f 100@ 60§ >>log g a b 120§ c", {}),
+    ("hairpins", "2c< d> e'2< [c e g]> 4: C7!< c>e<", {}),
+    ("hairpins-follow-expression", "expr=100 2c< vol=60 >> d< e vol=90", {}),
     # --- accordi, blocchi, percussioni
     ("chords", "C Am7 G7 Cmaj7 F#m7b5 Bb Ebdim7 Dsus4 E5 C°", {}),
     ("chords-octave-voicing-bass", "C*3 Cmaj7.drop2 G7/B C/E*3 C7/3", {}),
@@ -75,6 +85,13 @@ CASES = [
     ("error-undefined-pattern", "%Nope", {}),
     ("error-bar-check-in-block", "[c | e]", {}),
     ("error-semicolon-outside-voices", "c ; d", {}),
+    ("error-automation-range", "vol=128 c", {}),
+    ("error-pan-range", "pan=-1.5 c", {}),
+    ("error-automation-ramp-not-closed", "vol=40 >> c d", {}),
+    ("error-automation-ramp-in-voice-not-closed", "{ vol=40 >> c ; d } vol=90", {}),
+    ("error-hairpin-on-rest", "c r<", {}),
+    ("error-hairpin-in-expression-ramp", "expr=40 >> c< expr=120", {}),
+    ("error-unknown-curve", "p@ >>quad c f@", {}),
     # --- avvisi (il testo e' valido)
     ("warning-bar-missing", "4: c d e | f g a b |", {}),
     ("warning-bar-extra", "8: c d e f g a b c d | e", {}),
@@ -137,7 +154,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "1.0", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "1.1", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 

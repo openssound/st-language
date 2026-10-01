@@ -1,7 +1,9 @@
 # ST-language
 
 **ST-language** is a plain-text music notation — notes, abstract chords,
-drums, dynamics, tempo changes, several voices and lyrics — and this is
+drums, dynamics, tempo changes, automations (volume, expression, pan,
+modulation, effect sends, with curved ramps and hairpins), several
+voices and lyrics — and this is
 its reference implementation: a pure-Python library (no dependencies)
 with command-line tools to check songs and export them to **MIDI** and
 **MusicXML**. It is the notation engine of
