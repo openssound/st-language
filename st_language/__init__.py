@@ -12,11 +12,13 @@ Python autonoma (nessuna dipendenza esterna, Python 3.8+).
     st.to_midi(song, "brano.mid")
     st.to_musicxml(song, "brano.musicxml")
     st.to_abc(song, "brano.abc")
+    st.to_mtxt(song, "brano.mtxt")                    # MTXT 1.0, un evento per riga
+    st.mtxt_to_midi(open("take.mtxt").read(), "take.mid")
 
 La specifica del linguaggio e del formato .st e' in docs/spec/ del
 repository di SoundText; i comandi da terminale sono 'st-language'
-(check, midi, musicxml, abc, events), 'stcheck', 'st2mid', 'st2musicxml',
-'st2abc'.
+(check, midi, musicxml, abc, mtxt, events), 'stcheck', 'st2mid', 'st2musicxml',
+'st2abc', 'st2mtxt'.
 """
 
 from typing import Dict, List, Optional, Tuple
@@ -28,13 +30,13 @@ from .notation import (  # noqa: F401
 )
 from .song import Clip, Part, Song, load_song, read_song, song_from_notation, text_to_song  # noqa: F401
 
-__version__ = "2.3.0"
+__version__ = "2.4.0"
 
 __all__ = [
     "BarIssue", "Clip", "Event", "NotationError", "Part", "Pattern", "Song", "check", "check_bar_lines",
     "language", "load_song", "notation_warnings", "parse", "parse_track_text", "read_song",
-    "set_language", "set_translator", "song_from_notation", "text_to_song", "to_abc", "to_midi", "to_musicxml",
-    "tokenize", "transpose_tokens", "validate", "validate_track_text",
+    "mtxt_to_midi", "set_language", "set_translator", "song_from_notation", "text_to_song", "to_abc",
+    "to_midi", "to_musicxml", "to_mtxt", "tokenize", "transpose_tokens", "validate", "validate_track_text",
 ]
 
 
@@ -68,3 +70,18 @@ def to_musicxml(song: Song, path: str, only_audible: bool = True) -> str:
 def to_abc(song: Song, path: str, only_audible: bool = True) -> str:
     from .abc import export_project_to_abc
     return export_project_to_abc(song, path, only_audible=only_audible)
+
+
+def to_mtxt(song: Song, path: str, only_audible: bool = True) -> str:
+    """Il brano come file MTXT 1.0 (vedi st_language.mtxt); ritorna path."""
+    from .mtxt import song_to_mtxt
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(song_to_mtxt(song, only_audible=only_audible))
+    return path
+
+
+def mtxt_to_midi(text: str, path: str) -> str:
+    """Un testo MTXT come file MIDI; ritorna path. Solleva
+    st_language.mtxt.MtxtError (un ValueError) se il testo non e' valido."""
+    from .mtxt import mtxt_to_midi as convert
+    return convert(text, path)

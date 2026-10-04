@@ -33,11 +33,13 @@ st-language check song.st          # syntax errors and warnings (bar checks, lyr
 st-language midi song.st -o song.mid
 st-language musicxml song.st       # -> song.musicxml
 st-language abc song.st            # -> song.abc (ABC 2.1)
+st-language mtxt song.st           # -> song.mtxt (MTXT 1.0, one event per line)
+st-language mtxt take.mtxt         # MTXT -> take.mid
 st-language events song.st         # the events as JSON
 echo "4: c d e f | 2g 2g" | st2mid - -o melody.mid --instrument Trumpet
 ```
 
-`stcheck`, `st2mid`, `st2musicxml` and `st2abc` are shortcuts. A file without track
+`stcheck`, `st2mid`, `st2musicxml`, `st2abc` and `st2mtxt` are shortcuts. A file without track
 headers is a one-track song (choose the instrument with `--instrument`).
 Messages are in English, Italian, French or Spanish (`--lang`, or the
 `ST_LANGUAGE`/`LANG` environment variables).
@@ -76,6 +78,6 @@ GPL-3.0-or-later, © 2026 Sergio Scolaro.
 
 *In italiano:* ST-language e' la notazione musicale testuale di
 SoundText come libreria Python autonoma, senza dipendenze, con i comandi
-`st-language check | midi | musicxml | abc | events` (e le scorciatoie
-`stcheck`, `st2mid`, `st2musicxml`, `st2abc`). La specifica, anche in italiano, e'
+`st-language check | midi | musicxml | abc | mtxt | events` (e le scorciatoie
+`stcheck`, `st2mid`, `st2musicxml`, `st2abc`, `st2mtxt`). La specifica, anche in italiano, e'
 in `docs/spec/` del repository.

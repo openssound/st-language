@@ -545,10 +545,11 @@ RAMP_CURVES = {
 # Oltre ai nomi, 'ccN=' (N = 0-119) scrive un controller MIDI qualsiasi
 # (cc74 = brillantezza su molti synth) e 'bend=' il pitch bend in semitoni
 # (-24..24, l'ampiezza impostata dall'esportazione).
-RE_CONTROL = re.compile(r"^(vol|expr|pan|mod|rev|cho|bend|cc\d{1,3})=(-?\d+(?:\.\d+)?)$")
+RE_CONTROL = re.compile(r"^(vol|expr|pan|mod|rev|cho|bend|tune|cc\d{1,3})=(-?\d+(?:\.\d+)?)$")
+# tune=N: accordatura dello strumento in cent (RPN 1 Channel Fine Tuning).
 CONTROL_RANGES = {"vol": (0, 127), "expr": (0, 127), "pan": (-1, 1), "mod": (0, 127),
-                  "rev": (0, 127), "cho": (0, 127), "bend": (-24, 24)}
-CONTROL_DEFAULTS = {"vol": 100, "expr": 127, "pan": 0, "mod": 0, "rev": 0, "cho": 0, "bend": 0}
+                  "rev": (0, 127), "cho": (0, 127), "bend": (-24, 24), "tune": (-100, 100)}
+CONTROL_DEFAULTS = {"vol": 100, "expr": 127, "pan": 0, "mod": 0, "rev": 0, "cho": 0, "bend": 0, "tune": 0}
 # Controlli che tengono i decimali (gli altri sono arrotondati all'intero).
 CONTROL_DECIMAL = ("pan", "bend")
 # Ultimo numero di controller ammesso da 'ccN=' (120-127 sono messaggi di modo del canale).
@@ -566,6 +567,12 @@ RE_TEXT = re.compile(r'^\$"(.*)"$', re.DOTALL)
 # (50 = diritto, 66 = terzinato, fino a 80).
 RE_SWING = re.compile(r"^swing(16)?=(\d+)$")
 SWING_RANGE = (50, 80)
+
+# Micro-timing: 'shift=N' anticipa (N < 0) o ritarda (N > 0) di N
+# millisecondi le note che seguono, senza cambiare il ritmo scritto;
+# 'shift=0' torna a tempo.
+RE_SHIFT = re.compile(r"^shift=(-?\d+)$")
+SHIFT_RANGE = (-500, 500)
 
 
 # ---------------------------------------------------------------------------
@@ -618,6 +625,9 @@ class Event:
     swing: Optional[Tuple[float, float]] = None
     # Segni sulla nota (DECORATIONS): accent, fermata, tr...
     decorations: Optional[List[str]] = None
+    # Micro-timing (vedi RE_SHIFT): millisecondi di anticipo (< 0) o
+    # ritardo (> 0) con cui la nota suona rispetto a dove e' scritta.
+    shift: Optional[int] = None
 
 
 @dataclass
@@ -1153,7 +1163,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                          pending_lyrics: Optional[List["Event"]] = None,
                          initial_controls: Optional[Dict[str, float]] = None,
                          initial_swing: Optional[Tuple[float, float]] = None,
-                         initial_pitch: Optional["_PitchState"] = None
+                         initial_pitch: Optional["_PitchState"] = None,
+                         initial_shift: Optional[int] = None
                          ) -> Tuple[List[Event], Fraction, Fraction]:
     """Come parse_tokens, ma ritorna anche la posizione finale esatta (in
     beat, Fraction) e la griglia attiva alla fine. Griglia e posizione sono
@@ -1196,6 +1207,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
     pending_tie: Optional[Event] = None
     slur_notes: Optional[List[Event]] = None
     swing = initial_swing
+    shift = initial_shift
     pitch = initial_pitch.copy() if initial_pitch is not None else _PitchState(default_octave)
     saved_pitch: List[_PitchState] = []      # modo delle altezze fuori dai pattern
     # Automazioni: valore corrente di ogni controllo e rampe aperte
@@ -1275,6 +1287,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     target.decorations = (target.decorations or []) + [deco]
         else:
             ev.swing = swing
+            ev.shift = shift
             ev.decorations = list(decorations) if decorations else None
             target = _add(ev)
         if hairpin:
@@ -1381,7 +1394,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                         voice_tokens, default_octave, grid_beats, lenient, voice_ranges,
                         initial_velocity=velocity, voice=voice + k, extras=None,
                         pending_lyrics=lyric_targets if k == 0 else None,
-                        initial_controls=controls, initial_swing=swing, initial_pitch=pitch)
+                        initial_controls=controls, initial_swing=swing, initial_pitch=pitch,
+                        initial_shift=shift)
                     for ev in sub_events:
                         ev.start += float(cursor)
                         if ev.kind == "control":
@@ -1477,6 +1491,14 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 if not SWING_RANGE[0] <= percent <= SWING_RANGE[1]:
                     raise NotationError(tr("Swing fuori range ({0}-{1})", *SWING_RANGE), tok)
                 swing = None if percent == 50 else (0.5 if m.group(1) else 1.0, percent / 100)
+                continue
+
+            m = RE_SHIFT.match(tok)
+            if m:
+                ms = int(m.group(1))
+                if not SHIFT_RANGE[0] <= ms <= SHIFT_RANGE[1]:
+                    raise NotationError(tr("Spostamento fuori range ({0}..{1} ms)", *SHIFT_RANGE), tok)
+                shift = ms or None
                 continue
 
             if tok in ("SON", "SOFF"):

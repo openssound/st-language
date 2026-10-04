@@ -64,6 +64,10 @@ CASES = [
     ("key-accidentals", "key=G f g f# fn f♮ C key=Bb b e a key=Ebm a key=off b", {}),
     ("key-with-relative", "key=D rel: d e f g a b c d", {}),
     ("key-in-blocks-and-slides", "key=F [b d f] b>c", {}),
+    # --- micro-tempo e accordatura (2.4)
+    ("shift-moves-the-following-notes", "c shift=-20 d kick [c e] shift=15 e shift=0 f", {}),
+    ("shift-in-voices-and-ties", "shift=10 { c~ c ; 2e } shift=-5 C7", {}),
+    ("tune-automation-and-ramp", "tune=-30 c tune=-30 >>exp 2d tune=50 e", {}),
     # --- ritornelli, segni, indicazioni di testo (2.2)
     ("repeats", "4: |: c d e f :| g a b c |", {}),
     ("repeats-from-start", "4: c d e f :| g", {}),
@@ -136,6 +140,9 @@ CASES = [
     ("error-slur-single-note", "c() d", {}),
     ("error-slur-on-rest", "r( c d)", {}),
     ("error-swing-range", "swing=90 c", {}),
+    ("error-shift-range", "shift=600 c", {}),
+    ("error-shift-decimals", "shift=1.5 c", {}),
+    ("error-tune-range", "tune=-101 c", {}),
     ("error-cc-number", "cc121=10 c", {}),
     ("error-bend-range", "bend=30 c", {}),
     ("error-repeat-not-closed", "|: c d", {}),
@@ -211,7 +218,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "2.3", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.4", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 

@@ -126,8 +126,8 @@ _FILL_GRID_TOKEN = "16:"
 _DEFAULT_STATE_PREFIX = "4: 80@ "
 # Se i box usano anche questi comandi di stato, il prefisso li rimette a
 # posto: ottave assolute, nessuna tonalita', niente swing.
-_STATE_RESET_RE = re.compile(r"(?:^|\s)(?:rel:|abs:|key=|swing(?:16)?=)")
-_FULL_STATE_PREFIX = "4: 80@ abs: key=off swing=50 "
+_STATE_RESET_RE = re.compile(r"(?:^|\s)(?:rel:|abs:|key=|swing(?:16)?=|shift=)")
+_FULL_STATE_PREFIX = "4: 80@ abs: key=off swing=50 shift=0 "
 
 
 def clip_duration_beats(text: str, patterns: Dict[str, Pattern], default_octave: int) -> float:

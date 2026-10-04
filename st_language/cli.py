@@ -5,12 +5,14 @@ Comandi da terminale della libreria ST-language.
     st-language midi brano.st -o x.mid  esporta in MIDI
     st-language musicxml brano.st       esporta la partitura MusicXML
     st-language abc brano.st            esporta in notazione ABC
+    st-language mtxt brano.st           esporta in MTXT (formato di esecuzione)
+    st-language mtxt brano.mtxt         converte un file MTXT in MIDI
     st-language events brano.st         gli eventi (JSON), per verifiche
 
 Un file senza tracce (solo notazione, anche '-' = standard input) e' un
 brano di una traccia: --instrument ne sceglie lo strumento, --tempo e
 --time il tempo e la metrica. Scorciatoie installate col pacchetto:
-stcheck, st2mid, st2musicxml, st2abc.
+stcheck, st2mid, st2musicxml, st2abc, st2mtxt.
 """
 
 import argparse
@@ -88,7 +90,7 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
     parser = argparse.ArgumentParser(prog="st-language" if command is None else None,
                                      description="ST-language " + __version__)
     if command is None:
-        parser.add_argument("command", choices=["check", "midi", "musicxml", "abc", "events"])
+        parser.add_argument("command", choices=["check", "midi", "musicxml", "abc", "mtxt", "events"])
     parser.add_argument("files", nargs="+", help=tr("file .st o di sola notazione ('-' = standard input)"))
     parser.add_argument("-o", "--output", help=tr("file di uscita (con un solo file in ingresso)"))
     parser.add_argument("--instrument", default="Piano", help=tr("strumento per i file di sola notazione"))
@@ -104,6 +106,9 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
         parser.error(tr("-o vale con un solo file"))
     status = 0
     for source in args.files:
+        if command == "mtxt" and source.lower().endswith(".mtxt"):
+            status = max(status, _mtxt_to_midi(source, _output(source, args.output, ".mid")))
+            continue
         try:
             song = _read(source, args.instrument, args.tempo, args.time_sig)
         except OSError as e:
@@ -126,6 +131,11 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
             if command == "midi":
                 from .midi import song_to_midi
                 path = song_to_midi(song, _output(source, args.output, ".mid"), only_audible=not args.all_tracks)
+            elif command == "mtxt":
+                from .mtxt import song_to_mtxt
+                path = _output(source, args.output, ".mtxt")
+                with open(path, "w", encoding="utf-8", newline="\n") as f:
+                    f.write(song_to_mtxt(song, only_audible=not args.all_tracks))
             elif command == "abc":
                 from .abc import export_project_to_abc
                 path = export_project_to_abc(song, _output(source, args.output, ".abc"),
@@ -136,6 +146,23 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
                                                   only_audible=not args.all_tracks)
             print(path)
     return status
+
+
+def _mtxt_to_midi(source: str, path: str) -> int:
+    """st-language mtxt file.mtxt: il file MTXT come MIDI."""
+    from .mtxt import MtxtError, mtxt_to_midi
+    try:
+        with open(source, encoding="utf-8") as f:
+            text = f.read()
+        mtxt_to_midi(text, path)
+    except OSError as e:
+        print(f"{source}: {e}", file=sys.stderr)
+        return 2
+    except MtxtError as e:
+        print(f"{source}: {e}", file=sys.stderr)
+        return 1
+    print(path)
+    return 0
 
 
 def check_quiet(song: Song) -> int:
@@ -157,6 +184,10 @@ def musicxml_main(argv=None) -> int:
 
 def abc_main(argv=None) -> int:
     return main(argv, command="abc")
+
+
+def mtxt_main(argv=None) -> int:
+    return main(argv, command="mtxt")
 
 
 if __name__ == "__main__":
