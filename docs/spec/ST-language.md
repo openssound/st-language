@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.3** · Reference implementation: the `st_language` Python
+**Version 2.4** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -106,8 +106,8 @@ The grammar of each kind of token (EBNF; `digit` is 0-9, `letter` is
 A-Z or a-z, `word` is one or more letters, digits or `_`):
 
 ```ebnf
-token        = grid | velocity | tempo | ramp | control | swing | pitch-mode
-             | key-mode | sustain
+token        = grid | velocity | tempo | ramp | control | swing | shift
+             | pitch-mode | key-mode | sustain
              | bar-check | repeat | text | lyric | pattern-ref | midi-ref
              | group | voices | sounding ;
 
@@ -119,8 +119,9 @@ ramp         = ( ">>" | "<<" ) [ curve ] ;                       (* >>  >>exp *)
 curve        = "lin" | "exp" | "log" | "s" ;
 control      = control-name "=" [ "-" ] number [ "." digit { digit } ] ;
 control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" | "bend"
-             | "cc" number ;                                  (* vol=80  cc74=30 *)
+             | "tune" | "cc" number ;                         (* vol=80  cc74=30 *)
 swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
+shift        = "shift=" [ "-" ] number ;                        (* shift=-15 *)
 pitch-mode   = "rel:" | "abs:" ;
 key-mode     = "key=" ( root [ "m" ] | "off" ) ;                (* key=G  key=Dm *)
 sustain      = "SON" | "SOFF" ;
@@ -198,8 +199,9 @@ time, starting at 0) and a **current state**:
 | --- | --- | --- |
 | grid unit | 1 beat (as after `4:`) | grid tokens |
 | velocity | 80 | velocity tokens |
-| automation values | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0, `bend` 0, `ccN` 0 | control tokens (section 7.5) |
+| automation values | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0, `bend` 0, `tune` 0, `ccN` 0 | control tokens (section 7.5) |
 | swing | off | swing tokens (section 7.6) |
+| shift | 0 ms | `shift=` (section 7.7) |
 | pitch mode | `abs:` | `rel:` / `abs:` (section 5) |
 | key | none (`key=off`) | `key=` (section 5) |
 | default octave | given by the instrument (4 if none) | — |
@@ -457,6 +459,7 @@ single notes, and change continuously even during a held note:
 | `rev` | reverb send | 0-127 | 0 |
 | `cho` | chorus send | 0-127 | 0 |
 | `bend` | pitch bend, in semitones | −24..24 | 0 |
+| `tune` | tuning of the instrument, in cents | −100..100 | 0 |
 | `ccN` | MIDI controller N (0-119), e.g. `cc74` | 0-127 | 0 |
 
 A value outside the range, or `ccN` with N > 119, is an error. `pan` and
@@ -507,6 +510,24 @@ of an instant t is then, with k = ⌊t / pair⌋ and x = t / pair − k:
 all multiplied by *pair*; it is applied to the start and to the end of
 each event (section 13). A voice block inherits the swing in force.
 
+### 7.7 Micro-timing
+
+`shift=N` (N from −500 to 500, an integer) plays the following sounding
+events N **milliseconds** later (N > 0) or earlier (N < 0) than written,
+without changing the written rhythm; `shift=0` plays them on time again.
+Outside −500..500, or a number with decimals, is an error.
+
+Like swing, the shift does not change `start` and `duration` (bar checks
+and the score keep the written rhythm): every sounding event produced
+while the shift is not 0 gets the field `shift` = N. The player moves
+the whole event (start and end) by N ms, converted into beats with the
+tempo in force at the event's sounding start (after swing), and never
+before the start of the song. A voice block inherits the shift in force.
+
+`shift=` is meant for a feel (a snare a little behind the beat, a bass
+pushing ahead) and for aligning a part with a recording; for written
+rhythms use note values, tuplets and swing.
+
 ---
 
 ## 8. Structure
@@ -542,8 +563,8 @@ parser without a library MUST report such a reference as an error.
 `{ v₁ ; v₂ ; … }` contains **voices** that start together at the cursor.
 Each voice is a token sequence interpreted on its own:
 
-- it starts with the current grid unit, velocity, swing, automation
-  values, pitch mode, key and previous note (and the default octave); state changes inside a voice stay inside it,
+- it starts with the current grid unit, velocity, swing, shift,
+  automation values, pitch mode, key and previous note (and the default octave); state changes inside a voice stay inside it,
   except automation values (section 7.5), which belong to the whole
   track;
 - its events start at the block's position; voice k (counting from 1)
@@ -733,7 +754,7 @@ conforming parser MUST report at least these errors:
 - an unknown mark, or a mark other than `$fermata` on a rest; a repeat
   not written as required by section 8.7;
 - a tie or slur not used as required by sections 6.9 and 6.10; a swing
-  value outside 50-80;
+  value outside 50-80; a shift outside −500..500 ms;
 - an undefined pattern, a too-deep or cyclic reference, an unresolvable
   MIDI reference;
 - an empty block `[]` or an empty voice block.
@@ -790,6 +811,7 @@ Interpreting a track produces a list of events. Each event has:
 | `curve` | string | ramp curve: `lin`, `exp`, `log`, `s` (`control` ramps) |
 | `slur` | string | `start`, `continue`, `stop` (slurred events, section 6.10) |
 | `swing` | list | [pair, ratio] while swing is on (section 7.6) |
+| `shift` | integer | milliseconds of micro-timing, when not 0 (section 7.7) |
 | `decorations` | list | marks of the event (section 6.11) |
 | `voice` | integer | voice number (1 outside voice blocks) |
 | `lyric` | string | syllable (sung events) |
@@ -859,8 +881,8 @@ beat:
   0.25);
 - each box contributes `4: 80@ ` followed by its text (so a box always
   starts from the default state); when the text of any box of the track
-  contains `rel:`, `abs:`, `key=` or `swing`, the prefix is `4: 80@ abs:
-  key=off swing=50 `; a box whose text contains `//` is
+  contains `rel:`, `abs:`, `key=`, `swing` or `shift=`, the prefix is
+  `4: 80@ abs: key=off swing=50 shift=0 `; a box whose text contains `//` is
   followed by a line break;
 - the parts are joined with spaces; a box's end is its start plus the
   end of its last event.
@@ -882,6 +904,10 @@ per beat): a conductor track with tempo and meter, then one track per
 audible track:
 
 - channels in order, skipping channel 10, which is reserved for drums;
+  every track has its own channel: from the 16th melodic track on, the
+  tracks go to the next **port** (a *MIDI port* meta event, FF 21, at the
+  start of every track when more than one port is used), 15 melodic
+  tracks per port; drum tracks share channel 10 of port 0;
 - program change = instrument GM program (drums: bank 120);
 - notes: `note` → its pitch; `chord` → its realization (section 9.2);
   `block` → all atoms; `percussion` → the drum note of section 9.5;
@@ -902,18 +928,29 @@ audible track:
   on bar lines, no note crosses its boundaries and every pass is the same
   as the first in every track; `text` events are printed as words above
   the staff;
-- note times with swing → the sounding times of section 7.6;
+- note times with swing → the sounding times of section 7.6; with a
+  shift, moved by its milliseconds at the tempo in force (section 7.7);
 - slurred events (except the last) with no articulation → legato;
 - `control` → control change: `vol` CC 7 (× track volume / 100), `expr`
   CC 11, `pan` CC 10 (`round(64 + 63 × value)`), `mod` CC 1, `rev` CC 91,
   `cho` CC 93, `ccN` CC N; `bend` → pitch bend `8192 + round(value / 24
   × 8192)` (the 24-semitone range is set on the channel, as for slides,
-  which use the same pitch bend); a ramp is written as a series of values along its curve
+  which use the same pitch bend); `tune` → RPN 1 (channel fine tuning):
+  CC 101 = 0, CC 100 = 1, CC 6 and CC 38 with the 14-bit value `8192 +
+  round(value / 100 × 8192)` (at most 16383), then CC 101 = CC 100 = 127;
+  a ramp is written as a series of values along its curve
   (at most 128 points, at least 10 ticks apart, equal consecutive values
   omitted). The score export draws ramps of `vol` and `expr` (hairpins
   included) as crescendo/diminuendo wedges;
 - lyrics → *lyrics* meta events (syllables continuing a word without a
   trailing space, word ends with one; `_` not written).
+
+**MTXT.** The reference implementation also writes the same MIDI as
+[MTXT 1.0](https://github.com/Daninet/mtxt) text (one event per line,
+times in beats): each track is an MTXT channel numbered port × 16 +
+channel, with `meta name`, `voice` (MTXT and General MIDI names) and
+drum aliases named after section 9.5; `bend` and `tune` together become
+`cc pitch` in semitones. It also reads MTXT back into MIDI.
 
 ---
 
@@ -930,6 +967,12 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.4** — micro-timing `shift=N` in milliseconds (section 7.7) with the
+event field `shift`; the automation `tune=` in cents (section 7.5); in
+MIDI, more than 15 melodic tracks use more ports instead of sharing
+channels (section 13). Every valid 2.3 text is valid 2.4 text with the
+same events.
 
 **2.3** — relative octaves `rel:` / `abs:` with `^` and `,`, the key
 `key=K` with the natural `n` / `♮` (section 5); patterns read in the

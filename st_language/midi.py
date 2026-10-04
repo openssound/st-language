@@ -92,22 +92,31 @@ CONTROL_STEP_TICKS = 10
 # Numero "di controller" dato da control_points al pitch bend (bend=), che
 # non e' un control change: valore 0-16383, 8192 = nessun bend.
 PITCH_BEND = -1
+# ... e all'accordatura (tune=), scritta come RPN 1 (Channel Fine Tuning):
+# valore 0-16383, 8192 = nessuno scostamento, +-100 cent agli estremi.
+TUNE = -2
 
 
 def control_number(name: str) -> int:
-    """Il controller MIDI di un'automazione (cc74 -> 74), PITCH_BEND per bend."""
+    """Il controller MIDI di un'automazione (cc74 -> 74), PITCH_BEND per
+    bend, TUNE per tune."""
     if name == "bend":
         return PITCH_BEND
+    if name == "tune":
+        return TUNE
     return CONTROL_CC[name] if name in CONTROL_CC else int(name[2:])
 
 
 def control_cc_value(name: str, value: float, volume_scale: float = 1.0) -> int:
     """Valore MIDI (0-127) di un'automazione: pan da -1..1 a 1..127 (0 =
     centro, 64); vol moltiplicato per volume_scale (il volume del mixer);
-    bend in semitoni come pitch bend 0-16383."""
+    bend in semitoni come pitch bend 0-16383, tune in cent come RPN 1
+    0-16383."""
     if name == "bend":
         bend = round(value / SLIDE_PITCH_BEND_RANGE_SEMITONES * 8192)
         return max(0, min(16383, 8192 + bend))
+    if name == "tune":
+        return max(0, min(16383, 8192 + round(value / 100 * 8192)))
     if name == "pan":
         raw = 64 + value * 63
     elif name == "vol":
@@ -139,6 +148,13 @@ def control_points(ev: Event, volume_scale: float = 1.0, ticks_per_beat: int = T
     return points
 
 
+def tune_controls(value: int) -> List[Tuple[int, int]]:
+    """I control change (controller, valore) che scrivono l'accordatura fine
+    (RPN 1) col valore 0-16383 di control_cc_value; alla fine si deseleziona
+    l'RPN (127/127) perche' un Data Entry successivo non la cambi."""
+    return [(101, 0), (100, 1), (6, value >> 7), (38, value & 0x7F), (101, 127), (100, 127)]
+
+
 _ARTICULATION_DURATION_FACTOR = {
     "staccato": 0.5,   # nota accorciata del 50%, il resto e' silenzio
     "mute": 0.15,      # nota "stoppata": molto breve
@@ -158,6 +174,20 @@ def sounding_span(ev: Event) -> Tuple[float, float]:
     """(inizio, fine) in quarti con cui l'evento suona: con lo swing (vedi
     notation.swing_time) le note sulle seconde meta' delle coppie si spostano."""
     return swing_time(ev.start, ev.swing), swing_time(ev.start + ev.duration, ev.swing)
+
+
+def shift_ticks(ev: Event, tempo_ticks: List[Tuple[int, float]], tick: int,
+                ticks_per_beat: int = TICKS_PER_BEAT) -> int:
+    """I tick di micro-timing dell'evento (shift=N millisecondi), col tempo
+    in vigore a `tick` nella mappa [(tick, bpm)] ordinata."""
+    if not ev.shift:
+        return 0
+    bpm = tempo_ticks[0][1] if tempo_ticks else 120
+    for at, value in tempo_ticks:
+        if at > tick:
+            break
+        bpm = value
+    return round(ev.shift / 1000 * bpm / 60 * ticks_per_beat)
 
 
 # Accenti: la nota suona piu' forte (la velocity scritta resta quella della
@@ -230,57 +260,39 @@ def _apply_articulation(start_tick: int, end_tick: int, articulation: Optional[s
     return start_tick + new_len
 
 
-def _assign_channels(tracks: List["Part"]) -> dict:
-    """Assegna un canale MIDI a ciascuna traccia; le percussioni usano
-    sempre il canale riservato (10 nella numerazione 1-based / 9 in 0-based).
+MIDI_CHANNELS = 16
 
-    Un file MIDI ha solo 15 canali melodici: finche' bastano, ogni traccia ha
-    il suo. Con piu' tracce (es. un import con molte voci) si assegna prima un
-    canale a ogni strumento DIVERSO (a parita' di volume e pan, altrimenti al
-    solo strumento), poi i canali che avanzano vanno alle tracce extra nell'ordine
-    in cui compaiono, e le restanti condividono il canale del proprio
-    strumento. Su un canale c'e' infatti un solo programma (Program Change), un
-    solo volume/pan e un solo stato di pitch bend: condividerlo fra strumenti
-    diversi farebbe suonare una traccia con lo strumento dell'altra (es. le
-    chitarre di un brano suonate come sax e pianoforte). Solo con
-    piu' strumenti diversi che canali si ricade sul riuso ciclico,
-    inevitabile."""
-    channel_pool = [c for c in range(16) if c != DRUM_MIDI_CHANNEL]
+
+def _assign_channels(tracks: List["Part"]) -> dict:
+    """Assegna a ciascuna traccia uno "slot" MIDI = porta * 16 + canale; le
+    percussioni usano sempre il canale riservato (10 nella numerazione
+    1-based / 9 in 0-based) della porta 0.
+
+    Ogni porta ha 15 canali melodici: le prime 15 tracce melodiche vanno
+    sulla porta 0 (slot = canale, come un file MIDI classico), le successive
+    sulle porte 1, 2... (meta evento "MIDI port" in testa alla traccia, vedi
+    midi_ports_needed). Cosi' ogni traccia ha sempre il suo canale: un
+    canale ha un solo programma, un solo volume/pan, un solo pitch bend e
+    una sola accordatura, e condividerlo fra tracce mescolerebbe strumenti
+    e automazioni."""
+    channel_pool = [c for c in range(MIDI_CHANNELS) if c != DRUM_MIDI_CHANNEL]
     mapping = {}
-    melodic = []
+    melodic = 0
     for t in tracks:
         if t.instrument.is_percussion:
             mapping[t.name] = DRUM_MIDI_CHANNEL
         else:
-            melodic.append(t)
-
-    if len(melodic) <= len(channel_pool):
-        for t, channel in zip(melodic, channel_pool):
-            mapping[t.name] = channel
-        return mapping
-
-    for group_key in (lambda t: (t.instrument_name, t.volume, t.pan),
-                      lambda t: t.instrument_name):
-        groups = list(dict.fromkeys(group_key(t) for t in melodic))
-        if len(groups) > len(channel_pool):
-            continue
-        primary = {g: channel_pool[i] for i, g in enumerate(groups)}
-        spare = channel_pool[len(groups):]
-        seen = set()
-        for t in melodic:
-            g = group_key(t)
-            if g not in seen:
-                seen.add(g)
-                mapping[t.name] = primary[g]
-            elif spare:
-                mapping[t.name] = spare.pop(0)
-            else:
-                mapping[t.name] = primary[g]
-        return mapping
-
-    for i, t in enumerate(melodic):   # piu' strumenti diversi che canali
-        mapping[t.name] = channel_pool[i % len(channel_pool)]
+            port, index = divmod(melodic, len(channel_pool))
+            mapping[t.name] = port * MIDI_CHANNELS + channel_pool[index]
+            melodic += 1
     return mapping
+
+
+def midi_ports_needed(mapping: dict) -> bool:
+    """True se gli slot di _assign_channels usano piu' di una porta: solo
+    allora si scrive il meta evento "MIDI port" (un file con 15 tracce
+    melodiche o meno resta identico a prima)."""
+    return any(slot >= MIDI_CHANNELS for slot in mapping.values())
 
 
 # --------------------------------------------------------------- testi
@@ -339,10 +351,13 @@ def write_smf(path: str, tracks: List[List[Tuple[int, int, bytes]]], ticks_per_b
 _OFF, _CTRL, _ON = 0, 1, 2
 
 
-def _part_events(part, events: List[Event], channel: int, key: Optional[str] = None
-                 ) -> List[Tuple[int, int, bytes]]:
+def _part_events(part, events: List[Event], slot: int, key: Optional[str] = None, ports: bool = False,
+                 tempo_ticks: Optional[List[Tuple[int, float]]] = None) -> List[Tuple[int, int, bytes]]:
     instrument = part.instrument
+    port, channel = divmod(slot, MIDI_CHANNELS)
     out: List[Tuple[int, int, bytes]] = [(0, _CTRL, _meta(0x03, midi_text_bytes(part.name)))]
+    if ports:
+        out.append((0, _CTRL, _meta(0x21, bytes([port]))))
     if instrument.is_percussion:
         out.append((0, _CTRL, bytes([0xB0 | channel, 0, 120])))
     out.append((0, _CTRL, bytes([0xC0 | channel, instrument.gm_program & 0x7F])))
@@ -361,6 +376,8 @@ def _part_events(part, events: List[Event], channel: int, key: Optional[str] = N
 
     for ev in events:
         start, end = (tick(b) for b in sounding_span(ev))
+        moved = shift_ticks(ev, tempo_ticks or [], start)
+        start, end = max(0, start + moved), max(0, end + moved)
         end_tick = max(end_tick, end)
         if ev.lyric and ev.lyric != "_":
             text = ev.lyric[:-1] if ev.lyric.endswith("-") and len(ev.lyric) > 1 else ev.lyric + " "
@@ -369,6 +386,9 @@ def _part_events(part, events: List[Event], channel: int, key: Optional[str] = N
             for beat, cc, value in control_points(ev, part.volume / 100.0):
                 if cc == PITCH_BEND:
                     out.append((tick(beat), _CTRL, bytes([0xE0 | channel, value & 0x7F, value >> 7])))
+                elif cc == TUNE:
+                    for control, data in tune_controls(value):
+                        out.append((tick(beat), _CTRL, bytes([0xB0 | channel, control, data])))
                 else:
                     out.append((tick(beat), _CTRL, bytes([0xB0 | channel, cc, value])))
             continue
@@ -411,14 +431,19 @@ def _part_events(part, events: List[Event], channel: int, key: Optional[str] = N
     return out
 
 
-def song_to_midi(song, path: str, only_audible: bool = True, midi_dir: Optional[str] = None) -> str:
-    """Scrive il brano (st_language.song.Song) come file MIDI; ritorna path.
-    Con only_audible si rispettano Mute e Solo."""
+def song_midi_tracks(song, only_audible: bool = True, midi_dir: Optional[str] = None
+                     ) -> Tuple[List[List[Tuple[int, int, bytes]]], List["Part"], dict]:
+    """Le tracce MIDI del brano [(tick, priorita', messaggio)] (la prima e'
+    quella del tempo), le tracce del brano che vi corrispondono e i loro slot
+    (porta * 16 + canale, vedi _assign_channels). Usate da song_to_midi e
+    dall'export MTXT (st_language.mtxt)."""
     tracks = [t for t in (song.audible_tracks() if only_audible else song.tracks) if not t.is_audio]
     events_by_track = {t.name: t.parsed_events(song.patterns, midi_dir=midi_dir) for t in tracks}
     conductor: List[Tuple[int, int, bytes]] = [(0, _CTRL, _meta(0x03, midi_text_bytes(song.name)))]
     tempo_map = build_tempo_beat_map(song, tracks=tracks, events_by_track=events_by_track)
+    tempo_ticks = []
     for beat, bpm in with_fermatas(tempo_map, fermata_spans(events_by_track)):
+        tempo_ticks.append((round(beat * TICKS_PER_BEAT), bpm))
         tempo = round(60_000_000 / max(1, bpm))
         conductor.append((round(beat * TICKS_PER_BEAT), _CTRL, _meta(0x51, tempo.to_bytes(3, "big"))))
     for beat, sig in build_metrica_beat_map(song):
@@ -429,8 +454,16 @@ def song_to_midi(song, path: str, only_audible: bool = True, midi_dir: Optional[
         power = max(0, den.bit_length() - 1)
         conductor.append((round(beat * TICKS_PER_BEAT), _CTRL, _meta(0x58, bytes([num, power, 24, 8]))))
     channels = _assign_channels(tracks)
+    ports = midi_ports_needed(channels)
     midi_tracks = [conductor]
     for t in tracks:
-        midi_tracks.append(_part_events(t, events_by_track[t.name], channels[t.name], song.key))
-    write_smf(path, midi_tracks)
+        midi_tracks.append(_part_events(t, events_by_track[t.name], channels[t.name], song.key, ports,
+                                        tempo_ticks))
+    return midi_tracks, tracks, channels
+
+
+def song_to_midi(song, path: str, only_audible: bool = True, midi_dir: Optional[str] = None) -> str:
+    """Scrive il brano (st_language.song.Song) come file MIDI; ritorna path.
+    Con only_audible si rispettano Mute e Solo."""
+    write_smf(path, song_midi_tracks(song, only_audible, midi_dir)[0])
     return path

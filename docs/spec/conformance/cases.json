@@ -1,5 +1,5 @@
 {
- "spec_version": "2.3",
+ "spec_version": "2.4",
  "cases": [
   {
    "id": "notes-basic",
@@ -2719,6 +2719,169 @@
    }
   },
   {
+   "id": "shift-moves-the-following-notes",
+   "input": "c shift=-20 d kick [c e] shift=15 e shift=0 f",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "shift": -20
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "kick",
+      "shift": -20
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "c",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "e",
+        "octave": 4
+       }
+      ],
+      "shift": -20
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "shift": 15
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "shift-in-voices-and-ties",
+   "input": "shift=10 { c~ c ; 2e } shift=-5 C7",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "shift": 10
+     },
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "voice": 2,
+      "shift": 10
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C7",
+      "octave": 4,
+      "shift": -5
+     }
+    ]
+   }
+  },
+  {
+   "id": "tune-automation-and-ramp",
+   "input": "tune=-30 c tune=-30 >>exp 2d tune=50 e",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "tune",
+      "value": -30
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "tune",
+      "value": -30
+     },
+     {
+      "start": 1.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 2.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "tune",
+      "value": 50,
+      "start_value": -30,
+      "curve": "exp"
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
    "id": "repeats",
    "input": "4: |: c d e f :| g a b c |",
    "expect": {
@@ -5223,6 +5386,27 @@
   {
    "id": "error-swing-range",
    "input": "swing=90 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-shift-range",
+   "input": "shift=600 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-shift-decimals",
+   "input": "shift=1.5 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-tune-range",
+   "input": "tune=-101 c",
    "expect": {
     "error": true
    }
