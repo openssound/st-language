@@ -1,5 +1,5 @@
 {
- "spec_version": "2.0",
+ "spec_version": "2.1",
  "cases": [
   {
    "id": "notes-basic",
@@ -1540,6 +1540,526 @@
    }
   },
   {
+   "id": "ties",
+   "input": "4: 2c 2d~ | 2d 2e | c#~ db C7~ C7 [c e]~ | [e c] c~ 100@ c~ c",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c#",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 2.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C7",
+      "octave": 4
+     },
+     {
+      "start": 12.0,
+      "duration": 2.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "c",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "e",
+        "octave": 4
+       }
+      ]
+     },
+     {
+      "start": 14.0,
+      "duration": 3.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ],
+    "warnings": [
+     {
+      "start": 41,
+      "end": 42,
+      "bar": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "ties-with-values",
+   "input": "c'2~ c'8 r'8 e'4.~ e'8",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 2.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.5,
+      "duration": 0.5,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 3.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "slurs",
+   "input": "c( d r e f) [c e]( d~ d) C( G7)",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slur": "start"
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "slur": "continue"
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "slur": "continue"
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4,
+      "slur": "stop"
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "c",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "e",
+        "octave": 4
+       }
+      ],
+      "slur": "start"
+     },
+     {
+      "start": 6.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "slur": "stop"
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C",
+      "octave": 4,
+      "slur": "start"
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "G7",
+      "octave": 4,
+      "slur": "stop"
+     }
+    ]
+   }
+  },
+  {
+   "id": "slurs-in-groups",
+   "input": "2(c( d) e)",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slur": "start"
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "slur": "stop"
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slur": "start"
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "slur": "stop"
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "swing",
+   "input": "swing=66 8: c d e f swing16=60 16: g a b c swing=50 8: d e",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "swing": [
+       1.0,
+       0.66
+      ]
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "swing": [
+       1.0,
+       0.66
+      ]
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "swing": [
+       1.0,
+       0.66
+      ]
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4,
+      "swing": [
+       1.0,
+       0.66
+      ]
+     },
+     {
+      "start": 2.0,
+      "duration": 0.25,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4,
+      "swing": [
+       0.5,
+       0.6
+      ]
+     },
+     {
+      "start": 2.25,
+      "duration": 0.25,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4,
+      "swing": [
+       0.5,
+       0.6
+      ]
+     },
+     {
+      "start": 2.5,
+      "duration": 0.25,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4,
+      "swing": [
+       0.5,
+       0.6
+      ]
+     },
+     {
+      "start": 2.75,
+      "duration": 0.25,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "swing": [
+       0.5,
+       0.6
+      ]
+     },
+     {
+      "start": 3.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 3.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "swing-in-voices",
+   "input": "swing=62 { 8: c d ; 4e } f",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "swing": [
+       1.0,
+       0.62
+      ]
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "swing": [
+       1.0,
+       0.62
+      ]
+     },
+     {
+      "start": 0.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "voice": 2,
+      "swing": [
+       1.0,
+       0.62
+      ]
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4,
+      "swing": [
+       1.0,
+       0.62
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "automations-cc-and-bend",
+   "input": "cc74=20 >>exp 2c cc74=100 bend=-2 c bend=0.5 >> d bend=0",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "cc74",
+      "value": 20
+     },
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "cc74",
+      "value": 100,
+      "start_value": 20,
+      "curve": "exp"
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "bend",
+      "value": -2.0
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "bend",
+      "value": 0.5
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "bend",
+      "value": 0.0,
+      "start_value": 0.5,
+      "curve": "lin"
+     }
+    ]
+   }
+  },
+  {
    "id": "hairpins-follow-expression",
    "input": "expr=100 2c< vol=60 >> d< e vol=90",
    "expect": {
@@ -2858,6 +3378,97 @@
   {
    "id": "error-slide-zero-duration",
    "input": "0c*4>d*4",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-tie-different-note",
+   "input": "c~ d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-tie-to-rest",
+   "input": "c~ r",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-tie-not-continued",
+   "input": "c d~",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-tie-on-percussion",
+   "input": "kick~ kick",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-tie-across-voices",
+   "input": "c~ { c ; e }",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-slur-not-closed",
+   "input": "c( d e",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-slur-not-opened",
+   "input": "c d)",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-slur-nested",
+   "input": "c( d( e) f)",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-slur-single-note",
+   "input": "c() d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-slur-on-rest",
+   "input": "r( c d)",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-swing-range",
+   "input": "swing=90 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-cc-number",
+   "input": "cc121=10 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-bend-range",
+   "input": "bend=30 c",
    "expect": {
     "error": true
    }

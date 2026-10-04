@@ -24,7 +24,7 @@ from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from .chords import apply_bass_note, parse_chord_symbol, pitch_to_midi, voice_chord
 from .instruments import DRUM_MIDI_CHANNEL, PERCUSSION_MAP, InstrumentProfile
-from .notation import RAMP_CURVES, Event
+from .notation import RAMP_CURVES, Event, swing_time
 from .timing import RE_METRICA_VALUE, build_metrica_beat_map, build_tempo_beat_map
 
 if TYPE_CHECKING:          # solo per le annotazioni (nessun import circolare)
@@ -89,9 +89,25 @@ CONTROL_MAX_POINTS = 128
 CONTROL_STEP_TICKS = 10
 
 
+# Numero "di controller" dato da control_points al pitch bend (bend=), che
+# non e' un control change: valore 0-16383, 8192 = nessun bend.
+PITCH_BEND = -1
+
+
+def control_number(name: str) -> int:
+    """Il controller MIDI di un'automazione (cc74 -> 74), PITCH_BEND per bend."""
+    if name == "bend":
+        return PITCH_BEND
+    return CONTROL_CC[name] if name in CONTROL_CC else int(name[2:])
+
+
 def control_cc_value(name: str, value: float, volume_scale: float = 1.0) -> int:
     """Valore MIDI (0-127) di un'automazione: pan da -1..1 a 1..127 (0 =
-    centro, 64); vol moltiplicato per volume_scale (il volume del mixer)."""
+    centro, 64); vol moltiplicato per volume_scale (il volume del mixer);
+    bend in semitoni come pitch bend 0-16383."""
+    if name == "bend":
+        bend = round(value / SLIDE_PITCH_BEND_RANGE_SEMITONES * 8192)
+        return max(0, min(16383, 8192 + bend))
     if name == "pan":
         raw = 64 + value * 63
     elif name == "vol":
@@ -106,7 +122,7 @@ def control_points(ev: Event, volume_scale: float = 1.0, ticks_per_beat: int = T
     """I control change di un evento "control" come (beat, controller,
     valore): un punto solo per un valore fisso, per una rampa i valori
     lungo la curva (senza ripetere valori uguali consecutivi)."""
-    cc = CONTROL_CC[ev.name]
+    cc = control_number(ev.name)
     if ev.duration <= 0 or ev.start_value is None:
         return [(ev.start, cc, control_cc_value(ev.name, ev.value, volume_scale))]
     span = ev.duration * ticks_per_beat
@@ -128,6 +144,25 @@ _ARTICULATION_DURATION_FACTOR = {
     "mute": 0.15,      # nota "stoppata": molto breve
     "legato": 1.15,    # nota leggermente prolungata, per legare alla successiva
 }
+
+
+def effective_articulation(ev: Event) -> Optional[str]:
+    """L'articolazione con cui suona l'evento: quella scritta, altrimenti
+    legato per le note dentro una legatura di portamento (tranne l'ultima)."""
+    if ev.articulation:
+        return ev.articulation
+    return "legato" if ev.slur in ("start", "continue") else None
+
+
+def sounding_span(ev: Event) -> Tuple[float, float]:
+    """(inizio, fine) in quarti con cui l'evento suona: con lo swing (vedi
+    notation.swing_time) le note sulle seconde meta' delle coppie si spostano."""
+    return swing_time(ev.start, ev.swing), swing_time(ev.start + ev.duration, ev.swing)
+
+
+def needs_bend_range(events: List[Event]) -> bool:
+    """Se il canale va preparato per il pitch bend (slide o bend=)."""
+    return any(ev.kind == "slide" or (ev.kind == "control" and ev.name == "bend") for ev in events)
 
 
 def _apply_articulation(start_tick: int, end_tick: int, articulation: Optional[str]) -> int:
@@ -259,7 +294,7 @@ def _part_events(part, events: List[Event], channel: int) -> List[Tuple[int, int
     out.append((0, _CTRL, bytes([0xC0 | channel, instrument.gm_program & 0x7F])))
     out.append((0, _CTRL, bytes([0xB0 | channel, 7, max(0, min(127, round(part.volume)))])))
     out.append((0, _CTRL, bytes([0xB0 | channel, 10, max(0, min(127, part.pan))])))
-    if any(ev.kind == "slide" for ev in events):
+    if needs_bend_range(events):
         for control, value in ((101, 0), (100, 0), (6, SLIDE_PITCH_BEND_RANGE_SEMITONES), (38, 0),
                                (101, 127), (100, 127)):
             out.append((0, _CTRL, bytes([0xB0 | channel, control, value])))
@@ -271,14 +306,17 @@ def _part_events(part, events: List[Event], channel: int) -> List[Tuple[int, int
         return round(beats * TICKS_PER_BEAT)
 
     for ev in events:
-        start, end = tick(ev.start), tick(ev.start + ev.duration)
+        start, end = (tick(b) for b in sounding_span(ev))
         end_tick = max(end_tick, end)
         if ev.lyric and ev.lyric != "_":
             text = ev.lyric[:-1] if ev.lyric.endswith("-") and len(ev.lyric) > 1 else ev.lyric + " "
             out.append((start, _CTRL, _meta(0x05, midi_text_bytes(text))))
         if ev.kind == "control":
             for beat, cc, value in control_points(ev, part.volume / 100.0):
-                out.append((tick(beat), _CTRL, bytes([0xB0 | channel, cc, value])))
+                if cc == PITCH_BEND:
+                    out.append((tick(beat), _CTRL, bytes([0xE0 | channel, value & 0x7F, value >> 7])))
+                else:
+                    out.append((tick(beat), _CTRL, bytes([0xB0 | channel, cc, value])))
             continue
         if ev.kind == "sustain":
             sustain = ev.name == "on"
@@ -309,7 +347,7 @@ def _part_events(part, events: List[Event], channel: int) -> List[Tuple[int, int
         if not notes or factor <= 0:
             continue
         velocity = max(1, min(127, round(ev.velocity * factor)))
-        stop = _apply_articulation(start, end, ev.articulation)
+        stop = _apply_articulation(start, end, effective_articulation(ev))
         for n in notes:
             out.append((start, _ON, bytes([0x90 | channel, n, velocity])))
             out.append((stop, _OFF, bytes([0x80 | channel, n, 0])))

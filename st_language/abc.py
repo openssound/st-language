@@ -149,12 +149,15 @@ def _entry_text(entry: _Entry, voice: _Voice, bar_alters, signature) -> str:
     if entry.item is None:
         rest = "z" if voice.first else "x"
         return out + rest + length_suffix(units)
+    if entry.first_of_item and entry.item.slur == "start":
+        out += "("
     if entry.first_of_item and entry.item.articulation in _ARTICULATIONS:
         out += _ARTICULATIONS[entry.item.articulation]
     notes = [pitch_text(p.step, p.alter, p.octave + voice.transpose // 12, bar_alters, signature)
              for p in entry.item.pitches]
     body = notes[0] if len(notes) == 1 else "[" + "".join(notes) + "]"
-    return out + body + length_suffix(units) + ("-" if entry.tie_start else "")
+    slur_end = ")" if not entry.tie_start and entry.item.slur == "stop" else ""
+    return out + body + length_suffix(units) + ("-" if entry.tie_start else "") + slur_end
 
 
 def _measure_text(entries: List[_Entry], voice: _Voice, signature) -> Tuple[str, List[str]]:

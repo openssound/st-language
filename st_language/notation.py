@@ -124,11 +124,16 @@ def tokenize_spans(text: str) -> List[Tuple[str, int, int]]:
 
     def _with_value(k: int) -> int:
         """Fine di un blocco [...] col suo eventuale valore di nota
-        attaccato ('[c e g]'2) o della forcella ('[c e g]<')."""
+        attaccato ('[c e g]'2), la forcella ('[c e g]<'), la legatura di
+        valore ('[c e g]~') e quella di portamento ('[c e g](')."""
         if k < n and text[k] == "'":
             return _plain_end(k)
         if k < n and text[k] in "<>" and (k + 1 >= n or text[k + 1] not in "<>"):
-            return k + 1
+            k += 1
+        if k < n and text[k] == "~":
+            k += 1
+        if k < n and text[k] in "()":
+            k += 1
         return k
 
     while i < n:
@@ -352,19 +357,37 @@ def _slide_segment_durations(points: List[Tuple[Optional[int], str, int]],
 def split_note_value(tok: str) -> Tuple[str, str]:
     """(token senza valore di nota, valore come scritto: "'8." o "").
     c*4'8. -> ('c*4', "'8."); c'8! -> ('c!', "'8"); c'2< -> ('c', "'2<");
-    2c< -> ('2c', "<")."""
-    if tok.startswith(LYRIC_QUOTE):
+    2c< -> ('2c', "<"); c'2~( -> ('c', "'2~(").
+
+    In fondo al valore restano, in quest'ordine, la forcella (< o >), la
+    legatura di valore (~) e quella di portamento (( o )): fanno parte del
+    "valore" restituito, cosi' chi ricompone il token (trasposizione,
+    congelamento) li conserva; vedi split_marks."""
+    if tok.startswith(LYRIC_QUOTE) or tok.startswith("{"):
         return tok, ""
-    # Forcella in fondo (c'2<, 2c*4>): fa parte del "valore" restituito,
-    # cosi' chi ricompone il token (trasposizione, congelamento) la conserva.
-    hairpin = ""
+    tail = ""
+    if len(tok) > 1 and tok[-1] in "()":
+        tok, tail = tok[:-1], tok[-1]
+    if len(tok) > 1 and tok[-1] == "~":
+        tok, tail = tok[:-1], "~" + tail
     if len(tok) > 1 and tok[-1] in "<>" and tok[-2] not in "<>":
-        tok, hairpin = tok[:-1], tok[-1]
+        tok, tail = tok[:-1], tok[-1] + tail
     m = RE_NOTE_VALUE.match(tok)
     if not m:
-        return tok, hairpin
+        return tok, tail
     base, number, tuplet, dots, articulation = m.groups()
-    return base + articulation, f"'{number}{tuplet}{dots}{hairpin}"
+    return base + articulation, f"'{number}{tuplet}{dots}{tail}"
+
+
+def split_marks(value: str) -> Tuple[str, str, bool, str]:
+    """Il valore restituito da split_note_value scomposto in (valore di
+    nota, forcella, legatura di valore, legatura di portamento)."""
+    slur = value[-1] if value[-1:] in ("(", ")") else ""
+    value = value[:len(value) - len(slur)]
+    tie = value.endswith("~")
+    value = value[:-1] if tie else value
+    hairpin = value[-1] if value[-1:] in ("<", ">") else ""
+    return value[:len(value) - len(hairpin)], hairpin, tie, slur
 
 
 def note_value_beats(value: str) -> Fraction:
@@ -403,10 +426,23 @@ RAMP_CURVES = {
 # da -1 sinistra a 1 destra), modulazione (CC1, vibrato), mandate a
 # riverbero (CC91) e chorus (CC93). 'vol=60' imposta il valore da li' in
 # poi; 'vol=40 >> ... vol=100' va da 40 a 100 nel tempo fra i due comandi.
-RE_CONTROL = re.compile(r"^(vol|expr|pan|mod|rev|cho)=(-?\d+(?:\.\d+)?)$")
+# Oltre ai nomi, 'ccN=' (N = 0-119) scrive un controller MIDI qualsiasi
+# (cc74 = brillantezza su molti synth) e 'bend=' il pitch bend in semitoni
+# (-24..24, l'ampiezza impostata dall'esportazione).
+RE_CONTROL = re.compile(r"^(vol|expr|pan|mod|rev|cho|bend|cc\d{1,3})=(-?\d+(?:\.\d+)?)$")
 CONTROL_RANGES = {"vol": (0, 127), "expr": (0, 127), "pan": (-1, 1), "mod": (0, 127),
-                  "rev": (0, 127), "cho": (0, 127)}
-CONTROL_DEFAULTS = {"vol": 100, "expr": 127, "pan": 0, "mod": 0, "rev": 0, "cho": 0}
+                  "rev": (0, 127), "cho": (0, 127), "bend": (-24, 24)}
+CONTROL_DEFAULTS = {"vol": 100, "expr": 127, "pan": 0, "mod": 0, "rev": 0, "cho": 0, "bend": 0}
+# Controlli che tengono i decimali (gli altri sono arrotondati all'intero).
+CONTROL_DECIMAL = ("pan", "bend")
+# Ultimo numero di controller ammesso da 'ccN=' (120-127 sono messaggi di modo del canale).
+CC_MAX = 119
+
+# Swing: 'swing=N' sposta la seconda croma di ogni coppia, 'swing16=N' la
+# seconda semicroma; N e' la percentuale della coppia data alla prima nota
+# (50 = diritto, 66 = terzinato, fino a 80).
+RE_SWING = re.compile(r"^swing(16)?=(\d+)$")
+SWING_RANGE = (50, 80)
 
 
 # ---------------------------------------------------------------------------
@@ -451,6 +487,12 @@ class Event:
     value: Optional[float] = None
     start_value: Optional[float] = None
     curve: Optional[str] = None
+    # Legatura di portamento (c( d e f)): "start" sulla prima nota, "continue"
+    # su quelle in mezzo, "stop" sull'ultima; suonano legate (vedi midi).
+    slur: Optional[str] = None
+    # Swing attivo (vedi RE_SWING e swing_time): (durata della coppia in
+    # quarti, frazione data alla prima nota), es. (1.0, 0.66) per le crome.
+    swing: Optional[Tuple[float, float]] = None
 
 
 @dataclass
@@ -679,6 +721,36 @@ def _assign_lyrics(syllables: List[str], targets: List[Event]) -> int:
     return 0
 
 
+def _pitch_key(ev: Event):
+    """Cio' che una legatura di valore confronta: la stessa nota (anche
+    scritta con un'altra alterazione), lo stesso accordo, lo stesso blocco."""
+    from .chords import pitch_to_midi
+    if ev.kind == "note":
+        return ("note", pitch_to_midi(ev.letter, ev.octave))
+    if ev.kind == "chord":
+        return ("chord", ev.symbol, ev.octave, ev.voicing, ev.bass)
+    if ev.kind == "block":
+        return ("block", tuple(sorted(
+            (it["kind"], pitch_to_midi(it["letter"], it["octave"]) if it["kind"] == "note"
+             else (it.get("symbol"), it.get("octave"), it.get("voicing"), it.get("bass"), it.get("name")))
+            for it in ev.items)))
+    return (ev.kind, id(ev))
+
+
+def swing_time(beat: float, swing: Optional[Tuple[float, float]]) -> float:
+    """La posizione (in quarti) di un istante con lo swing: dentro ogni
+    coppia di note lunga 'pair' quarti la prima meta' si allunga fino alla
+    frazione 'ratio' e la seconda si accorcia di conseguenza; gli inizi
+    delle coppie (i battiti, per le crome) non si spostano."""
+    if not swing:
+        return beat
+    pair, ratio = swing
+    k = beat // pair
+    x = (beat - k * pair) / pair
+    warped = x * 2 * ratio if x <= 0.5 else ratio + (x - 0.5) * 2 * (1 - ratio)
+    return (k + warped) * pair
+
+
 def parse_tokens(tokens: List[str], default_octave: int = 4) -> List[Event]:
     return _parse_tokens_exact(tokens, default_octave)[0]
 
@@ -689,7 +761,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                          initial_velocity: int = 80, voice: int = 1,
                          extras: Optional[dict] = None,
                          pending_lyrics: Optional[List["Event"]] = None,
-                         initial_controls: Optional[Dict[str, float]] = None
+                         initial_controls: Optional[Dict[str, float]] = None,
+                         initial_swing: Optional[Tuple[float, float]] = None
                          ) -> Tuple[List[Event], Fraction, Fraction]:
     """Come parse_tokens, ma ritorna anche la posizione finale esatta (in
     beat, Fraction) e la griglia attiva alla fine. Griglia e posizione sono
@@ -726,6 +799,11 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
     # lista e' quella del chiamante per la prima voce di un blocco { ; }
     # (le note prima del blocco aspettano lo stesso testo).
     lyric_targets: List[Event] = pending_lyrics if pending_lyrics is not None else []
+    # Legature: l'evento che continua nel prossimo token (c~ c), e quella di
+    # portamento aperta con le note che ne fanno parte.
+    pending_tie: Optional[Event] = None
+    slur_notes: Optional[List[Event]] = None
+    swing = initial_swing
     # Automazioni: valore corrente di ogni controllo e rampe aperte
     # ({nome: (inizio, valore di partenza, curva)}), indipendenti fra loro.
     controls: Dict[str, float] = dict(initial_controls or CONTROL_DEFAULTS)
@@ -784,6 +862,47 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             lyric_targets.append(ev)
         return ev
 
+    def _sounding(ev: Event, dur: Fraction, hairpin: str, tie: bool, slur: str,
+                  start: Fraction, tok: str) -> None:
+        """Aggiunge un evento che suona, con legature, forcella e swing: se
+        la nota precedente finiva con '~' questo token la allunga invece di
+        crearne una nuova (deve avere la stessa altezza)."""
+        nonlocal pending_tie, slur_notes
+        if pending_tie is not None:
+            if _pitch_key(pending_tie) != _pitch_key(ev):
+                raise NotationError(tr("La legatura di valore (~) collega due note diverse: "
+                                       "deve arrivare alla stessa nota, accordo o blocco"), tok)
+            target = pending_tie
+            target.duration = float(Fraction(target.duration).limit_denominator(10 ** 6) + dur)
+            if ev.articulation:
+                target.articulation = ev.articulation
+        else:
+            ev.swing = swing
+            target = _add(ev)
+        if hairpin:
+            _hairpin(hairpin, start, dur, tok)
+        pending_tie = target if tie else None
+        if ev.kind == "percussion":
+            if slur:
+                raise NotationError(tr("Una legatura di portamento va su note, accordi, blocchi o slide"), tok)
+            return
+        if slur == "(":
+            if slur_notes is not None:
+                raise NotationError(tr("Legatura di portamento gia' aperta: chiudila con ')' prima di aprirne "
+                                       "un'altra"), tok)
+            slur_notes = [target]
+            return
+        if slur_notes is not None and (not slur_notes or slur_notes[-1] is not target):
+            slur_notes.append(target)
+        if slur == ")":
+            if slur_notes is None:
+                raise NotationError(tr("')' chiude una legatura di portamento mai aperta"), tok)
+            if len(slur_notes) < 2:
+                raise NotationError(tr("Una legatura di portamento collega almeno due note"), tok)
+            for n, note in enumerate(slur_notes):
+                note.slur = "start" if n == 0 else ("stop" if n == len(slur_notes) - 1 else "continue")
+            slur_notes = None
+
     for index, tok in enumerate(tokens):
         before = cursor
         try:
@@ -804,6 +923,9 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
 
             m = RE_VOICES.match(tok)
             if m:
+                if pending_tie is not None or slur_notes is not None:
+                    raise NotationError(tr("Una legatura (~ o parentesi) non puo' attraversare un blocco di voci: "
+                                           "chiudila prima"), tok)
                 voices = split_voices(m.group(1))
                 if not any(v.strip() for v in voices):
                     raise NotationError(tr("Blocco di voci vuoto"), tok)
@@ -822,7 +944,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                         voice_tokens, default_octave, grid_beats, lenient, voice_ranges,
                         initial_velocity=velocity, voice=voice + k, extras=None,
                         pending_lyrics=lyric_targets if k == 0 else None,
-                        initial_controls=controls)
+                        initial_controls=controls, initial_swing=swing)
                     for ev in sub_events:
                         ev.start += float(cursor)
                         if ev.kind == "control":
@@ -878,7 +1000,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 curve = m.group(1) or "lin"
                 if last_state_kind and last_state_kind.startswith("control:"):
                     name = last_state_kind.split(":", 1)[1]
-                    pending_controls[name] = (cursor, controls[name], curve)
+                    pending_controls[name] = (cursor, controls.get(name, 0), curve)
                     continue
                 if last_state_kind not in ("velocity", "tempo"):
                     raise NotationError(
@@ -893,11 +1015,13 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             m = RE_CONTROL.match(tok)
             if m:
                 name, number = m.group(1), float(m.group(2))
-                low, high = CONTROL_RANGES[name]
+                if name.startswith("cc") and int(name[2:]) > CC_MAX:
+                    raise NotationError(tr("Controller MIDI non valido: 'ccN=' va da cc0 a cc{0}", CC_MAX), tok)
+                low, high = CONTROL_RANGES.get(name, (0, 127))
                 if not low <= number <= high:
                     raise NotationError(tr("Valore di '{name}' fuori dall'intervallo {low}..{high}",
                                            name=name, low=low, high=high), tok)
-                value = number if name == "pan" else round(number)
+                value = number if name in CONTROL_DECIMAL else round(number)
                 if name in pending_controls:
                     start, start_value, curve = pending_controls.pop(name)
                     if cursor > start:
@@ -908,6 +1032,14 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     _control(cursor, name, value)
                 controls[name] = value
                 last_state_kind = "control:" + name
+                continue
+
+            m = RE_SWING.match(tok)
+            if m:
+                percent = int(m.group(2))
+                if not SWING_RANGE[0] <= percent <= SWING_RANGE[1]:
+                    raise NotationError(tr("Swing fuori range ({0}-{1})", *SWING_RANGE), tok)
+                swing = None if percent == 50 else (0.5 if m.group(1) else 1.0, percent / 100)
                 continue
 
             if tok in ("SON", "SOFF"):
@@ -937,16 +1069,19 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             # Da qui solo token che occupano tempo: col valore di nota
             # esplicito (c'8.) durano quello invece dell'unita' di griglia.
             tok, value = split_note_value(tok)
-            hairpin = value[-1] if value[-1:] in ("<", ">") else ""
-            if hairpin:
-                value = value[:-1]
+            value, hairpin, tie, slur = split_marks(value)
             unit = note_value_beats(value) if value else grid_beats
             note_start = cursor
 
             m = RE_REST.match(tok)
             if m:
                 if hairpin:
-                    raise NotationError(tr("Una pausa non puo' avere una forcella ('<' o '>')"), tok + hairpin)
+                    raise NotationError(tr("Una pausa non puo' avere una forcella ('<' o '>')"), tokens[index])
+                if tie or slur:
+                    raise NotationError(tr("Una pausa non puo' avere una legatura"), tokens[index])
+                if pending_tie is not None:
+                    raise NotationError(tr("La legatura di valore (~) deve arrivare a una nota uguale, "
+                                           "non a una pausa"), tokens[index])
                 mult = int(m.group(1)) if m.group(1) else 1
                 dur = unit * mult
                 _add(Event(start=float(cursor), duration=float(dur), kind="rest", velocity=velocity))
@@ -961,15 +1096,15 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 if dur <= 0:
                     raise NotationError(tr("Slide di durata nulla"), tok)
                 _, first_letter, first_octave = points[0]
-                _add(Event(
+                if tie or pending_tie is not None:
+                    raise NotationError(tr("Uno slide non puo' avere una legatura di valore (~)"), tokens[index])
+                _sounding(Event(
                     start=float(cursor), duration=float(dur), kind="slide", velocity=velocity,
                     letter=first_letter, octave=first_octave,
                     slide_points=[(letter, octave) for _, letter, octave in points[1:]],
                     slide_segment_durations=[float(d) for d in segment_durations],
-                ))
+                ), dur, hairpin, tie, slur, note_start, tokens[index])
                 cursor += dur
-                if hairpin:
-                    _hairpin(hairpin, note_start, dur, tokens[index])
                 continue
 
             if tok.startswith("[") or re.match(r"^\d+\[", tok):
@@ -983,11 +1118,9 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     raise NotationError(tr("Blocco simultaneo vuoto"), tok)
                 items = [_parse_atom(st, default_octave) for st in sub_toks]
                 dur = unit * mult
-                _add(Event(start=float(cursor), duration=float(dur), kind="block",
-                     velocity=velocity, items=items))
+                _sounding(Event(start=float(cursor), duration=float(dur), kind="block",
+                                velocity=velocity, items=items), dur, hairpin, tie, slur, note_start, tokens[index])
                 cursor += dur
-                if hairpin:
-                    _hairpin(hairpin, note_start, dur, tokens[index])
                 continue
 
             # nota / accordo / percussione singoli
@@ -995,19 +1128,21 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             dur = unit * atom["mult"]
             start, duration = float(cursor), float(dur)
             if atom["kind"] == "note":
-                _add(Event(start=start, duration=duration, kind="note", velocity=velocity,
-                     letter=atom["letter"], octave=atom["octave"],
-                     articulation=atom.get("articulation")))
+                ev = Event(start=start, duration=duration, kind="note", velocity=velocity,
+                           letter=atom["letter"], octave=atom["octave"],
+                           articulation=atom.get("articulation"))
             elif atom["kind"] == "chord":
-                _add(Event(start=start, duration=duration, kind="chord", velocity=velocity,
-                     symbol=atom["symbol"], octave=atom["octave"], voicing=atom.get("voicing"),
-                     articulation=atom.get("articulation"), bass=atom.get("bass")))
+                ev = Event(start=start, duration=duration, kind="chord", velocity=velocity,
+                           symbol=atom["symbol"], octave=atom["octave"], voicing=atom.get("voicing"),
+                           articulation=atom.get("articulation"), bass=atom.get("bass"))
             else:  # percussion
-                _add(Event(start=start, duration=duration, kind="percussion", velocity=velocity,
-                     name=atom["name"]))
+                if tie or pending_tie is not None:
+                    raise NotationError(tr("Una percussione non puo' avere una legatura di valore (~)"),
+                                        tokens[index])
+                ev = Event(start=start, duration=duration, kind="percussion", velocity=velocity,
+                           name=atom["name"])
+            _sounding(ev, dur, hairpin, tie, slur, note_start, tokens[index])
             cursor += dur
-            if hairpin:
-                _hairpin(hairpin, note_start, dur, tokens[index])
         except (NotationError, ValueError):
             if not lenient:
                 raise
@@ -1017,6 +1152,10 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             if ranges is not None:
                 ranges.append((before, cursor))
 
+    if pending_tie is not None and not lenient:
+        raise NotationError(tr("Legatura di valore (~) senza la nota che la continua"))
+    if slur_notes is not None and not lenient:
+        raise NotationError(tr("Legatura di portamento aperta ma mai chiusa con ')'"))
     if pending_controls and not lenient:
         raise NotationError(tr("Rampa di '{name}' aperta ma mai chiusa da un valore finale ({name}=N)",
                                name=next(iter(pending_controls))))

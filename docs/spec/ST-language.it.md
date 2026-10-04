@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.0** · Implementazione di riferimento: la libreria Python
+**Versione 2.1** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -80,8 +80,9 @@ la prima regola che si applica:
 3. Delle cifre facoltative seguite da `[` aprono un **blocco** che finisce
    alla prima `]` successiva (i blocchi non si annidano); un `'` subito
    dopo la `]` aggiunge al token un valore di nota (`[c e g]'2`), e un
-   solo `<` o `>` subito dopo la `]` una forcella (`[c e g]<`). Senza
-   `]` e' un errore.
+   solo `<` o `>` subito dopo la `]` una forcella (`[c e g]<`), poi un `~`
+   una legatura di valore e un `(` o `)` una legatura di portamento
+   (`[c e g]~`, `[c e g](`). Senza `]` e' un errore.
 4. Delle cifre facoltative seguite da `(` aprono un **gruppo** che finisce
    alla `)` corrispondente; le parentesi si annidano, e quelle dentro un
    testo cantato non contano. Senza la `)` corrispondente e' un errore.
@@ -103,8 +104,9 @@ La grammatica di ogni tipo di token (EBNF; `digit` e' 0-9, `letter` e'
 A-Z o a-z, `word` sono una o piu' lettere, cifre o `_`):
 
 ```ebnf
-token        = grid | velocity | tempo | ramp | control | sustain | bar-check
-             | lyric | pattern-ref | midi-ref | group | voices | sounding ;
+token        = grid | velocity | tempo | ramp | control | swing | sustain
+             | bar-check | lyric | pattern-ref | midi-ref | group | voices
+             | sounding ;
 
 grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
@@ -113,7 +115,9 @@ tempo        = "tempo=" number ;                               (* tempo=120 *)
 ramp         = ( ">>" | "<<" ) [ curve ] ;                       (* >>  >>exp *)
 curve        = "lin" | "exp" | "log" | "s" ;
 control      = control-name "=" [ "-" ] number [ "." digit { digit } ] ;
-control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" ;   (* vol=80  pan=-0.5 *)
+control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" | "bend"
+             | "cc" number ;                                  (* vol=80  cc74=30 *)
+swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
 sustain      = "SON" | "SOFF" ;
 bar-check    = "|" ;
 lyric        = '"' { qualunque carattere tranne '"' } '"' ;
@@ -124,7 +128,7 @@ voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } 
 voice        = { token } ;
 
 sounding     = ( note | chord | percussion | rest | block | slide ) [ value ]
-               [ hairpin ] ;
+               [ hairpin ] [ "~" ] [ "(" | ")" ] ;
 hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
@@ -153,9 +157,12 @@ Note sulla grammatica:
 - Il **valore di nota** puo' stare prima o dopo il modificatore: `c'8!` e
   `c!'8` significano la stessa cosa. Non puo' seguire una griglia, una
   velocity o un altro comando di stato.
-- La **forcella** e' sempre l'ultimo carattere (`c'2!<`, `2c*4>`); una
-  pausa con la forcella e' un errore. Un token che finisce con `<<` o
-  `>>` non e' mai una forcella.
+- In fondo a un token che suona vengono, in quest'ordine, la **forcella**
+  (`c'2!<`, `2c*4>`), la **legatura di valore** `~` (sezione 6.9) e il
+  segno della **legatura di portamento** `(` o `)` (sezione 6.10):
+  `c'2<~(`. Un token che finisce con `<<` o `>>` non e' mai una
+  forcella. Un `(` in fondo a un token che suona non e' un gruppo: i
+  gruppi cominciano con `(` o con delle cifre seguite da `(`.
 - In un **accordo** la qualita' e' la stringa *piu' corta* che fa tornare
   il resto del token, quindi una `x` finale e' il modificatore di
   stoppato (`Cmaj7x`). Dopo uno stile di voicing, una `x` finale e' il
@@ -182,7 +189,8 @@ tempo corrente, che parte da 0) e uno **stato corrente**:
 | --- | --- | --- |
 | unita' di griglia | 1 quarto (come dopo `4:`) | comandi di griglia |
 | velocity | 80 | comandi di velocity |
-| valori delle automazioni | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0 | comandi di automazione (sezione 7.5) |
+| valori delle automazioni | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0, `bend` 0, `ccN` 0 | comandi di automazione (sezione 7.5) |
+| swing | spento | comandi di swing (sezione 7.6) |
 | ottava di default | quella dello strumento (4 se manca) | — |
 
 **Griglia.** `N:` imposta l'unita' a 4/N quarti: `4:` semiminima, `8:`
@@ -293,6 +301,39 @@ slide di durata totale 0 e' un errore.
 L'evento porta la prima altezza, le tappe successive e le durate dei
 segmenti.
 
+### 6.9 Legature di valore
+
+Un `~` in fondo a una nota, un accordo o un blocco lo **lega** al
+successivo token che suona, che DEVE essere la stessa nota (la stessa
+altezza MIDI: `c#~ db` va bene), lo stesso accordo (sigla, ottava, stile,
+basso) o lo stesso blocco (gli stessi atomi, in qualunque ordine). I due
+fanno **un solo** evento: l'inizio del primo, la somma delle durate,
+l'articolazione dell'ultima parte se ne ha una. In mezzo possono esserci
+controlli di battuta, commenti, testo cantato e comandi di stato (valgono
+come sempre, ma l'evento legato tiene la sua velocity); `c~ | c` e' il
+modo normale di tenere una nota oltre la stanghetta. Una catena
+`c~ c~ c` lega tre parti.
+
+E' un errore legare una pausa, una percussione o uno slide, legare a una
+nota diversa o a una pausa, lasciare una legatura senza la nota che la
+continua, o avere un blocco di voci fra le due parti.
+
+### 6.10 Legature di portamento
+
+Un `(` in fondo a un token che suona apre una **legatura di portamento**,
+un `)` in fondo a uno successivo la chiude: `c( d e f)`. Ogni nota,
+accordo, blocco o slide dall'apertura alla chiusura riceve il campo
+`slur`: `start` il primo, `stop` l'ultimo, `continue` gli altri (pause e
+percussioni in mezzo non ne fanno parte; un evento legato conta una
+volta). Una legatura DEVE contenere almeno due eventi, le legature non si
+annidano, e una legatura DEVE chiudersi nello stesso testo di traccia o
+nella stessa voce in cui si apre, senza blocchi di voci in mezzo. Gli
+eventi sotto la legatura senza un'articolazione propria suonano legati
+(sezione 13), tranne l'ultimo.
+
+Dentro un gruppo le parentesi delle legature fanno parte del conteggio
+delle parentesi del gruppo: `2(c( d) e)` ripete una coppia legata.
+
 ---
 
 ## 7. Comandi di stato
@@ -365,10 +406,12 @@ durante una nota tenuta:
 | `mod` | modulazione (vibrato) | 0-127 | 0 |
 | `rev` | mandata al riverbero | 0-127 | 0 |
 | `cho` | mandata al chorus | 0-127 | 0 |
+| `bend` | pitch bend, in semitoni | −24..24 | 0 |
+| `ccN` | controller MIDI N (0-119), es. `cc74` | 0-127 | 0 |
 
-Un valore fuori dall'intervallo e' un errore. `pan` tiene i decimali,
-gli altri valori sono arrotondati all'intero piu' vicino (`vol=80.6` e'
-81).
+Un valore fuori dall'intervallo, o `ccN` con N > 119, e' un errore. `pan`
+e `bend` tengono i decimali, gli altri valori sono arrotondati all'intero
+piu' vicino (`vol=80.6` e' 81).
 
 Senza rampa, `nome=N` produce un evento `control` nel punto del cursore
 con `name`, `value` = N e durata 0. Una rampa (sezione 7.3) subito dopo
@@ -393,6 +436,27 @@ dell'evento. Una forcella produce, dopo l'evento:
    (l'espressione torna al suo valore).
 
 Una forcella dentro una rampa di `expr` aperta e' un errore.
+
+### 7.6 Swing
+
+`swing=N` (N da 50 a 80) fa lo swing delle crome dal cursore in poi:
+dentro ogni battito la prima meta' si allunga fino a N % del battito e la
+seconda si accorcia di conseguenza. `swing16=N` fa lo stesso con le
+semicrome dentro ogni mezzo battito. `swing=50` (o `swing16=50`) toglie
+lo swing. Fuori da 50-80 e' un errore.
+
+Lo swing non cambia `start` e `duration` degli eventi (i controlli di
+battuta e la partitura restano diritti): ogni evento che suona prodotto
+con lo swing attivo riceve il campo `swing` = [coppia, rapporto], dove
+*coppia* e' 1 (crome) o 0,5 (semicrome) e *rapporto* e' N / 100. Il
+tempo in cui suona un istante t e' poi, con k = ⌊t / coppia⌋ e
+x = t / coppia − k:
+
+    k + 2·rapporto·x                          se x ≤ 1/2
+    k + rapporto + 2·(1 − rapporto)·(x − 1/2) altrimenti
+
+il tutto moltiplicato per *coppia*; si applica all'inizio e alla fine di
+ogni evento (sezione 13). Un blocco di voci eredita lo swing in vigore.
 
 ---
 
@@ -424,7 +488,7 @@ errore.
 `{ v₁ ; v₂ ; … }` contiene **voci** che partono insieme nel punto del
 cursore. Ogni voce e' una sequenza di token interpretata per conto suo:
 
-- parte con l'unita' di griglia, la velocity e i valori delle
+- parte con l'unita' di griglia, la velocity, lo swing e i valori delle
   automazioni correnti (e l'ottava di default); i cambi di stato dentro
   una voce restano li', tranne i valori delle automazioni (sezione 7.5),
   che sono di tutta la traccia;
@@ -580,6 +644,8 @@ conforme DEVE segnalare almeno questi errori:
   automazione, o non chiusa come richiesto dalle sezioni 7.3 e 7.5;
 - un valore di automazione fuori dal suo intervallo; una forcella su una
   pausa o dentro una rampa di `expr` aperta;
+- una legatura usata diversamente da come dicono le sezioni 6.9 e 6.10;
+  uno swing fuori da 50-80;
 - un pattern non definito, un riferimento troppo profondo o ciclico, un
   riferimento MIDI che non si risolve;
 - un blocco vuoto `[]` o un blocco di voci vuoto.
@@ -636,6 +702,8 @@ ha:
 | `value` | numero | valore dell'automazione (`control`; alla fine di una rampa) |
 | `start_value` | numero | valore all'inizio di una rampa (`control`) |
 | `curve` | stringa | curva della rampa: `lin`, `exp`, `log`, `s` (rampe `control`) |
+| `slur` | stringa | `start`, `continue`, `stop` (eventi sotto una legatura, sezione 6.10) |
+| `swing` | elenco | [coppia, rapporto] con lo swing attivo (sezione 7.6) |
 | `voice` | intero | numero di voce (1 fuori dai blocchi di voci) |
 | `lyric` | stringa | sillaba (eventi cantati) |
 
@@ -739,9 +807,13 @@ una traccia per ogni traccia udibile:
 - `slide` → la prima altezza con rampe di pitch bend (ampiezza 24
   semitoni impostata con l'RPN 0);
 - `sustain` → CC 64; marcatori di tempo e cambi per battuta → set-tempo;
+- tempi delle note con lo swing → i tempi della sezione 7.6;
+- eventi sotto una legatura (tranne l'ultimo) senza articolazione → legato;
 - `control` → control change: `vol` CC 7 (× volume della traccia / 100),
   `expr` CC 11, `pan` CC 10 (`round(64 + 63 × valore)`), `mod` CC 1,
-  `rev` CC 91, `cho` CC 93; una rampa si scrive come una serie di valori
+  `rev` CC 91, `cho` CC 93, `ccN` CC N; `bend` → pitch bend `8192 +
+  round(valore / 24 × 8192)` (sul canale si imposta l'ampiezza di 24
+  semitoni, come per gli slide, che usano lo stesso pitch bend); una rampa si scrive come una serie di valori
   lungo la sua curva (al piu' 128 punti, distanti almeno 10 tick, senza
   ripetere valori uguali consecutivi). L'esportazione in partitura
   disegna le rampe di `vol` e di `expr` (forcelle comprese) come forcelle
@@ -766,6 +838,12 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.1** — legature di valore `~` (sezione 6.9), legature di portamento
+`( )` (sezione 6.10), swing `swing=N` / `swing16=N` (sezione 7.6), le
+automazioni `ccN=` e `bend=` (sezione 7.5); i campi `slur` e `swing`
+degli eventi. Ogni testo valido 2.0 e' valido anche in 2.1, con gli
+stessi eventi.
 
 **2.0** — tolte le forme doppie, perche' ogni cosa abbia una sola
 scrittura: l'ottava e' solo `*n` (`c/4` e l'ottava degli accordi `C7/3`

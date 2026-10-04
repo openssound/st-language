@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.0** · Reference implementation: the `st_language` Python
+**Version 2.1** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -78,7 +78,8 @@ position, the first matching rule applies:
    the first following `]` (blocks do not nest); a `'` immediately after
    the `]` extends the token with a note value (`[c e g]'2`), and a
    single `<` or `>` immediately after the `]` extends it with a hairpin
-   (`[c e g]<`). No `]` is an error.
+   (`[c e g]<`), then a `~` with a tie and a `(` or `)` with a slur mark
+   (`[c e g]~`, `[c e g](`). No `]` is an error.
 4. Optional digits followed by `(` start a **group** token that ends at
    the matching `)`; parentheses nest, and parentheses inside lyric
    strings do not count. No matching `)` is an error.
@@ -99,8 +100,9 @@ The grammar of each kind of token (EBNF; `digit` is 0-9, `letter` is
 A-Z or a-z, `word` is one or more letters, digits or `_`):
 
 ```ebnf
-token        = grid | velocity | tempo | ramp | control | sustain | bar-check
-             | lyric | pattern-ref | midi-ref | group | voices | sounding ;
+token        = grid | velocity | tempo | ramp | control | swing | sustain
+             | bar-check | lyric | pattern-ref | midi-ref | group | voices
+             | sounding ;
 
 grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
@@ -109,7 +111,9 @@ tempo        = "tempo=" number ;                               (* tempo=120 *)
 ramp         = ( ">>" | "<<" ) [ curve ] ;                       (* >>  >>exp *)
 curve        = "lin" | "exp" | "log" | "s" ;
 control      = control-name "=" [ "-" ] number [ "." digit { digit } ] ;
-control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" ;   (* vol=80  pan=-0.5 *)
+control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" | "bend"
+             | "cc" number ;                                  (* vol=80  cc74=30 *)
+swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
 sustain      = "SON" | "SOFF" ;
 bar-check    = "|" ;
 lyric        = '"' { any character except '"' } '"' ;
@@ -120,7 +124,7 @@ voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } 
 voice        = { token } ;
 
 sounding     = ( note | chord | percussion | rest | block | slide ) [ value ]
-               [ hairpin ] ;
+               [ hairpin ] [ "~" ] [ "(" | ")" ] ;
 hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
@@ -149,9 +153,11 @@ Notes on the grammar:
 - The **value** may come before or after the modifier: `c'8!` and `c!'8`
   are the same token meaning. It cannot follow a grid, velocity or other
   state command.
-- The **hairpin** is always the last character (`c'2!<`, `2c*4>`); a rest
-  with a hairpin is an error. A token ending in `<<` or `>>` is never a
-  hairpin.
+- At the end of a sounding token come, in this order, the **hairpin**
+  (`c'2!<`, `2c*4>`), the **tie** `~` (section 6.9) and the **slur** mark
+  `(` or `)` (section 6.10): `c'2<~(`. A token ending in `<<` or `>>` is
+  never a hairpin. A `(` at the end of a sounding token is not a group:
+  groups start with `(` or with digits followed by `(`.
 - In a **chord**, the quality is the *shortest* string that lets the
   rest of the token match, so a final `x` is the mute modifier
   (`Cmaj7x`). After a voicing style, a final `x` is the modifier if the
@@ -178,7 +184,8 @@ time, starting at 0) and a **current state**:
 | --- | --- | --- |
 | grid unit | 1 beat (as after `4:`) | grid tokens |
 | velocity | 80 | velocity tokens |
-| automation values | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0 | control tokens (section 7.5) |
+| automation values | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0, `bend` 0, `ccN` 0 | control tokens (section 7.5) |
+| swing | off | swing tokens (section 7.6) |
 | default octave | given by the instrument (4 if none) | — |
 
 **Grid.** `N:` sets the unit to 4/N beats: `4:` quarter note, `8:`
@@ -286,6 +293,37 @@ duration is 0 is an error.
 The event carries the first pitch, the following taps and the segment
 durations.
 
+### 6.9 Ties
+
+A `~` at the end of a note, chord or block **ties** it to the next
+sounding token, which MUST be the same note (the same MIDI pitch, so
+`c#~ db` is allowed), the same chord (symbol, octave, style, bass) or the
+same block (the same atoms in any order). The two make **one** event:
+the start of the first, the sum of the durations, the articulation of
+the last part if it has one. Bar checks, comments, lyrics and state
+commands may stand between them (they apply as usual, but the tied event
+keeps its velocity); `c~ | c` is the usual way to hold a note across a
+bar line. A chain `c~ c~ c` ties three parts.
+
+It is an error to tie a rest, a percussion or a slide, to tie to a
+different note or to a rest, to leave a tie with no following note, or
+to have a voice block between the two parts.
+
+### 6.10 Slurs
+
+A `(` at the end of a sounding token opens a **slur** on it, a `)` at
+the end of a later one closes it: `c( d e f)`. Every note, chord, block
+or slide from the opening to the closing gets the field `slur`: `start`
+on the first, `stop` on the last, `continue` on the others (rests and
+percussion in between are not part of it; a tied event counts once). A
+slur MUST contain at least two events, slurs do not nest, and a slur
+MUST be closed in the same track text or voice where it is opened, with
+no voice block in between. Slurred events without their own articulation
+sound legato (section 13), except the last one.
+
+Inside a group the parentheses of slurs are part of the group's
+balanced parentheses: `2(c( d) e)` repeats a slurred pair.
+
 ---
 
 ## 7. State commands
@@ -356,9 +394,12 @@ single notes, and change continuously even during a held note:
 | `mod` | modulation (vibrato) | 0-127 | 0 |
 | `rev` | reverb send | 0-127 | 0 |
 | `cho` | chorus send | 0-127 | 0 |
+| `bend` | pitch bend, in semitones | −24..24 | 0 |
+| `ccN` | MIDI controller N (0-119), e.g. `cc74` | 0-127 | 0 |
 
-A value outside the range is an error. `pan` keeps its decimals; the
-other values are rounded to the nearest integer (`vol=80.6` is 81).
+A value outside the range, or `ccN` with N > 119, is an error. `pan` and
+`bend` keep their decimals; the other values are rounded to the nearest
+integer (`vol=80.6` is 81).
 
 Without a ramp, `name=N` produces a `control` event at the cursor with
 `name`, `value` = N and duration 0. A ramp (section 7.3) right after it
@@ -383,6 +424,26 @@ event. A hairpin produces, after the event:
    expression returns to its value).
 
 A hairpin inside an open `expr` ramp is an error.
+
+### 7.6 Swing
+
+`swing=N` (N from 50 to 80) swings the eighth notes from the cursor on:
+inside every beat, the first half is stretched to N % of the beat and
+the second half shrinks to the rest. `swing16=N` does the same with the
+sixteenth notes inside every half beat. `swing=50` (or `swing16=50`)
+turns swing off. Outside 50-80 is an error.
+
+Swing does not change the events' `start` and `duration` (bar checks and
+the score keep the straight rhythm): every sounding event produced while
+swing is on gets the field `swing` = [pair, ratio], where *pair* is 1
+(eighths) or 0.5 (sixteenths) and *ratio* is N / 100. The sounding time
+of an instant t is then, with k = ⌊t / pair⌋ and x = t / pair − k:
+
+    k + 2·ratio·x                       if x ≤ 1/2
+    k + ratio + 2·(1 − ratio)·(x − 1/2)  otherwise
+
+all multiplied by *pair*; it is applied to the start and to the end of
+each event (section 13). A voice block inherits the swing in force.
 
 ---
 
@@ -412,8 +473,8 @@ parser without a library MUST report such a reference as an error.
 `{ v₁ ; v₂ ; … }` contains **voices** that start together at the cursor.
 Each voice is a token sequence interpreted on its own:
 
-- it starts with the current grid unit, velocity and automation values
-  (and the default octave); state changes inside a voice stay inside it,
+- it starts with the current grid unit, velocity, swing and automation
+  values (and the default octave); state changes inside a voice stay inside it,
   except automation values (section 7.5), which belong to the whole
   track;
 - its events start at the block's position; voice k (counting from 1)
@@ -562,6 +623,8 @@ conforming parser MUST report at least these errors:
   as required by sections 7.3 and 7.5;
 - an automation value outside its range; a hairpin on a rest or inside
   an open `expr` ramp;
+- a tie or slur not used as required by sections 6.9 and 6.10; a swing
+  value outside 50-80;
 - an undefined pattern, a too-deep or cyclic reference, an unresolvable
   MIDI reference;
 - an empty block `[]` or an empty voice block.
@@ -615,6 +678,8 @@ Interpreting a track produces a list of events. Each event has:
 | `value` | number | automation value (`control`; at the end of a ramp) |
 | `start_value` | number | value at the start of a ramp (`control`) |
 | `curve` | string | ramp curve: `lin`, `exp`, `log`, `s` (`control` ramps) |
+| `slur` | string | `start`, `continue`, `stop` (slurred events, section 6.10) |
+| `swing` | list | [pair, ratio] while swing is on (section 7.6) |
 | `voice` | integer | voice number (1 outside voice blocks) |
 | `lyric` | string | syllable (sung events) |
 
@@ -713,9 +778,13 @@ audible track:
 - `slide` → the first pitch with pitch-bend ramps (bend range set to 24
   semitones via RPN 0);
 - `sustain` → CC 64; tempo markers and per-bar changes → set-tempo;
+- note times with swing → the sounding times of section 7.6;
+- slurred events (except the last) with no articulation → legato;
 - `control` → control change: `vol` CC 7 (× track volume / 100), `expr`
   CC 11, `pan` CC 10 (`round(64 + 63 × value)`), `mod` CC 1, `rev` CC 91,
-  `cho` CC 93; a ramp is written as a series of values along its curve
+  `cho` CC 93, `ccN` CC N; `bend` → pitch bend `8192 + round(value / 24
+  × 8192)` (the 24-semitone range is set on the channel, as for slides,
+  which use the same pitch bend); a ramp is written as a series of values along its curve
   (at most 128 points, at least 10 ticks apart, equal consecutive values
   omitted). The score export draws ramps of `vol` and `expr` (hairpins
   included) as crescendo/diminuendo wedges;
@@ -737,6 +806,11 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.1** — ties `~` (section 6.9), slurs `( )` (section 6.10), swing
+`swing=N` / `swing16=N` (section 7.6), the automations `ccN=` and `bend=`
+(section 7.5); the event fields `slur` and `swing`. Every valid 2.0 text
+is valid 2.1 text with the same events.
 
 **2.0** — removed the duplicate forms, so that each thing has one
 spelling: the octave is only `*n` (`c/4` and the chord octave `C7/3`
