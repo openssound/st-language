@@ -34,7 +34,7 @@ TICKS_PER_BEAT = 480
 
 
 # Ampiezza (in semitoni) del pitch bend impostata via RPN sui canali che
-# contengono almeno uno slide/portamento (c/4>d/4): abbastanza ampia da
+# contengono almeno uno slide/portamento (c*4>d*4): abbastanza ampia da
 # coprire slide di piu' di un'ottava mantenendo comunque precisione utile.
 SLIDE_PITCH_BEND_RANGE_SEMITONES = 24
 

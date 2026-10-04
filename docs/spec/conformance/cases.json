@@ -1,5 +1,5 @@
 {
- "spec_version": "1.1",
+ "spec_version": "2.0",
  "cases": [
   {
    "id": "notes-basic",
@@ -131,7 +131,7 @@
   },
   {
    "id": "notes-octaves",
-   "input": "c*5 c/3 a*0 g*9 cb*4 b#*4",
+   "input": "c*5 c*3 a*0 g*9 cb*4 b#*4",
    "expect": {
     "events": [
      {
@@ -717,7 +717,7 @@
   },
   {
    "id": "tempo-markers",
-   "input": "120§ c d 90§ e",
+   "input": "tempo=120 c d tempo=90 e",
    "expect": {
     "events": [
      {
@@ -763,7 +763,7 @@
   },
   {
    "id": "tempo-ramp",
-   "input": "100§ >> c d e 140§ f",
+   "input": "tempo=100 >> c d e tempo=140 f",
    "expect": {
     "events": [
      {
@@ -1251,7 +1251,7 @@
   },
   {
    "id": "ramp-curves-velocity",
-   "input": "20@ >>exp c d e f 100@ 60§ >>log g a b 120§ c",
+   "input": "20@ >>exp c d e f 100@ tempo=60 >>log g a b tempo=120 c",
    "expect": {
     "events": [
      {
@@ -1723,7 +1723,7 @@
   },
   {
    "id": "chords-octave-voicing-bass",
-   "input": "C*3 Cmaj7.drop2 G7/B C/E*3 C7/3",
+   "input": "C*3 Cmaj7.drop2 G7/B C/E*3 C7*3",
    "expect": {
     "events": [
      {
@@ -2662,7 +2662,7 @@
   },
   {
    "id": "error-ramp-mixed",
-   "input": "p@ >> c 120§ d",
+   "input": "p@ >> c tempo=120 d",
    "expect": {
     "error": true
    }
@@ -2733,6 +2733,34 @@
   {
    "id": "error-unknown-curve",
    "input": "p@ >>quad c f@",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-old-slash-octave",
+   "input": "c/4 d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-old-chord-octave",
+   "input": "C7/3",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-old-tempo",
+   "input": "120§ c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-tempo-range",
+   "input": "tempo=0 c",
    "expect": {
     "error": true
    }

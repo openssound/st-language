@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 1.1** · Implementazione di riferimento: la libreria Python
+**Versione 2.0** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -109,7 +109,7 @@ token        = grid | velocity | tempo | ramp | control | sustain | bar-check
 grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
 dynamic      = "ppp" | "pp" | "p" | "mp" | "mf" | "f" | "ff" | "fff" ;
-tempo        = number "§" ;                                     (* 120§ *)
+tempo        = "tempo=" number ;                               (* tempo=120 *)
 ramp         = ( ">>" | "<<" ) [ curve ] ;                       (* >>  >>exp *)
 curve        = "lin" | "exp" | "log" | "s" ;
 control      = control-name "=" [ "-" ] number [ "." digit { digit } ] ;
@@ -129,9 +129,9 @@ hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
 accidental   = "#" | "b" | "♭" | "-" ;
-octave       = ( "*" | "/" ) number ;
+octave       = "*" number ;
 modifier     = "!" | "x" | "_" ;
-chord        = [ number ] root quality [ "." style ] [ "/" ( bass | number ) ]
+chord        = [ number ] root quality [ "." style ] [ "/" bass ]
                [ "*" number ] [ modifier ] ;
 root         = "A" | "B" | "C" | "D" | "E" | "F" | "G" , [ accidental ] ;
 bass         = root ;
@@ -161,9 +161,8 @@ Note sulla grammatica:
   stoppato (`Cmaj7x`). Dopo uno stile di voicing, una `x` finale e' il
   modificatore se lo stile senza di essa esiste e quello con la `x` no
   (`C.drop2x` e' `drop2` stoppato, `C.hendrix` e' lo stile `hendrix`).
-- Dopo `/`, una lettera e' il **basso** alternativo (`C/E`); delle cifre
-  sono la vecchia forma dell'ottava (`C7/3` = `C7*3`). Per le note `/n` e
-  `*n` sono forme equivalenti dell'ottava.
+- Dopo `/` viene il **basso** alternativo (`C/E`); l'ottava si scrive
+  sempre con `*` (`C7*3`, `C/E*3`).
 - Le lettere minuscole a-g sono note; una parola minuscola che non e' una
   nota, una pausa o un comando e' il nome di una **percussione** e DEVE
   essere uno dei nomi della sezione 9.5.
@@ -206,7 +205,7 @@ Una nota e' una lettera `a`-`g` con un'alterazione facoltativa: `#`
 (diesis), `b`, `♭` o `-` (bemolle; `-` e' una scorciatoia di digitazione).
 `b` da sola e' la nota Si; `bb` e' Si bemolle.
 
-L'**ottava** segue `*` (o la vecchia forma `/`): `c*4` e' il Do centrale.
+L'**ottava** segue `*`: `c*4` e' il Do centrale.
 Se manca si usa l'ottava di default dello strumento. Il numero di nota
 MIDI e'
 
@@ -309,7 +308,8 @@ classiche sono velocity fisse:
 
 ### 7.2 Tempo
 
-`N§` imposta il tempo (battiti al minuto) dal cursore in poi. Produce un
+`tempo=N` imposta il tempo (battiti al minuto, 1-999; fuori e' un errore)
+dal cursore in poi. Produce un
 evento di tipo `tempo_marker` con `bpm` = N. Il tempo e' globale: un
 marcatore in una traccia qualsiasi cambia il tempo di tutto il brano.
 
@@ -767,6 +767,14 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.0** — tolte le forme doppie, perche' ogni cosa abbia una sola
+scrittura: l'ottava e' solo `*n` (`c/4` e l'ottava degli accordi `C7/3`
+non sono piu' validi; `/` e' solo il basso alternativo), il comando di
+tempo e' `tempo=N` al posto di `N§`. Nel file di brano un'intestazione
+corta di traccia vuole uno spazio prima dell'indice (`Guitar 2:`;
+`Guitar2:` e' lo strumento `Guitar2`). I testi con le forme tolte non
+sono validi.
 
 **1.1** — automazioni (`vol=`, `expr=`, `pan=`, `mod=`, `rev=`,
 `cho=`, sezione 7.5) con le loro rampe, curve delle rampe (`>>exp`,

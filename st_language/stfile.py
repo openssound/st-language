@@ -93,14 +93,11 @@ _RE_TRACK_HDR_SPACED = re.compile(r"^([A-Za-z]\w*)(?:\s+(\d+))?\s*:$")
 def short_track_header(line: str, instrument_names) -> Optional[Tuple[str, str]]:
     """(strumento, indice) di un'intestazione corta di traccia ("Piano:",
     "Piano 2:", "Lead8basslead 2:"), None se la riga non lo e' o se lo
-    strumento non e' fra instrument_names. Il nome intero vale prima della
-    forma storica senza spazio ("Guitar2:" = Guitar, indice 2)."""
+    strumento non e' fra instrument_names. L'indice va dopo uno spazio:
+    "Guitar2:" e' lo strumento "Guitar2", non Guitar con indice 2."""
     m = _RE_TRACK_HDR_SPACED.match(line)
     if m and m.group(1) in instrument_names:
         return m.group(1), m.group(2) or ""
-    m = re.match(r"^([A-Za-z]\w*?)(\d+)\s*:$", line)
-    if m and m.group(1) in instrument_names:
-        return m.group(1), m.group(2)
     return None
 
 # Formato esplicito con parentesi quadre, usato quando il nome della traccia
