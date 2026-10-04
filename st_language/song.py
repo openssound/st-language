@@ -23,7 +23,7 @@ from .notation import Event, Pattern, COMMENT_MARK, parse_track_text, tokenize
 from .stfile import (
     RE_AMBIENTE, RE_AUDIO_HDR, RE_BOX_HDR, RE_EFFECTS_HDR, RE_INSTRUMENT_HDR, RE_KEY, RE_MASTER,
     RE_MASTER_CHAIN_HDR, RE_METRICA, RE_METRICA_LIST_HDR, RE_MIXER_HDR, RE_PATTERN_HDR, RE_SYNTH_HDR,
-    RE_TEMPO, RE_TEMPO_LIST_HDR, RE_TRACK_HDR, RE_TRACK_HDR_DASH, RE_TRACK_HDR_EXPLICIT,
+    RE_TEMPO, RE_TEMPO_LIST_HDR, RE_TRACK_HDR, RE_TRACK_HDR_DASH, RE_TRACK_HDR_EXPLICIT, short_track_header,
     _extract_box_blocks, _extract_named_blocks, _parse_bar_value_list, _parse_instrument_body,
     _parse_mixer_body,
 )
@@ -272,11 +272,11 @@ def read_song(text: str, name: str = "ST") -> Song:
                 flush()
             current_name, current_instrument, mode = m.group(1).strip(), m.group(2), "track"
             continue
-        m = RE_TRACK_HDR.match(line)
-        if m and m.group(1) in _instrument_names(song):
+        header = short_track_header(line, _instrument_names(song))
+        if header:
             if mode:
                 flush()
-            instr, idx = m.group(1), m.group(2)
+            instr, idx = header
             current_name = f"{instr} {idx}".strip() if idx else instr
             current_instrument, mode = instr, "track"
             continue

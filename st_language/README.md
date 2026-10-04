@@ -5,8 +5,8 @@ drums, dynamics, tempo changes, automations (volume, expression, pan,
 modulation, effect sends, with curved ramps and hairpins), several
 voices and lyrics — and this is
 its reference implementation: a pure-Python library (no dependencies)
-with command-line tools to check songs and export them to **MIDI** and
-**MusicXML**. It is the notation engine of
+with command-line tools to check songs and export them to **MIDI**,
+**MusicXML** and **ABC**. It is the notation engine of
 [SoundText](https://github.com/Crsvss/soundtext), usable on its own.
 
 ```
@@ -32,11 +32,12 @@ pip install .            # from the SoundText repository
 st-language check song.st          # syntax errors and warnings (bar checks, lyrics)
 st-language midi song.st -o song.mid
 st-language musicxml song.st       # -> song.musicxml
+st-language abc song.st            # -> song.abc (ABC 2.1)
 st-language events song.st         # the events as JSON
 echo "4: c d e f | 2g 2g" | st2mid - -o melody.mid --instrument Trumpet
 ```
 
-`stcheck`, `st2mid` and `st2musicxml` are shortcuts. A file without track
+`stcheck`, `st2mid`, `st2musicxml` and `st2abc` are shortcuts. A file without track
 headers is a one-track song (choose the instrument with `--instrument`).
 Messages are in English, Italian, French or Spanish (`--lang`, or the
 `ST_LANGUAGE`/`LANG` environment variables).
@@ -56,6 +57,7 @@ song.add_track("Bass", "Bass", "4: c*2 g*1 2c*2")
 song.add_pattern("Riff", "8: c d e g")
 st.to_midi(song, "demo.mid")
 st.to_musicxml(song, "demo.musicxml")
+st.to_abc(song, "demo.abc")
 ```
 
 ## Specification
@@ -74,6 +76,6 @@ GPL-3.0-or-later, © 2026 Sergio Scolaro.
 
 *In italiano:* ST-language e' la notazione musicale testuale di
 SoundText come libreria Python autonoma, senza dipendenze, con i comandi
-`st-language check | midi | musicxml | events` (e le scorciatoie
-`stcheck`, `st2mid`, `st2musicxml`). La specifica, anche in italiano, e'
+`st-language check | midi | musicxml | abc | events` (e le scorciatoie
+`stcheck`, `st2mid`, `st2musicxml`, `st2abc`). La specifica, anche in italiano, e'
 in `docs/spec/` del repository.

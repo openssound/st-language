@@ -686,6 +686,9 @@ beat:
 - the parts are joined with spaces; a box's end is its start plus the
   end of its last event.
 
+The body of a track that has boxes is ignored, so writers leave it empty:
+the header alone gives the track's name and instrument.
+
 ### 12.5 Solo and mute
 
 The audible tracks are the tracks not in mute; if at least one track is

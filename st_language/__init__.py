@@ -11,10 +11,12 @@ Python autonoma (nessuna dipendenza esterna, Python 3.8+).
     song = st.load_song("brano.st")                    # o st.read_song(testo)
     st.to_midi(song, "brano.mid")
     st.to_musicxml(song, "brano.musicxml")
+    st.to_abc(song, "brano.abc")
 
 La specifica del linguaggio e del formato .st e' in docs/spec/ del
 repository di SoundText; i comandi da terminale sono 'st-language'
-(check, midi, musicxml, events), 'stcheck', 'st2mid', 'st2musicxml'.
+(check, midi, musicxml, abc, events), 'stcheck', 'st2mid', 'st2musicxml',
+'st2abc'.
 """
 
 from typing import Dict, List, Optional, Tuple
@@ -31,7 +33,7 @@ __version__ = "1.1.0"
 __all__ = [
     "BarIssue", "Clip", "Event", "NotationError", "Part", "Pattern", "Song", "check", "check_bar_lines",
     "language", "load_song", "notation_warnings", "parse", "parse_track_text", "read_song",
-    "set_language", "set_translator", "song_from_notation", "text_to_song", "to_midi", "to_musicxml",
+    "set_language", "set_translator", "song_from_notation", "text_to_song", "to_abc", "to_midi", "to_musicxml",
     "tokenize", "transpose_tokens", "validate", "validate_track_text",
 ]
 
@@ -61,3 +63,8 @@ def to_midi(song: Song, path: str, only_audible: bool = True) -> str:
 def to_musicxml(song: Song, path: str, only_audible: bool = True) -> str:
     from .musicxml import export_project_to_musicxml
     return export_project_to_musicxml(song, path, only_audible=only_audible)
+
+
+def to_abc(song: Song, path: str, only_audible: bool = True) -> str:
+    from .abc import export_project_to_abc
+    return export_project_to_abc(song, path, only_audible=only_audible)
