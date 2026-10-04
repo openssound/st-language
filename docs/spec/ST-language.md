@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 1.1** · Reference implementation: the `st_language` Python
+**Version 2.0** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -105,7 +105,7 @@ token        = grid | velocity | tempo | ramp | control | sustain | bar-check
 grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
 dynamic      = "ppp" | "pp" | "p" | "mp" | "mf" | "f" | "ff" | "fff" ;
-tempo        = number "§" ;                                     (* 120§ *)
+tempo        = "tempo=" number ;                               (* tempo=120 *)
 ramp         = ( ">>" | "<<" ) [ curve ] ;                       (* >>  >>exp *)
 curve        = "lin" | "exp" | "log" | "s" ;
 control      = control-name "=" [ "-" ] number [ "." digit { digit } ] ;
@@ -125,9 +125,9 @@ hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
 accidental   = "#" | "b" | "♭" | "-" ;
-octave       = ( "*" | "/" ) number ;
+octave       = "*" number ;
 modifier     = "!" | "x" | "_" ;
-chord        = [ number ] root quality [ "." style ] [ "/" ( bass | number ) ]
+chord        = [ number ] root quality [ "." style ] [ "/" bass ]
                [ "*" number ] [ modifier ] ;
 root         = "A" | "B" | "C" | "D" | "E" | "F" | "G" , [ accidental ] ;
 bass         = root ;
@@ -157,9 +157,8 @@ Notes on the grammar:
   (`Cmaj7x`). After a voicing style, a final `x` is the modifier if the
   style without it exists and the style with it does not (`C.drop2x`
   is `drop2` muted, `C.hendrix` is the `hendrix` style).
-- After `/`, a letter is an alternate **bass** (`C/E`); digits are the
-  legacy octave form (`C7/3` = `C7*3`). For notes, `/n` and `*n` are
-  equivalent octave forms.
+- After `/` comes an alternate **bass** (`C/E`); the octave is always
+  written with `*` (`C7*3`, `C/E*3`).
 - Lowercase letters a-g are notes; a lowercase word that is not a note,
   a rest or a command is a **percussion** name and MUST be one of the
   names of section 9.5.
@@ -202,7 +201,7 @@ A note is a letter `a`-`g` with an optional accidental: `#` (sharp),
 `b`, `♭` or `-` (flat; `-` is a typing shortcut). `b` alone is the note
 B; `bb` is B-flat.
 
-The **octave** follows `*` (or the legacy `/`): `c*4` is middle C. When
+The **octave** follows `*`: `c*4` is middle C. When
 absent, the instrument's default octave is used. The MIDI note number is
 
 ```
@@ -300,7 +299,8 @@ are fixed velocities:
 
 ### 7.2 Tempo
 
-`N§` sets the tempo (beats per minute) from the cursor on. It produces
+`tempo=N` sets the tempo (beats per minute, 1-999; outside is an error)
+from the cursor on. It produces
 an event of kind `tempo_marker` with `bpm` = N. Tempo is global: a
 marker in any track changes the tempo of the whole song.
 
@@ -736,6 +736,13 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.0** — removed the duplicate forms, so that each thing has one
+spelling: the octave is only `*n` (`c/4` and the chord octave `C7/3`
+are no longer valid; `/` is only the alternate bass), the tempo command
+is `tempo=N` instead of `N§`. In the song file a short track header needs
+a space before the index (`Guitar 2:`; `Guitar2:` is the instrument
+`Guitar2`). Texts using the removed forms are invalid.
 
 **1.1** — automations (`vol=`, `expr=`, `pan=`, `mod=`, `rev=`,
 `cho=`, section 7.5) with their ramps, ramp curves (`>>exp`, `>>log`,

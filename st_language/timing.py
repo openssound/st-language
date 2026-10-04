@@ -3,7 +3,7 @@ Mappa di tempo (BPM) e metrica in funzione del beat assoluto (quarti) del
 progetto, unificando le due sorgenti di cambi possibili:
   1) l'elenco Tempo:/Metrica: per battuta dell'intestazione del progetto
      (project.tempo_changes / project.metrica_changes);
-  2) i marcatori di tempo inline (120§) presenti nelle tracce (solo tempo,
+  2) i marcatori di tempo inline (tempo=120) presenti nelle tracce (solo tempo,
      non esiste un equivalente inline per la metrica).
 
 Usata sia dall'esportazione MIDI (core.midi_export, che lavora in tick) sia

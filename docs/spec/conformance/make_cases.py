@@ -26,7 +26,7 @@ CASES = [
     # --- altezze e durate
     ("notes-basic", "c d e f g a b", {}),
     ("notes-accidentals", "c# db d♭ d- eb b bb", {}),
-    ("notes-octaves", "c*5 c/3 a*0 g*9 cb*4 b#*4", {}),
+    ("notes-octaves", "c*5 c*3 a*0 g*9 cb*4 b#*4", {}),
     ("notes-default-octave", "c e", {"octave": 2}),
     ("grid-and-multipliers", "8: c d 2e 16: f g 4: 3a r 2r", {}),
     ("grid-tuplets", "8T: c d e 16Q: c d e f g 8S: c d e f g a b 4: c", {}),
@@ -36,8 +36,8 @@ CASES = [
     # --- dinamiche, tempo, pedale
     ("velocity-and-dynamics", "100@ c 30@ d pp@ e mf@ f fff@ g", {}),
     ("velocity-ramp", "p@ >> c d e f ff@ g", {}),
-    ("tempo-markers", "120§ c d 90§ e", {}),
-    ("tempo-ramp", "100§ >> c d e 140§ f", {}),
+    ("tempo-markers", "tempo=120 c d tempo=90 e", {}),
+    ("tempo-ramp", "tempo=100 >> c d e tempo=140 f", {}),
     ("sustain", "SON c d SOFF e", {}),
     # --- automazioni, curve delle rampe, forcelle (1.1)
     ("automations-set", "vol=90 c expr=64 d pan=-0.5 mod=30 rev=40.4 cho=20 e", {}),
@@ -46,12 +46,12 @@ CASES = [
     ("automations-overlapping-ramps", "vol=50 >> pan=0 >> c d pan=1 e vol=120", {}),
     ("automations-ramp-same-position", "mod=10 >> mod=90 c", {}),
     ("automations-in-voices", "{ c vol=30 ; d d } expr=100 e<", {}),
-    ("ramp-curves-velocity", "20@ >>exp c d e f 100@ 60§ >>log g a b 120§ c", {}),
+    ("ramp-curves-velocity", "20@ >>exp c d e f 100@ tempo=60 >>log g a b tempo=120 c", {}),
     ("hairpins", "2c< d> e'2< [c e g]> 4: C7!< c>e<", {}),
     ("hairpins-follow-expression", "expr=100 2c< vol=60 >> d< e vol=90", {}),
     # --- accordi, blocchi, percussioni
     ("chords", "C Am7 G7 Cmaj7 F#m7b5 Bb Ebdim7 Dsus4 E5 C°", {}),
-    ("chords-octave-voicing-bass", "C*3 Cmaj7.drop2 G7/B C/E*3 C7/3", {}),
+    ("chords-octave-voicing-bass", "C*3 Cmaj7.drop2 G7/B C/E*3 C7*3", {}),
     ("blocks", "[c e g] 2[c*3 g*3] [kick snare] [C e*5]", {}),
     ("percussion", "kick snare hihat hihat_open crash ride 2kick", {}),
     ("slides", "c*4>d*4 2c*4>d*4>c*4 c*4>2d*4 8: c*4>d*4", {}),
@@ -81,7 +81,7 @@ CASES = [
     ("error-bad-note-value", "c'3", {}),
     ("error-ramp-without-anchor", ">> c", {}),
     ("error-ramp-not-closed", "p@ >> c d", {}),
-    ("error-ramp-mixed", "p@ >> c 120§ d", {}),
+    ("error-ramp-mixed", "p@ >> c tempo=120 d", {}),
     ("error-undefined-pattern", "%Nope", {}),
     ("error-bar-check-in-block", "[c | e]", {}),
     ("error-semicolon-outside-voices", "c ; d", {}),
@@ -92,6 +92,10 @@ CASES = [
     ("error-hairpin-on-rest", "c r<", {}),
     ("error-hairpin-in-expression-ramp", "expr=40 >> c< expr=120", {}),
     ("error-unknown-curve", "p@ >>quad c f@", {}),
+    ("error-old-slash-octave", "c/4 d", {}),
+    ("error-old-chord-octave", "C7/3", {}),
+    ("error-old-tempo", "120§ c", {}),
+    ("error-tempo-range", "tempo=0 c", {}),
     # --- avvisi (il testo e' valido)
     ("warning-bar-missing", "4: c d e | f g a b |", {}),
     ("warning-bar-extra", "8: c d e f g a b c d | e", {}),
@@ -154,7 +158,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "1.1", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.0", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 

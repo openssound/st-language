@@ -196,10 +196,7 @@ def midi_to_pitch(midi: int):
 
 
 def midi_to_token(midi: int) -> str:
-    """Converte una nota MIDI nel token di notazione interna (es. 60 -> 'c*4', 61 -> 'c#*4').
-    Usa '*' (sintassi preferita per l'ottava): '/' resta valido in lettura
-    per compatibilita' con progetti gia' scritti, ma qui si genera sempre
-    testo nuovo, quindi si usa direttamente la forma preferita."""
+    """Converte una nota MIDI nel token di notazione interna (es. 60 -> 'c*4', 61 -> 'c#*4')."""
     letter, octave = midi_to_pitch(midi)
     return f"{letter}*{octave}"
 

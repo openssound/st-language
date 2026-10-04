@@ -277,21 +277,15 @@ RE_REST = re.compile(r"^(\d*)r$")
 # note_name_to_pc). '-' e' una scorciatoia di digitazione: l'editor la sostituisce
 # automaticamente con '♭' quando viene battuta subito dopo una lettera nota, per
 # evitare l'ambiguita' visiva tra la 'b' di alterazione e la lettera nota 'b' (Si).
-# Ottava: '*n' (sintassi preferita) oppure, per compatibilita' con i progetti
-# gia' scritti, '/n' (equivalente, mai deprecato: nessun motivo di rompere
-# file esistenti solo per uniformare la sintassi).
-RE_NOTE = re.compile(r"^(\d*)([a-g])([#b♭-]?)(?:[/*](\d+))?([!x_])?$")
+# Ottava: '*n' (es. c*5); senza, quella di default dello strumento.
+RE_NOTE = re.compile(r"^(\d*)([a-g])([#b♭-]?)(?:\*(\d+))?([!x_])?$")
 # Suffisso opzionale '.stile' (es. Cmaj7.drop2) per forzare il voicing:
 # vedi core.chords.ALL_VOICINGS per l'elenco degli stili validi. La classe
 # di caratteri della qualita' include '#' per accordi come '7#9' e '°' per
 # l'alias di 'dim'/'dim7' ('C°', 'C°7').
-# Dopo l'eventuale '.stile' un unico gruppo opzionale introdotto da '/' e'
-# o il basso alternativo (lettera nota maiuscola, es. 'C/E' = Do col basso
-# Mi) o, per compatibilita' con la vecchia sintassi, l'ottava in cifre
-# (es. 'C7/3'): i due usi non sono ambigui per il parser, si distinguono
-# dal tipo di carattere che segue '/' (lettera vs cifra) - vedi
-# split_chord_slash(). L'ottava nella sintassi preferita si scrive invece
-# con '*n', indipendentemente dal basso alternativo (es. 'C/E*4').
+# Dopo l'eventuale '.stile', '/' introduce il basso alternativo (lettera
+# nota maiuscola, es. 'C/E' = Do col basso Mi); l'ottava si scrive con
+# '*n', anche insieme al basso (es. 'C/E*4').
 # Modificatore opzionale finale (dopo l'eventuale ottava): '!' staccato,
 # 'x' mute, '_' legato, stesso schema delle note (vedi Event.articulation).
 # La qualita' e' la piu' corta che fa tornare il resto del token: cosi'
@@ -299,18 +293,18 @@ RE_NOTE = re.compile(r"^(\d*)([a-g])([#b♭-]?)(?:[/*](\d+))?([!x_])?$")
 # della qualita' (nessuna qualita' finisce con 'x').
 RE_CHORD = re.compile(
     r"^(\d*)([A-G])([#b♭-]?)([A-Za-z0-9#°]*?)(?:\.([A-Za-z0-9]+))?"
-    r"(?:/([A-G][#b♭-]?|\d+))?(?:\*(\d+))?([!x_])?$"
+    r"(?:/([A-G][#b♭-]?))?(?:\*(\d+))?([!x_])?$"
 )
 RE_PERC = re.compile(r"^(\d*)([a-z][a-z_0-9]*)$")
-# Portamento/slide tra due o piu' note: c/4>d/4 (o c*4>d*4, vedi RE_NOTE),
+# Portamento/slide tra due o piu' note: c*4>d*4,
 # oppure una catena c*4>d*4>c*4 (bend-and-release: sale e poi rilascia,
 # tutto entro la stessa unita' di griglia). Ogni tappa puo' avere un proprio
 # moltiplicatore di durata (es. 2c*4>3d*4, vedi _slide_segment_durations
 # per la semantica): il gruppo catturato e' l'intera catena grezza, da
 # ripassare a RE_SLIDE_POINT tappa per tappa dopo lo split su '>'.
-_SLIDE_POINT_PATTERN = r"\d*[a-g][#b♭-]?(?:[/*]\d+)?"
+_SLIDE_POINT_PATTERN = r"\d*[a-g][#b♭-]?(?:\*\d+)?"
 RE_SLIDE = re.compile(rf"^({_SLIDE_POINT_PATTERN}(?:>{_SLIDE_POINT_PATTERN})+)$")
-RE_SLIDE_POINT = re.compile(r"^(\d*)([a-g])([#b♭-]?)(?:[/*](\d+))?$")
+RE_SLIDE_POINT = re.compile(r"^(\d*)([a-g])([#b♭-]?)(?:\*(\d+))?$")
 
 
 def _check_pitch_range(letter: str, octave: int, tok: str) -> None:
@@ -369,18 +363,6 @@ def _slide_segment_durations(points: List[Tuple[Optional[int], str, int]],
     return [(mult if mult is not None else 1) * grid_beats for mult, _, _ in points]
 
 
-def split_chord_slash(slash_val: Optional[str]):
-    """Scompone il gruppo unificato dopo '/' di RE_CHORD in (basso,
-    ottava_legacy): una lettera nota (es. 'E') e' basso alternativo, una
-    stringa di sole cifre (es. '3') e' l'ottava nella vecchia sintassi.
-    Ritorna (None, None) se il gruppo non era presente nel token."""
-    if slash_val is None:
-        return None, None
-    if slash_val[0].isdigit():
-        return None, slash_val
-    return slash_val, None
-
-
 def split_note_value(tok: str) -> Tuple[str, str]:
     """(token senza valore di nota, valore come scritto: "'8." o "").
     c*4'8. -> ('c*4', "'8."); c'8! -> ('c!', "'8"); c'2< -> ('c', "'2<");
@@ -416,8 +398,8 @@ def is_lyric(tok: str) -> bool:
     return len(tok) >= 2 and tok[0] == LYRIC_QUOTE and tok[-1] == LYRIC_QUOTE
 
 
-# Tempo istantaneo inline in una traccia: 120§
-RE_TEMPO_SET = re.compile(r"^(\d+)§$")
+# Tempo inline in una traccia (BPM, da qui in poi per tutto il brano): tempo=120
+RE_TEMPO_SET = re.compile(r"^tempo=(\d+)$")
 # Rampe: '>>' o '<<' (equivalenti), con la forma della curva facoltativa:
 # lin (di default), exp (parte piano e accelera: i fade dei volumi), log
 # (parte veloce e rallenta), s (morbida a inizio e fine).
@@ -513,9 +495,7 @@ def transpose_tokens(tokens: List[str], semitones: int, default_octave: int) -> 
             return f"{mult or ''}{new_letter}*{new_octave}{modifier or ''}"
         m = RE_CHORD.match(tok)
         if m:
-            mult, letter, accidental, suffix, voicing, slash_val, star_octv, modifier = m.groups()
-            bass, legacy_octv = split_chord_slash(slash_val)
-            octv = star_octv or legacy_octv
+            mult, letter, accidental, suffix, voicing, bass, octv, modifier = m.groups()
             symbol = letter + accidental + suffix
             try:
                 new_symbol = transpose_chord_root(symbol, semitones)
@@ -660,10 +640,8 @@ def _parse_atom(tok: str, default_octave: int):
         }
     m = RE_CHORD.match(tok)
     if m:
-        mult, letter, accidental, suffix, voicing, slash_val, star_octv, modifier = m.groups()
+        mult, letter, accidental, suffix, voicing, bass, octv, modifier = m.groups()
         voicing, modifier = _split_voicing_modifier(voicing, modifier)
-        bass, legacy_octv = split_chord_slash(slash_val)
-        octv = star_octv or legacy_octv
         symbol = letter + accidental + suffix
         # Import locale per evitare dipendenza circolare
         from .chords import parse_chord_symbol, ALL_VOICINGS
@@ -749,13 +727,13 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
     notation_warnings."""
     grid_beats = initial_grid  # unita' di durata corrente, in beat (quarti). Default: 1/4 (nera)
     velocity = initial_velocity  # velocity corrente
-    tempo = None             # tempo corrente inline (solo se la traccia usa N§)
+    tempo = None             # tempo corrente inline (solo se la traccia usa tempo=N)
     cursor = Fraction(0)     # posizione nella timeline, in beat
     events: List[Event] = []
 
     # Stato per le rampe (Crescendo/diminuendo di velocity, accelerando/
     # rallentando di tempo) introdotte da >> o << subito dopo un comando N@
-    # (o dinamica) / N§, e chiuse dal successivo comando dello stesso tipo.
+    # (o dinamica) / tempo=N, e chiuse dal successivo comando dello stesso tipo.
     last_state_kind = None   # 'grid' | 'velocity' | 'tempo' (ultimo comando di stato incontrato)
     pending_ramp = None      # {'kind': 'velocity'|'tempo', 'start_value': float, 'start_index': int}
     # Note che aspettano la sillaba del prossimo testo cantato "...": la
@@ -792,9 +770,9 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
         affected = [ev for ev in events[start_index:] if ev.kind != "control"]
         n = len(affected)
         if n == 0 and pending_ramp["kind"] == "tempo":
-            # Nessun evento dentro la rampa ('120§ >> 140§ c'): non c'e'
+            # Nessun evento dentro la rampa ('tempo=120 >> tempo=140 c'): non c'e'
             # niente su cui distribuirla, ma il valore di arrivo va comunque
-            # applicato da qui in poi, come un N§ senza rampa.
+            # applicato da qui in poi, come un tempo=N senza rampa.
             events.append(Event(start=float(cursor), duration=0.0, kind="tempo_marker", bpm=end_value))
         # frac va da 0 (primo evento della rampa, coincide col valore di
         # partenza) a 1 (ultimo evento, coincide col valore di arrivo): con
@@ -889,6 +867,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             m = RE_TEMPO_SET.match(tok)
             if m:
                 new_tempo = int(m.group(1))
+                if not 1 <= new_tempo <= 999:
+                    raise NotationError(tr("Tempo fuori range (1-999 BPM)"), tok)
                 if pending_ramp and pending_ramp["kind"] == "tempo":
                     _finalize_ramp(new_tempo)
                 elif pending_ramp:
@@ -898,8 +878,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     # meglio segnalarlo subito che lasciare un bug silenzioso.
                     raise NotationError(
                         tr("Rampa di velocity ('>>'/'<<' dopo N@ o una dinamica) aperta ma mai "
-                        "richiusa da un altro N@/dinamica prima di questo cambio di tempo (N§): "
-                        "chiudila con un altro N@ prima, oppure sposta N§ dopo la chiusura"), tok
+                        "richiusa da un altro N@/dinamica prima di questo cambio di tempo (tempo=N): "
+                        "chiudila con un altro N@ prima, oppure sposta tempo=N dopo la chiusura"), tok
                     )
                 else:
                     events.append(Event(start=float(cursor), duration=0.0, kind="tempo_marker", bpm=new_tempo))
@@ -916,7 +896,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     continue
                 if last_state_kind not in ("velocity", "tempo"):
                     raise NotationError(
-                        tr("'>>' / '<<' deve seguire un comando di velocity (N@), di tempo (N§) "
+                        tr("'>>' / '<<' deve seguire un comando di velocity (N@), di tempo (tempo=N) "
                            "o un'automazione (vol=, expr=, pan=, mod=, rev=, cho=)"), tok
                     )
                 start_value = tempo if last_state_kind == "tempo" else velocity
@@ -958,11 +938,11 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 if pending_ramp and pending_ramp["kind"] == "velocity":
                     _finalize_ramp(v)
                 elif pending_ramp:
-                    # kind == "tempo": stesso problema del ramo N§ sopra, speculare.
+                    # kind == "tempo": stesso problema del ramo tempo=N sopra, speculare.
                     raise NotationError(
-                        tr("Rampa di tempo ('>>'/'<<' dopo N§) aperta ma mai richiusa da un altro "
-                        "N§ prima di questo comando di velocity (N@/dinamica): chiudila con un "
-                        "altro N§ prima, oppure sposta il comando di velocity dopo la chiusura"), tok
+                        tr("Rampa di tempo ('>>'/'<<' dopo tempo=N) aperta ma mai richiusa da un altro "
+                        "tempo=N prima di questo comando di velocity (N@/dinamica): chiudila con un "
+                        "altro tempo=N prima, oppure sposta il comando di velocity dopo la chiusura"), tok
                     )
                 velocity = v
                 last_state_kind = "velocity"
@@ -1053,7 +1033,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
         raise NotationError(tr("Rampa di '{name}' aperta ma mai chiusa da un valore finale ({name}=N)",
                                name=next(iter(pending_controls))))
     if pending_ramp and not lenient:
-        anchor = "N§" if pending_ramp["kind"] == "tempo" else "N@"
+        anchor = "tempo=N" if pending_ramp["kind"] == "tempo" else "N@"
         raise NotationError(tr("Rampa '>>' o '<<' aperta ma mai chiusa da un valore finale ({anchor})", anchor=anchor))
 
     return events, cursor, grid_beats
@@ -1117,7 +1097,7 @@ def compute_token_spans(text: str, patterns: Dict[str, Pattern], midi_dir: Optio
     uno span e non blocca gli altri.
 
     Ritorna una lista di tuple (char_start, char_end, beat_start, beat_duration),
-    ordinata per beat_start crescente. I comandi di stato (N:, NT:, N@, N§,
+    ordinata per beat_start crescente. I comandi di stato (N:, NT:, N@, tempo=N,
     rampe, SON/SOFF) non producono uno span (non hanno una durata propria)."""
     raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave)
     raw_positions = [(cs, ce) for _, cs, ce in raw]
