@@ -87,6 +87,22 @@ _DRUM_DISPLAY = {
 _DRUM_DEFAULT_DISPLAY = ("C", 5, "normal")
 
 _ARTICULATIONS = {"staccato": "staccato", "mute": "staccatissimo", "legato": "tenuto"}
+# Segni sulle note ($accent...) come elementi di <notations>.
+_DECORATION_ARTICULATIONS = {"accent": "accent", "marcato": "strong-accent", "tenuto": "tenuto"}
+_DECORATION_ORNAMENTS = {"tr": "trill-mark", "mordent": "mordent", "turn": "turn"}
+
+
+def _decorations_xml(decorations) -> str:
+    xml = ""
+    arts = [_DECORATION_ARTICULATIONS[d] for d in decorations if d in _DECORATION_ARTICULATIONS]
+    if arts:
+        xml += "<articulations>" + "".join(f"<{a}/>" for a in arts) + "</articulations>"
+    orns = [_DECORATION_ORNAMENTS[d] for d in decorations if d in _DECORATION_ORNAMENTS]
+    if orns:
+        xml += "<ornaments>" + "".join(f"<{o}/>" for o in orns) + "</ornaments>"
+    if "fermata" in decorations:
+        xml += '<fermata type="upright"/>'
+    return xml
 
 # Sigle: intervalli dell'accordo -> valore 'kind' di MusicXML. Il testo
 # mostrato resta comunque quello scritto nel progetto (attributo text).
@@ -126,6 +142,7 @@ class _Item:
     lyric_xml: str = ""                    # <lyric> gia' pronto (vedi _mark_lyrics)
     slur: Optional[str] = None             # legatura di portamento: start/continue/stop
     swing: Optional[Tuple[float, float]] = None
+    decorations: Tuple[str, ...] = ()      # segni: accent, fermata, tr...
 
 
 @dataclass
@@ -218,7 +235,8 @@ def _track_items(events: List[Event], instrument, flats: bool, grid: Optional[in
         if ev.kind in ("rest", "tempo_marker") or end <= start:
             continue
         item = _Item(start, end, articulation=ev.articulation, velocity=ev.velocity,
-                     voice=ev.voice, lyric=ev.lyric, slur=ev.slur, swing=ev.swing)
+                     voice=ev.voice, lyric=ev.lyric, slur=ev.slur, swing=ev.swing,
+                     decorations=tuple(ev.decorations or ()))
         if ev.kind in ("note", "slide"):
             item.pitches.append(_spell_letter(ev.letter, ev.octave))
         elif ev.kind == "chord":
@@ -280,6 +298,140 @@ def _wedge_directions(wedges: List[Tuple[Fraction, Fraction, str]], end: Fractio
         directions.append(_Direction(stop, _direction_xml(
             f'<wedge type="stop" number="{number}"/>', 1, placement="below")))
     return directions
+
+
+@dataclass
+class _BarMarks:
+    """Cosa scrivere sulle stanghette di una battuta (ritornelli e caselle)."""
+    forward: bool = False                     # |: a sinistra
+    backward: Optional[int] = None            # :| a destra (quante volte si suona)
+    ending_start: Optional[int] = None        # casella N. che comincia qui
+    ending_stop: Optional[Tuple[int, str]] = None   # (N, "stop" / "discontinue")
+
+
+def _track_repeats(events: List[Event], grid: Optional[int]) -> List[dict]:
+    """I ritornelli piu' esterni della prima voce (eventi 'repeat'): inizio,
+    inizio di ogni passaggio, inizio delle caselle, fine."""
+    regions, depth, current = [], 0, None
+    for ev in events:
+        if ev.kind != "repeat" or ev.voice != 1:
+            continue
+        t = _frac(ev.start, grid)
+        if ev.name == "start":
+            depth += 1
+            if depth == 1:
+                current = {"start": t, "passes": [t], "endings": []}
+        elif ev.name == "again" and depth == 1:
+            current["passes"].append(t)
+        elif ev.name == "ending" and depth == 1:
+            current["endings"].append(t)
+        elif ev.name == "end":
+            if depth == 1 and current is not None:
+                current["end"] = t
+                regions.append(current)
+            depth = max(0, depth - 1)
+    return regions
+
+
+def _item_signature(item: _Item, offset: Fraction) -> tuple:
+    return (item.start - offset, item.end - offset, tuple(p.midi for p in item.pitches), tuple(item.drums),
+            item.harmony, item.articulation, item.velocity, item.voice, item.lyric, item.slur,
+            item.decorations)
+
+
+def _repeat_layout(measures, regions: List[dict], items_by_track: List[List[_Item]]
+                   ) -> List[Tuple[int, _BarMarks]]:
+    """Le battute da scrivere (indici in measures) con i segni di ritornello.
+    Un ritornello si scrive come tale solo se comincia e finisce sulle
+    stanghette, nessuna nota lo attraversa e ogni ripetizione e' uguale
+    alla prima in tutte le tracce; altrimenti la musica resta per esteso."""
+    starts = [m[0] for m in measures]
+    song_end = measures[-1][0] + measures[-1][1] if measures else Fraction(0)
+    index = {s: i for i, s in enumerate(starts)}
+    marks = [_BarMarks() for _ in measures]
+    skip = set()
+    taken: List[Tuple[Fraction, Fraction]] = []
+    seen = set()
+    for region in sorted(regions, key=lambda r: r["start"]):
+        key = (region["start"], tuple(region["passes"]), tuple(region["endings"]), region["end"])
+        if key in seen:
+            continue
+        seen.add(key)
+        start, passes, endings, end = region["start"], region["passes"], region["endings"], region["end"]
+        count = len(passes)
+        if count < 2 or (endings and len(endings) != count):
+            continue
+        length = (endings[0] if endings else passes[1]) - start
+        pass_ends = passes[1:] + [end]
+        bounds = set(passes) | set(endings) | {end} | {p + length for p in passes}
+        if length <= 0 or any(b not in index and b != song_end for b in bounds):
+            continue
+        if any(start < b_end and a < end for a, b_end in taken):
+            continue
+        ok = True
+        for items in items_by_track:
+            if any(i.start < b < i.end for i in items for b in bounds):
+                ok = False
+                break
+            first = sorted(_item_signature(i, start) for i in items if start <= i.start < start + length)
+            for p in passes[1:]:
+                copy = sorted(_item_signature(i, p) for i in items if p <= i.start < p + length)
+                if copy != first:
+                    ok = False
+                    break
+            if not ok:
+                break
+        if not ok:
+            continue
+        taken.append((start, end))
+        marks[index[start]].forward = True
+        for p in passes[1:]:
+            skip.update(i for i, s in enumerate(starts) if p <= s < p + length)
+        if not endings:
+            last = index.get(start + length, len(measures)) - 1
+            marks[last].backward = count
+            continue
+        for n, (a, b) in enumerate(zip(endings, pass_ends), 1):
+            last = index.get(b, len(measures)) - 1
+            marks[index[a]].ending_start = n
+            marks[last].ending_stop = (n, "discontinue" if n == count else "stop")
+            if n < count:
+                marks[last].backward = 2
+    return [(i, marks[i]) for i in range(len(measures)) if i not in skip]
+
+
+def _barline_xml(marks: _BarMarks, last: bool) -> Tuple[str, str]:
+    """Le stanghette (sinistra, destra) di una battuta in MusicXML."""
+    left = ""
+    if marks.forward or marks.ending_start:
+        left = '<barline location="left">'
+        if marks.forward:
+            left += "<bar-style>heavy-light</bar-style>"
+        if marks.ending_start:
+            n = marks.ending_start
+            left += f'<ending number="{n}" type="start">{n}.</ending>'
+        if marks.forward:
+            left += '<repeat direction="forward"/>'
+        left += "</barline>"
+    right = ""
+    if marks.backward or marks.ending_stop or last:
+        right = '<barline location="right">'
+        right += "<bar-style>light-heavy</bar-style>" if (marks.backward or last) else ""
+        if marks.ending_stop:
+            n, kind = marks.ending_stop
+            right += f'<ending number="{n}" type="{kind}"/>'
+        if marks.backward:
+            times = f' times="{marks.backward}"' if marks.backward > 2 else ""
+            right += f'<repeat direction="backward"{times}/>'
+        right += "</barline>"
+        if right == '<barline location="right"></barline>':
+            right = ""
+    return left, right
+
+
+def _track_texts(events: List[Event], grid: Optional[int]) -> List[Tuple[Fraction, str]]:
+    """Le indicazioni di testo ($"rit.") della traccia."""
+    return [(_frac(ev.start, grid), ev.name) for ev in events if ev.kind == "text"]
 
 
 def _swing_changes(items: List[_Item]) -> List[Tuple[Fraction, str]]:
@@ -611,6 +763,8 @@ def _entry_xml(entry: _Entry, divisions: int, voice: int, staff: int, drum_ids: 
             notations += _tuplet_notation(entry)
         if entry.first_of_item and item.articulation in _ARTICULATIONS and i == 0:
             notations += f"<articulations><{_ARTICULATIONS[item.articulation]}/></articulations>"
+        if i == 0 and entry.first_of_item and item.decorations:
+            notations += _decorations_xml(item.decorations)
         if i == 0 and entry.first_of_item and item.slur == "start":
             notations += '<slur type="start" number="1"/>'
         if i == 0 and not entry.tie_start and item.slur == "stop":
@@ -726,6 +880,8 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
         out.append("</score-part>")
     out.append("</part-list>")
 
+    layout = _repeat_layout(measures, [r for t in tracks for r in _track_repeats(events_by_track[t.name], grid)],
+                            [parsed[t.name][0] for t in tracks])
     for n, track in enumerate(tracks, 1):
         pid = f"P{n}"
         items, pedals = parsed[track.name]
@@ -772,6 +928,8 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
                     f"<dynamics><{mark}/></dynamics>", 1, placement="below")))
             for t, words in _swing_changes([i for i in items if i.voice == first_voice]):
                 directions.append(_Direction(t, _direction_xml(f"<words>{words}</words>", 1)))
+        for t, words in _track_texts(events_by_track[track.name], grid):
+            directions.append(_Direction(t, _direction_xml(f"<words>{escape(words)}</words>", 1)))
         for t, kind in pedals:
             directions.append(_Direction(t, _direction_xml(
                 f'<pedal type="{kind}" line="yes"/>', len(clefs), placement="below")))
@@ -781,7 +939,9 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
 
         out.append(f'<part id="{pid}">')
         previous_sig = None
-        for number, (m_start, m_len, num, den) in enumerate(measures, 1):
+        for number, (m_index, bar_marks) in enumerate(layout, 1):
+            m_start, m_len, num, den = measures[m_index]
+            left_bar, right_bar = _barline_xml(bar_marks, number == len(layout))
             out.append(f'<measure number="{number}">')
             attributes = ""
             if number == 1:
@@ -802,6 +962,8 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
                     attributes += "</clef>"
             if attributes:
                 out.append(f"<attributes>{attributes}</attributes>")
+            if left_bar:
+                out.append(left_bar)
             written = False
             for s, voices in enumerate(staff_voices, 1):
                 m_end = m_start + m_len
@@ -817,11 +979,11 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
                     for entry in _staff_entries(voices[v], staff_dirs, m_start, m_len, num, den):
                         out.append(_entry_xml(entry, divisions, xml_voice, s,
                                               drum_ids_by_part.get(pid, {}), stem))
-                    if number == len(measures):
+                    if number == len(layout):
                         # cio' che finisce col brano (una forcella) va dopo l'ultima nota
                         out += [d.xml for d in staff_dirs if d.time >= m_end]
-            if number == len(measures):
-                out.append('<barline location="right"><bar-style>light-heavy</bar-style></barline>')
+            if right_bar:
+                out.append(right_bar)
             out.append("</measure>")
         out.append("</part>")
     out.append("</score-partwise>")

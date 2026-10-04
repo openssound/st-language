@@ -22,10 +22,10 @@ di SoundText (core.midi_export), che aggiunge il mixaggio dell'app
 import struct
 from typing import List, Optional, Tuple, TYPE_CHECKING
 
-from .chords import apply_bass_note, parse_chord_symbol, pitch_to_midi, voice_chord
+from .chords import apply_bass_note, parse_chord_symbol, pitch_to_midi, scale_pitch_classes, voice_chord
 from .instruments import DRUM_MIDI_CHANNEL, PERCUSSION_MAP, InstrumentProfile
 from .notation import RAMP_CURVES, Event, swing_time
-from .timing import RE_METRICA_VALUE, build_metrica_beat_map, build_tempo_beat_map
+from .timing import RE_METRICA_VALUE, build_metrica_beat_map, build_tempo_beat_map, fermata_spans, with_fermatas
 
 if TYPE_CHECKING:          # solo per le annotazioni (nessun import circolare)
     from .song import Part, Song  # noqa: F401
@@ -160,6 +160,59 @@ def sounding_span(ev: Event) -> Tuple[float, float]:
     return swing_time(ev.start, ev.swing), swing_time(ev.start + ev.duration, ev.swing)
 
 
+# Accenti: la nota suona piu' forte (la velocity scritta resta quella della
+# dinamica, cosi' la partitura non scrive un cambio di dinamica).
+DECORATION_VELOCITY_FACTOR = {"accent": 1.25, "marcato": 1.4}
+# Durata di ciascuna nota di un abbellimento (trillo, mordente, gruppetto):
+# una biscroma a 480 tick per quarto.
+ORNAMENT_STEP_TICKS = 60
+
+
+def decorated_velocity(ev: Event, velocity: int) -> int:
+    """La velocity con gli accenti ($accent, $marcato) dell'evento."""
+    for deco in ev.decorations or ():
+        if deco in DECORATION_VELOCITY_FACTOR:
+            velocity = round(velocity * DECORATION_VELOCITY_FACTOR[deco])
+    return max(1, min(127, velocity))
+
+
+def _scale_neighbour(note: int, step: int, key: Optional[str]) -> int:
+    """La nota della scala della tonalita' (C se manca) subito sopra (step=1)
+    o sotto (step=-1)."""
+    try:
+        scale = set(scale_pitch_classes(key or "C"))
+    except ValueError:
+        scale = set(scale_pitch_classes("C"))
+    candidate = note + step
+    while candidate % 12 not in scale and abs(candidate - note) < 3:
+        candidate += step
+    return max(0, min(127, candidate))
+
+
+def ornament_spans(ev: Event, note: int, start: int, stop: int, key: Optional[str] = None
+                   ) -> List[Tuple[int, int, int]]:
+    """Le note (inizio, fine, altezza) con cui suona una nota singola con un
+    abbellimento: $tr alterna la nota e quella sopra nella scala, $mordent fa
+    nota-sotto-nota, $turn sopra-nota-sotto-nota; senza abbellimenti (o su
+    accordi e blocchi) la nota cosi' com'e'."""
+    decos = set(ev.decorations or ()) & {"tr", "mordent", "turn"}
+    if ev.kind != "note" or not decos or stop - start < 3:
+        return [(start, stop, note)]
+    upper, lower = _scale_neighbour(note, 1, key), _scale_neighbour(note, -1, key)
+    length = stop - start
+    if "tr" in decos:
+        count = max(3, length // ORNAMENT_STEP_TICKS)
+        if count % 2 == 0:
+            count -= 1                                  # comincia e finisce sulla nota
+        pitches = [note if k % 2 == 0 else upper for k in range(count)]
+        bounds = [start + length * k // count for k in range(count + 1)]
+        return [(bounds[k], bounds[k + 1], pitches[k]) for k in range(count)]
+    pitches = [note, lower, note] if "mordent" in decos else [upper, note, lower, note]
+    step = min(ORNAMENT_STEP_TICKS, length // len(pitches))
+    spans = [(start + step * k, start + step * (k + 1), p) for k, p in enumerate(pitches[:-1])]
+    return spans + [(start + step * (len(pitches) - 1), stop, pitches[-1])]
+
+
 def needs_bend_range(events: List[Event]) -> bool:
     """Se il canale va preparato per il pitch bend (slide o bend=)."""
     return any(ev.kind == "slide" or (ev.kind == "control" and ev.name == "bend") for ev in events)
@@ -286,7 +339,8 @@ def write_smf(path: str, tracks: List[List[Tuple[int, int, bytes]]], ticks_per_b
 _OFF, _CTRL, _ON = 0, 1, 2
 
 
-def _part_events(part, events: List[Event], channel: int) -> List[Tuple[int, int, bytes]]:
+def _part_events(part, events: List[Event], channel: int, key: Optional[str] = None
+                 ) -> List[Tuple[int, int, bytes]]:
     instrument = part.instrument
     out: List[Tuple[int, int, bytes]] = [(0, _CTRL, _meta(0x03, midi_text_bytes(part.name)))]
     if instrument.is_percussion:
@@ -346,11 +400,12 @@ def _part_events(part, events: List[Event], channel: int) -> List[Tuple[int, int
         notes = [n for n in notes if 0 <= n <= 127]
         if not notes or factor <= 0:
             continue
-        velocity = max(1, min(127, round(ev.velocity * factor)))
+        velocity = decorated_velocity(ev, round(ev.velocity * factor))
         stop = _apply_articulation(start, end, effective_articulation(ev))
         for n in notes:
-            out.append((start, _ON, bytes([0x90 | channel, n, velocity])))
-            out.append((stop, _OFF, bytes([0x80 | channel, n, 0])))
+            for a, b, pitch in ornament_spans(ev, n, start, stop, key):
+                out.append((a, _ON, bytes([0x90 | channel, pitch, velocity])))
+                out.append((b, _OFF, bytes([0x80 | channel, pitch, 0])))
     if sustain:
         out.append((end_tick, _CTRL, bytes([0xB0 | channel, 64, 0])))
     return out
@@ -362,7 +417,8 @@ def song_to_midi(song, path: str, only_audible: bool = True, midi_dir: Optional[
     tracks = [t for t in (song.audible_tracks() if only_audible else song.tracks) if not t.is_audio]
     events_by_track = {t.name: t.parsed_events(song.patterns, midi_dir=midi_dir) for t in tracks}
     conductor: List[Tuple[int, int, bytes]] = [(0, _CTRL, _meta(0x03, midi_text_bytes(song.name)))]
-    for beat, bpm in build_tempo_beat_map(song, tracks=tracks, events_by_track=events_by_track):
+    tempo_map = build_tempo_beat_map(song, tracks=tracks, events_by_track=events_by_track)
+    for beat, bpm in with_fermatas(tempo_map, fermata_spans(events_by_track)):
         tempo = round(60_000_000 / max(1, bpm))
         conductor.append((round(beat * TICKS_PER_BEAT), _CTRL, _meta(0x51, tempo.to_bytes(3, "big"))))
     for beat, sig in build_metrica_beat_map(song):
@@ -375,6 +431,6 @@ def song_to_midi(song, path: str, only_audible: bool = True, midi_dir: Optional[
     channels = _assign_channels(tracks)
     midi_tracks = [conductor]
     for t in tracks:
-        midi_tracks.append(_part_events(t, events_by_track[t.name], channels[t.name]))
+        midi_tracks.append(_part_events(t, events_by_track[t.name], channels[t.name], song.key))
     write_smf(path, midi_tracks)
     return path

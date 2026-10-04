@@ -25,7 +25,8 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from .instruments import PERCUSSION_MAP
 from .musicxml import (QUANT_GRID, _Direction, _Entry, _Item, _clefs, _drop_repeated_harmonies,
                        _dynamic_changes, _frac, _grid_divisions, _mark_lyrics, _measures, _monophonic,
-                       _spell_midi, _staff_entries, _track_items, key_fifths)
+                       _repeat_layout, _spell_midi, _staff_entries, _track_items, _track_repeats,
+                       _track_texts, key_fifths)
 
 if TYPE_CHECKING:          # solo per le annotazioni (nessun import circolare)
     from .song import Part, Song  # noqa: F401
@@ -41,6 +42,8 @@ _MAJOR_NAMES = {-7: "Cb", -6: "Gb", -5: "Db", -4: "Ab", -3: "Eb", -2: "Bb", -1: 
 _MINOR_NAMES = {-7: "Abm", -6: "Ebm", -5: "Bbm", -4: "Fm", -3: "Cm", -2: "Gm", -1: "Dm", 0: "Am",
                 1: "Em", 2: "Bm", 3: "F#m", 4: "C#m", 5: "G#m", 6: "D#m", 7: "A#m"}
 _ARTICULATIONS = {"staccato": ".", "mute": "!wedge!", "legato": "!tenuto!"}
+_DECORATIONS = {"accent": "!accent!", "marcato": "!marcato!", "tenuto": "!tenuto!", "fermata": "!fermata!",
+                "tr": "!trill!", "mordent": "!lowermordent!", "turn": "!turn!"}
 
 
 def key_name(key: str) -> str:
@@ -153,6 +156,8 @@ def _entry_text(entry: _Entry, voice: _Voice, bar_alters, signature) -> str:
         out += "("
     if entry.first_of_item and entry.item.articulation in _ARTICULATIONS:
         out += _ARTICULATIONS[entry.item.articulation]
+    if entry.first_of_item:
+        out += "".join(_DECORATIONS[d] for d in entry.item.decorations if d in _DECORATIONS)
     notes = [pitch_text(p.step, p.alter, p.octave + voice.transpose // 12, bar_alters, signature)
              for p in entry.item.pitches]
     body = notes[0] if len(notes) == 1 else "[" + "".join(notes) + "]"
@@ -213,6 +218,8 @@ def project_to_abc(project: "Song", only_audible: bool = True,
             break
         grid = QUANT_GRID
 
+    layout = _repeat_layout(measures, [r for t in tracks for r in _track_repeats(events_by_track[t.name], grid)],
+                            [parsed[t.name][0] for t in tracks])
     voices: List[_Voice] = []
     score: List[str] = []
     for n, track in enumerate(tracks, 1):
@@ -237,6 +244,8 @@ def project_to_abc(project: "Song", only_audible: bool = True,
         if n == 1:
             directions += [_Direction(t, f"[Q:1/4={bpm}]") for t, bpm in tempo_map if t > 0]
         directions += [_Direction(i.start, chord_symbol(*i.harmony)) for i in items if i.harmony]
+        directions += [_Direction(t, '"^' + words.replace('"', "'") + '"')
+                       for t, words in _track_texts(events_by_track[track.name], grid)]
         if not drums:
             first_voice = min((i.voice for i in items), default=1)
             directions += [_Direction(t, f"!{mark}!") for t, mark in
@@ -285,15 +294,28 @@ def project_to_abc(project: "Song", only_audible: bool = True,
         line: List[str] = []
         syllables: List[str] = []
         previous_sig = (measures[0][2], measures[0][3])
-        for number, (m_start, m_len, num, den) in enumerate(measures, 1):
+        for number, (m_index, marks) in enumerate(layout, 1):
+            m_start, m_len, num, den = measures[m_index]
             entries = _staff_entries(voice.items, voice.directions, m_start, m_len, num, den)
             text, bar_syllables = _measure_text(entries, voice, signature)
             if (num, den) != previous_sig:
                 text = f"[M:{num}/{den}] " + text
                 previous_sig = (num, den)
-            line.append(text + (" |]" if number == len(measures) else " |"))
+            if marks.ending_start:
+                text = f"[{marks.ending_start} " + text
+            if number == 1 and marks.forward:
+                text = "|: " + text
+            last = number == len(layout)
+            following = layout[number][1] if not last else None
+            if marks.backward:
+                bar = "::" if following is not None and following.forward else ":|"
+            elif following is not None and following.forward:
+                bar = "|:"
+            else:
+                bar = "|]" if last else "|"
+            line.append(text + " " + bar)
             syllables += bar_syllables
-            if number % BARS_PER_LINE == 0 or number == len(measures):
+            if number % BARS_PER_LINE == 0 or last:
                 out.append(" ".join(line))
                 if voice.has_lyrics:
                     # sempre una riga w: (anche vuota): per lo standard la

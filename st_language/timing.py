@@ -197,3 +197,44 @@ def click_grid_position(metrica_beat_map: List[Tuple[float, str]], beat: float) 
 
     accent = (k % num) == 0
     return next_click_beat, accent
+
+
+# Una corona ($fermata) suona la nota (o la pausa) lunga il doppio: il
+# tempo di tutto il brano si dimezza per la sua durata (tutti aspettano).
+FERMATA_TEMPO_FACTOR = 0.5
+
+
+def fermata_spans(events_by_track) -> List[Tuple[float, float]]:
+    """(inizio, fine) in quarti degli eventi con la corona, di tutte le tracce."""
+    spans = set()
+    for events in events_by_track.values():
+        for ev in events:
+            if ev.decorations and "fermata" in ev.decorations and ev.duration > 0:
+                spans.add((ev.start, ev.start + ev.duration))
+    return sorted(spans)
+
+
+def with_fermatas(beat_map: List[Tuple[float, int]], spans: List[Tuple[float, float]]) -> List[Tuple[float, int]]:
+    """La mappa di tempo (quarto, bpm) con il tempo rallentato durante le
+    corone (vedi FERMATA_TEMPO_FACTOR). Per l'esportazione MIDI: la partitura
+    scrive la corona, non un cambio di metronomo."""
+    if not spans:
+        return beat_map
+    base = sorted(beat_map) or [(0.0, 120)]
+
+    def bpm_at(beat: float) -> int:
+        bpm = base[0][1]
+        for b, value in base:
+            if b <= beat:
+                bpm = value
+        return bpm
+
+    points = sorted({b for b, _ in base} | {s for s, _ in spans} | {e for _, e in spans})
+    out: List[Tuple[float, int]] = []
+    for beat in points:
+        slow = any(s <= beat < e for s, e in spans)
+        bpm = max(1, round(bpm_at(beat) * (FERMATA_TEMPO_FACTOR if slow else 1)))
+        if not out or out[-1][1] != bpm:
+            out.append((beat, bpm))
+    return out
+

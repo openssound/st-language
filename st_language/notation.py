@@ -34,6 +34,15 @@ class NotationError(Exception):
 
 COMMENT_MARK = "//"
 BAR_CHECK = "|"
+# Ritornelli: |: ... :| (con le caselle |1. ... :| |2. ... ||) e la doppia
+# stanghetta ||; valgono anche come controlli di battuta (vedi expand_repeats).
+REPEAT_START, REPEAT_END, DOUBLE_BAR = "|:", ":|", "||"
+RE_ENDING = re.compile(r"^\|([1-9])\.$")
+RE_REPEAT_END_ENDING = re.compile(r"^:\|([1-9])\.$")
+# Segnaposto interni (non scrivibili: contengono un carattere di controllo)
+# che expand_repeats e i gruppi N(...) lasciano nel testo espanso, perche'
+# il parser ne faccia gli eventi 'repeat' (vedi Event).
+_MARK = "\x00"
 LYRIC_QUOTE = '"'
 
 
@@ -118,15 +127,25 @@ def tokenize_spans(text: str) -> List[Tuple[str, int, int]]:
         return -1
 
     def _plain_end(k: int) -> int:
+        """Fine di un token semplice: allo spazio, alla stanghetta, a un
+        testo cantato, a ':|' (che resta alla griglia: '4:|') e a '$"'."""
+        start = k
         while k < n and not text[k].isspace() and text[k] not in _PLAIN_STOP:
+            if text[k] == ":" and k + 1 < n and text[k + 1] == BAR_CHECK:
+                if RE_GRID.match(text[start:k + 1]):
+                    k += 1
+                break
+            if text[k] == "$" and k + 1 < n and text[k + 1] == LYRIC_QUOTE:
+                break
             k += 1
         return k
 
     def _with_value(k: int) -> int:
         """Fine di un blocco [...] col suo eventuale valore di nota
-        attaccato ('[c e g]'2), la forcella ('[c e g]<'), la legatura di
-        valore ('[c e g]~') e quella di portamento ('[c e g](')."""
-        if k < n and text[k] == "'":
+        attaccato ('[c e g]'2), i segni ('[c e g]$accent'), la forcella
+        ('[c e g]<'), la legatura di valore ('[c e g]~') e quella di
+        portamento ('[c e g](')."""
+        if k < n and text[k] in "'$":
             return _plain_end(k)
         if k < n and text[k] in "<>" and (k + 1 >= n or text[k + 1] not in "<>"):
             k += 1
@@ -142,8 +161,20 @@ def tokenize_spans(text: str) -> List[Tuple[str, int, int]]:
             i += 1
             continue
         if ch == BAR_CHECK:
-            tokens.append((ch, i, i + 1))
-            i += 1
+            # | da sola, |: (inizio ritornello), || (doppia stanghetta), |1. (casella)
+            m = re.match(r"\|(?::|\||[1-9]\.)?", text[i:])
+            tokens.append((m.group(), i, i + len(m.group())))
+            i += len(m.group())
+            continue
+        if ch == ":" and i + 1 < n and text[i + 1] == BAR_CHECK:
+            m = re.match(r":\|(?:[1-9]\.)?", text[i:])       # :| (fine ritornello), :|2.
+            tokens.append((m.group(), i, i + len(m.group())))
+            i += len(m.group())
+            continue
+        if ch == "$" and i + 1 < n and text[i + 1] == LYRIC_QUOTE:
+            k = _quote_end(i + 1)                                # $"rit." (indicazione di testo)
+            tokens.append((text[i:k + 1], i, k + 1))
+            i = k + 1
             continue
         if ch == LYRIC_QUOTE:
             k = _quote_end(i)
@@ -372,6 +403,9 @@ def split_note_value(tok: str) -> Tuple[str, str]:
         tok, tail = tok[:-1], "~" + tail
     if len(tok) > 1 and tok[-1] in "<>" and tok[-2] not in "<>":
         tok, tail = tok[:-1], tok[-1] + tail
+    m = RE_DECORATIONS.search(tok)
+    if m and m.start() > 0:
+        tok, tail = tok[:m.start()], m.group(1) + tail
     m = RE_NOTE_VALUE.match(tok)
     if not m:
         return tok, tail
@@ -379,15 +413,21 @@ def split_note_value(tok: str) -> Tuple[str, str]:
     return base + articulation, f"'{number}{tuplet}{dots}{tail}"
 
 
-def split_marks(value: str) -> Tuple[str, str, bool, str]:
+def split_marks(value: str) -> Tuple[str, str, bool, str, List[str]]:
     """Il valore restituito da split_note_value scomposto in (valore di
-    nota, forcella, legatura di valore, legatura di portamento)."""
+    nota, forcella, legatura di valore, legatura di portamento, segni)."""
     slur = value[-1] if value[-1:] in ("(", ")") else ""
     value = value[:len(value) - len(slur)]
     tie = value.endswith("~")
     value = value[:-1] if tie else value
     hairpin = value[-1] if value[-1:] in ("<", ">") else ""
-    return value[:len(value) - len(hairpin)], hairpin, tie, slur
+    value = value[:len(value) - len(hairpin)]
+    decorations: List[str] = []
+    m = RE_DECORATIONS.search(value)
+    if m:
+        decorations = m.group(1).split("$")[1:]
+        value = value[:m.start()]
+    return value, hairpin, tie, slur, decorations
 
 
 def note_value_beats(value: str) -> Fraction:
@@ -437,6 +477,13 @@ CONTROL_DEFAULTS = {"vol": 100, "expr": 127, "pan": 0, "mod": 0, "rev": 0, "cho"
 CONTROL_DECIMAL = ("pan", "bend")
 # Ultimo numero di controller ammesso da 'ccN=' (120-127 sono messaggi di modo del canale).
 CC_MAX = 119
+
+# Segni sulle note, in fondo al token prima della forcella e delle legature:
+# c$tr, C$fermata, [c e g]$accent$tenuto (vedi split_note_value).
+DECORATIONS = ("accent", "marcato", "tenuto", "fermata", "tr", "mordent", "turn")
+RE_DECORATIONS = re.compile(r"((?:\$[a-z]+)+)$")
+# Indicazione di testo sopra il pentagramma: $"rit.", $"dolce".
+RE_TEXT = re.compile(r'^\$"(.*)"$', re.DOTALL)
 
 # Swing: 'swing=N' sposta la seconda croma di ogni coppia, 'swing16=N' la
 # seconda semicroma; N e' la percentuale della coppia data alla prima nota
@@ -493,6 +540,8 @@ class Event:
     # Swing attivo (vedi RE_SWING e swing_time): (durata della coppia in
     # quarti, frazione data alla prima nota), es. (1.0, 0.66) per le crome.
     swing: Optional[Tuple[float, float]] = None
+    # Segni sulla nota (DECORATIONS): accent, fermata, tr...
+    decorations: Optional[List[str]] = None
 
 
 @dataclass
@@ -631,11 +680,147 @@ def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
             mult = int(mult_s) if mult_s else 1
             inner_tokens = tokenize(inner)
             body = expand_patterns(inner_tokens, patterns, midi_dir, default_octave, _depth + 1)
-            out.extend(body * mult)
+            if mult < 2:
+                out.extend(body * mult)
+                continue
+            # Le ripetizioni restano segnate (eventi 'repeat'): la partitura
+            # puo' scriverle come ritornello invece che per esteso.
+            for k in range(mult):
+                out.append(f"{_MARK}start" if k == 0 else f"{_MARK}again:{k + 1}")
+                out.extend(body)
+            out.append(f"{_MARK}end")
             continue
 
         out.append(t)
     return out
+
+
+def _is_repeat_token(tok: str) -> bool:
+    return tok in (REPEAT_START, REPEAT_END, DOUBLE_BAR) or bool(RE_ENDING.match(tok)) \
+        or bool(RE_REPEAT_END_ENDING.match(tok))
+
+
+def expand_repeats(tokens: List[str], origins: Optional[List[int]] = None,
+                   lenient: bool = False) -> Tuple[List[str], List[int]]:
+    """Ritornelli scritti per esteso, come li suona un musicista:
+
+        |: corpo :|                          corpo due volte
+        |: corpo |1. fine1 :| |2. fine2 ||   corpo fine1 corpo fine2
+
+    Senza '|:' il ritornello parte dall'inizio (o dalla fine del ritornello
+    precedente); le caselle sono 1., 2., 3. ... (tante ripetizioni quante
+    caselle), ognuna chiusa da ':|' tranne l'ultima, che finisce a '||' o
+    alla fine del testo. '|:', ':|', '|N.' e '||' valgono anche come
+    controlli di battuta ('|'). Ritorna (token, origini): origins dice da
+    quale token di partenza viene ciascun token (vedi _expanded_ranges).
+    Con lenient i ritornelli malformati restano semplici controlli di
+    battuta invece di sollevare NotationError."""
+    if origins is None:
+        origins = list(range(len(tokens)))
+    if not any(_is_repeat_token(t) for t in tokens):
+        return list(tokens), list(origins)
+    toks: List[str] = []
+    orig: List[int] = []
+    for t, o in zip(tokens, origins):
+        m = RE_REPEAT_END_ENDING.match(t)
+        if m:
+            toks += [REPEAT_END, f"|{m.group(1)}."]
+            orig += [o, o]
+        else:
+            toks.append(t)
+            orig.append(o)
+    try:
+        return _expand_repeats(toks, orig)
+    except NotationError:
+        if not lenient:
+            raise
+        return [BAR_CHECK if _is_repeat_token(t) else t for t in toks], orig
+
+
+def _expand_repeats(toks: List[str], orig: List[int]) -> Tuple[List[str], List[int]]:
+    out: List[str] = []
+    out_o: List[int] = []
+
+    def emit(tok: str, origin: int) -> None:
+        out.append(tok)
+        out_o.append(origin)
+
+    def emit_plain(a: int, b: int) -> None:
+        for k in range(a, b):
+            t = toks[k]
+            if t == DOUBLE_BAR:
+                t = BAR_CHECK
+            elif _is_repeat_token(t):
+                raise NotationError(tr("Ritornello dentro un altro ritornello: i ritornelli non si annidano"), t)
+            emit(t, orig[k])
+
+    n = len(toks)
+    pos = 0                  # primo token non ancora scritto
+    body_start = None        # dopo il '|:' aperto
+    i = 0
+    while i < n:
+        t = toks[i]
+        if t == REPEAT_START:
+            if body_start is not None:
+                raise NotationError(tr("Ritornello '|:' gia' aperto: chiudilo con ':|' prima di aprirne un altro"), t)
+            emit_plain(pos, i)
+            emit(BAR_CHECK, orig[i])
+            body_start = pos = i + 1
+            i += 1
+            continue
+        m = RE_ENDING.match(t)
+        if t == REPEAT_END or m:
+            start = body_start if body_start is not None else pos
+            opener = orig[start - 1] if body_start is not None else orig[i]
+            endings: List[Tuple[int, int, int]] = []     # (inizio, fine, origine di chi la chiude)
+            after = i + 1
+            if m:
+                if m.group(1) != "1":
+                    raise NotationError(tr("Le caselle del ritornello vanno numerate da 1. in poi"), t)
+                j, number = i, 1
+                while True:
+                    k = j + 1
+                    while k < n and toks[k] not in (REPEAT_END, DOUBLE_BAR, REPEAT_START) \
+                            and not RE_ENDING.match(toks[k]):
+                        k += 1
+                    if k < n and toks[k] == REPEAT_END:
+                        endings.append((j + 1, k, orig[k]))
+                        number += 1
+                        if k + 1 < n and toks[k + 1] == f"|{number}.":
+                            j = k + 1
+                            continue
+                        raise NotationError(tr("Dopo ':|' ci vuole la casella successiva ('|{number}.')",
+                                               number=number), toks[k])
+                    if k < n and toks[k] in (REPEAT_START,) or (k < n and RE_ENDING.match(toks[k])):
+                        raise NotationError(tr("Casella del ritornello non chiusa: chiudila con ':|' o '||'"),
+                                            toks[k])
+                    endings.append((j + 1, k, orig[k] if k < n else -1))    # l'ultima: fino a || o alla fine
+                    after = k + 1 if k < n else n
+                    break
+                if len(endings) < 2:
+                    raise NotationError(tr("Un ritornello con le caselle ne vuole almeno due (|1. e |2.)"), t)
+            passes = len(endings) or 2
+            for p in range(passes):
+                emit(f"{_MARK}start" if p == 0 else f"{_MARK}again:{p + 1}", opener)
+                emit_plain(start, i)
+                if endings:
+                    a, b, closer = endings[p]
+                    emit(BAR_CHECK, orig[a - 1])
+                    emit(f"{_MARK}ending:{p + 1}", orig[a - 1])
+                    emit_plain(a, b)
+                    if closer >= 0:
+                        emit(BAR_CHECK, closer)
+                else:
+                    emit(BAR_CHECK, orig[i])
+            emit(f"{_MARK}end", opener)
+            body_start = None
+            pos = i = after
+            continue
+        i += 1
+    if body_start is not None:
+        raise NotationError(tr("Ritornello '|:' aperto ma mai chiuso con ':|'"))
+    emit_plain(pos, n)
+    return out, out_o
 
 
 # ---------------------------------------------------------------------------
@@ -784,6 +969,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
     dentro le voci ("voice_bars": {i: (inizio, [[posizioni], ...])}) e gli
     avvisi sul testo cantato ("lyric_issues": {i: messaggio}), vedi
     notation_warnings."""
+    tokens, _origins = expand_repeats(tokens, lenient=lenient)
     grid_beats = initial_grid  # unita' di durata corrente, in beat (quarti). Default: 1/4 (nera)
     velocity = initial_velocity  # velocity corrente
     tempo = None             # tempo corrente inline (solo se la traccia usa tempo=N)
@@ -831,7 +1017,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
         start_value = pending_ramp["start_value"]
         start_index = pending_ramp["start_index"]
         # le automazioni (vol=, forcelle...) scritte dentro la rampa non contano
-        affected = [ev for ev in events[start_index:] if ev.kind != "control"]
+        affected = [ev for ev in events[start_index:] if ev.kind not in ("control", "repeat", "text")]
         n = len(affected)
         if n == 0 and pending_ramp["kind"] == "tempo":
             # Nessun evento dentro la rampa ('tempo=120 >> tempo=140 c'): non c'e'
@@ -863,7 +1049,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
         return ev
 
     def _sounding(ev: Event, dur: Fraction, hairpin: str, tie: bool, slur: str,
-                  start: Fraction, tok: str) -> None:
+                  start: Fraction, tok: str, decorations: Optional[List[str]] = None) -> None:
         """Aggiunge un evento che suona, con legature, forcella e swing: se
         la nota precedente finiva con '~' questo token la allunga invece di
         crearne una nuova (deve avere la stessa altezza)."""
@@ -876,8 +1062,12 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             target.duration = float(Fraction(target.duration).limit_denominator(10 ** 6) + dur)
             if ev.articulation:
                 target.articulation = ev.articulation
+            for deco in decorations or ():
+                if deco not in (target.decorations or []):
+                    target.decorations = (target.decorations or []) + [deco]
         else:
             ev.swing = swing
+            ev.decorations = list(decorations) if decorations else None
             target = _add(ev)
         if hairpin:
             _hairpin(hairpin, start, dur, tok)
@@ -912,6 +1102,19 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 # check_bar_lines (avviso, non errore).
                 continue
 
+            if tok.startswith(_MARK):
+                # inizio, ripetizione, casella o fine di un ritornello (vedi expand_repeats)
+                name, _, number = tok[1:].partition(":")
+                events.append(Event(start=float(cursor), duration=0.0, kind="repeat", name=name,
+                                    value=int(number) if number else None, voice=voice))
+                continue
+
+            m = RE_TEXT.match(tok)
+            if m:
+                events.append(Event(start=float(cursor), duration=0.0, kind="text", name=m.group(1),
+                                    voice=voice))
+                continue
+
             if is_lyric(tok):
                 extra = _assign_lyrics(tok[1:-1].split(), lyric_targets)
                 lyric_targets.clear()
@@ -935,7 +1138,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 # MIDI): dopo il blocco resta l'ultimo valore scritto in una voce.
                 control_ends: List[tuple] = []
                 for k, voice_text in enumerate(voices):
-                    voice_tokens = tokenize(voice_text)
+                    voice_tokens = expand_repeats(tokenize(voice_text), lenient=lenient)[0]
                     voice_ranges: List[Tuple[Fraction, Fraction]] = []
                     # La prima voce continua il testo cantato della traccia:
                     # un testo dentro di essa prende anche le note prima del
@@ -1069,7 +1272,11 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             # Da qui solo token che occupano tempo: col valore di nota
             # esplicito (c'8.) durano quello invece dell'unita' di griglia.
             tok, value = split_note_value(tok)
-            value, hairpin, tie, slur = split_marks(value)
+            value, hairpin, tie, slur, decorations = split_marks(value)
+            for deco in decorations:
+                if deco not in DECORATIONS:
+                    raise NotationError(tr("Segno sconosciuto: '${deco}'. Ammessi: {0}",
+                                           ", ".join("$" + d for d in DECORATIONS), deco=deco), tokens[index])
             unit = note_value_beats(value) if value else grid_beats
             note_start = cursor
 
@@ -1079,12 +1286,15 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     raise NotationError(tr("Una pausa non puo' avere una forcella ('<' o '>')"), tokens[index])
                 if tie or slur:
                     raise NotationError(tr("Una pausa non puo' avere una legatura"), tokens[index])
+                if any(d != "fermata" for d in decorations):
+                    raise NotationError(tr("Su una pausa va solo la corona ($fermata)"), tokens[index])
                 if pending_tie is not None:
                     raise NotationError(tr("La legatura di valore (~) deve arrivare a una nota uguale, "
                                            "non a una pausa"), tokens[index])
                 mult = int(m.group(1)) if m.group(1) else 1
                 dur = unit * mult
-                _add(Event(start=float(cursor), duration=float(dur), kind="rest", velocity=velocity))
+                _add(Event(start=float(cursor), duration=float(dur), kind="rest", velocity=velocity,
+                           decorations=decorations or None))
                 cursor += dur
                 continue
 
@@ -1103,7 +1313,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     letter=first_letter, octave=first_octave,
                     slide_points=[(letter, octave) for _, letter, octave in points[1:]],
                     slide_segment_durations=[float(d) for d in segment_durations],
-                ), dur, hairpin, tie, slur, note_start, tokens[index])
+                ), dur, hairpin, tie, slur, note_start, tokens[index], decorations)
                 cursor += dur
                 continue
 
@@ -1119,7 +1329,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 items = [_parse_atom(st, default_octave) for st in sub_toks]
                 dur = unit * mult
                 _sounding(Event(start=float(cursor), duration=float(dur), kind="block",
-                                velocity=velocity, items=items), dur, hairpin, tie, slur, note_start, tokens[index])
+                                velocity=velocity, items=items), dur, hairpin, tie, slur, note_start, tokens[index],
+                          decorations)
                 cursor += dur
                 continue
 
@@ -1141,7 +1352,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                                         tokens[index])
                 ev = Event(start=start, duration=duration, kind="percussion", velocity=velocity,
                            name=atom["name"])
-            _sounding(ev, dur, hairpin, tie, slur, note_start, tokens[index])
+            _sounding(ev, dur, hairpin, tie, slur, note_start, tokens[index], decorations)
             cursor += dur
         except (NotationError, ValueError):
             if not lenient:
@@ -1201,6 +1412,7 @@ def _expanded_ranges(text: str, patterns: Dict[str, Pattern], midi_dir: Optional
             body = []
         expanded.extend(body)
         origins.extend([i] * len(body))
+    expanded, origins = expand_repeats(expanded, origins, lenient=True)
     ranges: List[Tuple[Fraction, Fraction]] = []
     _parse_tokens_exact(expanded, default_octave=default_octave, lenient=True, ranges=ranges,
                         extras=extras)
@@ -1229,22 +1441,28 @@ def compute_token_spans(text: str, patterns: Dict[str, Pattern], midi_dir: Optio
     raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave)
     raw_positions = [(cs, ce) for _, cs, ce in raw]
 
-    covered: Dict[int, Tuple[Fraction, Fraction]] = {}
+    # Uno span per ogni tratto consecutivo dello stesso token grezzo: un
+    # gruppo o un pattern e' un tratto solo, un token ripetuto da un
+    # ritornello ne ha uno per passaggio.
+    runs: List[list] = []
+    previous = None
     for origin, (start, end) in zip(origins, ranges):
+        if origin != previous:
+            runs.append([origin, None, None])
+            previous = origin
         if end <= start:
             continue  # comando di stato o token non valido: nessuna durata
-        if origin in covered:
-            first, last = covered[origin]
-            covered[origin] = (min(first, start), max(last, end))
-        else:
-            covered[origin] = (start, end)
+        run = runs[-1]
+        run[1] = start if run[1] is None else min(run[1], start)
+        run[2] = end if run[2] is None else max(run[2], end)
 
     spans = []
-    for origin in sorted(covered):
+    for origin, start, end in runs:
+        if start is None:
+            continue
         cs, ce = raw_positions[origin]
-        start, end = covered[origin]
         spans.append((cs, ce, float(start), float(end - start)))
-    return spans
+    return sorted(spans, key=lambda span: (span[2], span[0]))
 
 
 def find_span_at_beat(spans: List[tuple], beat: float) -> Optional[tuple]:
@@ -1428,6 +1646,8 @@ def notation_warnings(text: str, patterns: Dict[str, Pattern], time_sig: str = "
         lo sfasamento aggiornato."""
         # Dove cadrebbe senza gli errori gia' segnalati prima.
         expected = offset + position - shift
+        if expected == 0:
+            return shift            # una '|' all'inizio del brano (o un '|:') e' sempre giusta
         k, line = grid.nearest(expected)
         delta = expected - line
         if delta and origin not in reported:

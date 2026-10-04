@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.1** · Implementazione di riferimento: la libreria Python
+**Versione 2.2** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -74,7 +74,13 @@ Tolti i commenti, il testo si divide in **token** da sinistra a destra;
 gli spazi separano i token e per il resto si ignorano. In ogni punto vale
 la prima regola che si applica:
 
-1. `|` e' un token a se' (controllo di battuta, sezione 8.6).
+1. `|` e' un token a se' (controllo di battuta, sezione 8.6), insieme a
+   cio' che lo segue subito in `|:` (inizio ritornello), `||` (doppia
+   stanghetta) e `|N.` con N una cifra 1-9 (casella, sezione 8.7). Un
+   `:` subito prima di `|` apre un token `:|` (fine ritornello), che con
+   il numero di una casella diventa `:|N.`; un token semplice non
+   contiene mai `:|`. `$"` apre un token di **indicazione di testo** che
+   finisce alla `"` successiva (sezione 8.8).
 2. `"` apre un token di **testo cantato** che finisce alla `"`
    successiva. Senza la virgoletta di chiusura e' un errore.
 3. Delle cifre facoltative seguite da `[` aprono un **blocco** che finisce
@@ -105,8 +111,8 @@ A-Z o a-z, `word` sono una o piu' lettere, cifre o `_`):
 
 ```ebnf
 token        = grid | velocity | tempo | ramp | control | swing | sustain
-             | bar-check | lyric | pattern-ref | midi-ref | group | voices
-             | sounding ;
+             | bar-check | repeat | text | lyric | pattern-ref | midi-ref
+             | group | voices | sounding ;
 
 grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
@@ -120,6 +126,8 @@ control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" | "bend"
 swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
 sustain      = "SON" | "SOFF" ;
 bar-check    = "|" ;
+repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| |1. *)
+text         = '$"' { any character except '"' } '"' ;          (* $"rit." *)
 lyric        = '"' { qualunque carattere tranne '"' } '"' ;
 pattern-ref  = [ number ] "%" word ;                            (* %Riff  3%Riff *)
 midi-ref     = [ number ] "&" ( word | "/" | "-" ) { word | "/" | "-" } ;
@@ -128,7 +136,9 @@ voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } 
 voice        = { token } ;
 
 sounding     = ( note | chord | percussion | rest | block | slide ) [ value ]
-               [ hairpin ] [ "~" ] [ "(" | ")" ] ;
+               { mark } [ hairpin ] [ "~" ] [ "(" | ")" ] ;
+mark         = "$" ( "accent" | "marcato" | "tenuto" | "fermata" | "tr"
+                     | "mordent" | "turn" ) ;                      (* c$tr *)
 hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
@@ -157,10 +167,10 @@ Note sulla grammatica:
 - Il **valore di nota** puo' stare prima o dopo il modificatore: `c'8!` e
   `c!'8` significano la stessa cosa. Non puo' seguire una griglia, una
   velocity o un altro comando di stato.
-- In fondo a un token che suona vengono, in quest'ordine, la **forcella**
-  (`c'2!<`, `2c*4>`), la **legatura di valore** `~` (sezione 6.9) e il
-  segno della **legatura di portamento** `(` o `)` (sezione 6.10):
-  `c'2<~(`. Un token che finisce con `<<` o `>>` non e' mai una
+- In fondo a un token che suona vengono, in quest'ordine, i **segni**
+  (sezione 6.11), la **forcella** (`c'2!<`, `2c*4>`), la **legatura di
+  valore** `~` (sezione 6.9) e il segno della **legatura di portamento**
+  `(` o `)` (sezione 6.10): `c'2$accent<~(`. Un token che finisce con `<<` o `>>` non e' mai una
   forcella. Un `(` in fondo a un token che suona non e' un gruppo: i
   gruppi cominciano con `(` o con delle cifre seguite da `(`.
 - In un **accordo** la qualita' e' la stringa *piu' corta* che fa tornare
@@ -334,6 +344,27 @@ eventi sotto la legatura senza un'articolazione propria suonano legati
 Dentro un gruppo le parentesi delle legature fanno parte del conteggio
 delle parentesi del gruppo: `2(c( d) e)` ripete una coppia legata.
 
+### 6.11 Segni
+
+Un `$nome` in fondo a un token che suona (dopo il valore) aggiunge un
+**segno**; piu' segni si possono mettere di seguito (`c$accent$tenuto`).
+L'evento riceve il campo `decorations` con i nomi nell'ordine in cui
+sono scritti (un evento legato raccoglie i segni di tutte le sue parti,
+una volta ciascuno):
+
+| Segno | Significato | Suono (sezione 13) |
+| --- | --- | --- |
+| `$accent` | accento | piu' forte |
+| `$marcato` | accento forte | ancora piu' forte |
+| `$tenuto` | tenuto | come scritto |
+| `$fermata` | corona (anche su una pausa) | tutto il brano aspetta: durata doppia |
+| `$tr` | trillo | alterna la nota e quella sopra nella tonalita' |
+| `$mordent` | mordente | nota, quella sotto nella tonalita', nota |
+| `$turn` | gruppetto | sopra, nota, sotto, nota |
+
+Un nome sconosciuto e' un errore; su una pausa va solo `$fermata`. I
+segni non cambiano `start`, `duration` e `velocity` dell'evento.
+
 ---
 
 ## 7. Comandi di stato
@@ -467,7 +498,10 @@ ogni evento (sezione 13). Un blocco di voci eredita lo swing in vigore.
 `N(token)` ripete il contenuto N volte (1 se manca il numero), come se i
 token fossero scritti per esteso. I gruppi si annidano. Si espandono
 prima dell'interpretazione, quindi lo stato impostato in un gruppo resta
-anche dopo.
+anche dopo. Con N ≥ 2 le ripetizioni sono segnate da eventi `repeat`
+come nella sezione 8.7 (`start` prima della prima, `again` con il numero
+del passaggio prima delle altre, `end` dopo l'ultima), perche' una
+partitura possa scriverle come ritornello.
 
 ### 8.2 Pattern
 
@@ -532,7 +566,41 @@ Le sillabe vanno nel campo `lyric` dell'evento.
 
 `|` dichiara che nel punto del cursore finisce una battuta. Non occupa
 tempo e, se non torna, non e' un errore ma un **avviso** (sezione 10.2).
-Dentro un blocco `[...]` e' un errore.
+Dentro un blocco `[...]` e' un errore. Anche i token dei ritornelli della
+sezione 8.7 sono controlli di battuta.
+
+### 8.7 Ritornelli
+
+I ritornelli si scrivono come in partitura e si espandono prima
+dell'interpretazione, dopo pattern e gruppi:
+
+    |: corpo :|                           corpo due volte
+    |: corpo |1. fine1 :| |2. fine2 ||    corpo fine1 corpo fine2
+
+- `|:` apre la parte da ripetere; se manca, la parte comincia
+  dall'inizio del testo (o della voce), o dopo il ritornello precedente.
+- Senza caselle, `:|` chiude la parte, che si suona due volte.
+- Con le caselle, il corpo e' seguito da `|1.`; la casella k si chiude con
+  `:|` e DEVE essere seguita da `|k+1.` (`:|2.` equivale a `:| |2.`);
+  l'ultima casella si chiude con `||` o con la fine del testo. I
+  passaggi sono tanti quante le caselle, almeno due.
+- I ritornelli non si annidano. `|:`, `:|`, `|N.` e `||` sono controlli di
+  battuta.
+
+L'espansione inserisce nel punto del cursore eventi di tipo `repeat`
+lunghi zero: `start` prima del primo passaggio, `again` (con `value` = il
+numero del passaggio) prima di ciascuno dei successivi, `ending` (con
+`value` = il suo numero) prima di ogni casella, `end` dopo l'ultimo
+passaggio. Un `||` fuori da un ritornello e' solo un controllo di
+battuta. Un ritornello aperto, chiuso due volte, numerato male o con una
+sola casella e' un errore.
+
+### 8.8 Indicazioni di testo
+
+`$"testo"` mette un'**indicazione di testo** (rit., dolce, a tempo…) nel
+punto del cursore: un evento di tipo `text` con `name` = il testo e
+durata 0. Non cambia il suono: tempo e dinamica cambiano con i loro
+comandi.
 
 ---
 
@@ -644,6 +712,8 @@ conforme DEVE segnalare almeno questi errori:
   automazione, o non chiusa come richiesto dalle sezioni 7.3 e 7.5;
 - un valore di automazione fuori dal suo intervallo; una forcella su una
   pausa o dentro una rampa di `expr` aperta;
+- un segno sconosciuto, o un segno diverso da `$fermata` su una pausa; un
+  ritornello scritto diversamente da come dice la sezione 8.7;
 - una legatura usata diversamente da come dicono le sezioni 6.9 e 6.10;
   uno swing fuori da 50-80;
 - un pattern non definito, un riferimento troppo profondo o ciclico, un
@@ -661,7 +731,8 @@ piu' avanti nel brano (un box, sezione 12.4) si controlla nella sua
 posizione assoluta. I controlli si esaminano in ordine di tempo con uno
 **sfasamento** corrente (all'inizio 0):
 
-1. atteso = posizione − sfasamento;
+1. atteso = posizione − sfasamento; se atteso e' 0 (l'inizio del brano)
+   il controllo e' giusto e non cambia nulla;
 2. si trova la stanghetta piu' vicina ad *atteso*, mai quella al quarto
    0; a pari distanza, la precedente; sia l'inizio della battuta k;
 3. delta = atteso − quella stanghetta. Se delta ≠ 0, si segnala sulla `|`
@@ -687,7 +758,7 @@ ha:
 
 | Campo | Tipo | Significato |
 | --- | --- | --- |
-| `kind` | stringa | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker`, `control` |
+| `kind` | stringa | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker`, `control`, `repeat`, `text` |
 | `start` | numero | inizio, in quarti dall'inizio della traccia |
 | `duration` | numero | durata in quarti (0 per `sustain` e `tempo_marker`, e per `control` senza rampa) |
 | `velocity` | 1-127 | velocity corrente (di default 80) |
@@ -704,6 +775,7 @@ ha:
 | `curve` | stringa | curva della rampa: `lin`, `exp`, `log`, `s` (rampe `control`) |
 | `slur` | stringa | `start`, `continue`, `stop` (eventi sotto una legatura, sezione 6.10) |
 | `swing` | elenco | [coppia, rapporto] con lo swing attivo (sezione 7.6) |
+| `decorations` | elenco | segni dell'evento (sezione 6.11) |
 | `voice` | intero | numero di voce (1 fuori dai blocchi di voci) |
 | `lyric` | stringa | sillaba (eventi cantati) |
 
@@ -807,6 +879,18 @@ una traccia per ogni traccia udibile:
 - `slide` → la prima altezza con rampe di pitch bend (ampiezza 24
   semitoni impostata con l'RPN 0);
 - `sustain` → CC 64; marcatori di tempo e cambi per battuta → set-tempo;
+- segni: `$accent` × 1,25 e `$marcato` × 1,4 sulla velocity (al piu' 127);
+  `$tr` alterna la nota e l'altezza successiva sopra nella tonalita' del
+  brano (C se manca) a passi di 1/8 di quarto, cominciando e finendo
+  sulla nota; `$mordent` suona nota, altezza sotto, nota e `$turn` sopra,
+  nota, sotto, nota, ogni nota dell'abbellimento lunga 1/8 di quarto
+  tranne l'ultima; `$fermata` dimezza il tempo di tutto il brano durante
+  l'evento;
+- i ritornelli si suonano espansi; l'esportazione in partitura scrive un
+  ritornello (con le sue caselle) invece della musica per esteso quando
+  comincia e finisce sulle stanghette, nessuna nota ne attraversa i
+  confini e ogni passaggio e' uguale al primo in tutte le tracce; gli
+  eventi `text` diventano parole sopra il pentagramma;
 - tempi delle note con lo swing → i tempi della sezione 7.6;
 - eventi sotto una legatura (tranne l'ultimo) senza articolazione → legato;
 - `control` → control change: `vol` CC 7 (× volume della traccia / 100),
@@ -838,6 +922,14 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.2** — ritornelli `|: :|` con le caselle `|1.` `|2.` e `||` (sezione
+8.7), segni `$accent`, `$marcato`, `$tenuto`, `$fermata`, `$tr`,
+`$mordent`, `$turn` (sezione 6.11), indicazioni di testo `$"…"`
+(sezione 8.8); eventi `repeat` anche per i gruppi `N(…)` con N ≥ 2; un
+controllo di battuta all'inizio del brano e' sempre giusto. Gli eventi
+di un testo 2.1 sono gli stessi, piu' gli eventi `repeat` dei suoi
+gruppi.
 
 **2.1** — legature di valore `~` (sezione 6.9), legature di portamento
 `( )` (sezione 6.10), swing `swing=N` / `swing16=N` (sezione 7.6), le

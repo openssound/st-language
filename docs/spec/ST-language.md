@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.1** · Reference implementation: the `st_language` Python
+**Version 2.2** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -71,7 +71,13 @@ After comments are removed, the text is split into **tokens** from left
 to right; whitespace separates tokens and is otherwise ignored. At each
 position, the first matching rule applies:
 
-1. `|` is a token by itself (bar check, section 8.6).
+1. `|` is a token by itself (bar check, section 8.6), together with
+   what immediately follows it in `|:` (repeat start), `||` (double bar)
+   and `|N.` with N a digit 1-9 (repeat ending, section 8.7). A `:`
+   immediately before `|` starts a `:|` token (repeat end), extended to
+   `:|N.` by an ending number; a plain token never contains `:|`.
+   `$"` starts a **text indication** token that ends at the next `"`
+   (section 8.8).
 2. `"` starts a **lyric** token that ends at the next `"`. A lyric with
    no closing quote is an error.
 3. Optional digits followed by `[` start a **block** token that ends at
@@ -101,8 +107,8 @@ A-Z or a-z, `word` is one or more letters, digits or `_`):
 
 ```ebnf
 token        = grid | velocity | tempo | ramp | control | swing | sustain
-             | bar-check | lyric | pattern-ref | midi-ref | group | voices
-             | sounding ;
+             | bar-check | repeat | text | lyric | pattern-ref | midi-ref
+             | group | voices | sounding ;
 
 grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
@@ -116,6 +122,8 @@ control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" | "bend"
 swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
 sustain      = "SON" | "SOFF" ;
 bar-check    = "|" ;
+repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| |1. *)
+text         = '$"' { any character except '"' } '"' ;          (* $"rit." *)
 lyric        = '"' { any character except '"' } '"' ;
 pattern-ref  = [ number ] "%" word ;                            (* %Riff  3%Riff *)
 midi-ref     = [ number ] "&" ( word | "/" | "-" ) { word | "/" | "-" } ;
@@ -124,7 +132,9 @@ voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } 
 voice        = { token } ;
 
 sounding     = ( note | chord | percussion | rest | block | slide ) [ value ]
-               [ hairpin ] [ "~" ] [ "(" | ")" ] ;
+               { mark } [ hairpin ] [ "~" ] [ "(" | ")" ] ;
+mark         = "$" ( "accent" | "marcato" | "tenuto" | "fermata" | "tr"
+                     | "mordent" | "turn" ) ;                      (* c$tr *)
 hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
@@ -153,9 +163,10 @@ Notes on the grammar:
 - The **value** may come before or after the modifier: `c'8!` and `c!'8`
   are the same token meaning. It cannot follow a grid, velocity or other
   state command.
-- At the end of a sounding token come, in this order, the **hairpin**
-  (`c'2!<`, `2c*4>`), the **tie** `~` (section 6.9) and the **slur** mark
-  `(` or `)` (section 6.10): `c'2<~(`. A token ending in `<<` or `>>` is
+- At the end of a sounding token come, in this order, the **marks**
+  (section 6.11), the **hairpin** (`c'2!<`, `2c*4>`), the **tie** `~`
+  (section 6.9) and the **slur** mark `(` or `)` (section 6.10):
+  `c'2$accent<~(`. A token ending in `<<` or `>>` is
   never a hairpin. A `(` at the end of a sounding token is not a group:
   groups start with `(` or with digits followed by `(`.
 - In a **chord**, the quality is the *shortest* string that lets the
@@ -324,6 +335,26 @@ sound legato (section 13), except the last one.
 Inside a group the parentheses of slurs are part of the group's
 balanced parentheses: `2(c( d) e)` repeats a slurred pair.
 
+### 6.11 Marks
+
+A `$name` at the end of a sounding token (after the value) adds a
+**mark**; several marks may follow each other (`c$accent$tenuto`). The
+event gets the field `decorations` with the names in the order written
+(a tied event collects the marks of all its parts, once each):
+
+| Mark | Meaning | Sound (section 13) |
+| --- | --- | --- |
+| `$accent` | accent | louder |
+| `$marcato` | strong accent | louder still |
+| `$tenuto` | tenuto | as written |
+| `$fermata` | fermata (also on a rest) | the whole song waits: double length |
+| `$tr` | trill | alternates the note and the next one above in the key |
+| `$mordent` | mordent | note, the one below in the key, note |
+| `$turn` | turn | above, note, below, note |
+
+An unknown name is an error; on a rest only `$fermata` is allowed. The
+marks do not change the event's `start`, `duration` and `velocity`.
+
 ---
 
 ## 7. State commands
@@ -454,6 +485,10 @@ each event (section 13). A voice block inherits the swing in force.
 `N(tokens)` repeats its content N times (1 if no number), as if the
 tokens had been written out. Groups can be nested. Groups are expanded
 before interpretation, so state set inside a group carries on after it.
+With N ≥ 2 the repetitions are marked with `repeat` events as in section
+8.7 (`start` before the first, `again` with the pass number before the
+others, `end` after the last), so that a score may print them as a
+repeat.
 
 ### 8.2 Patterns
 
@@ -516,7 +551,39 @@ Syllables are stored in the event's `lyric` field.
 
 `|` asserts that a bar ends at the cursor. It takes no time and is not
 an error when it is wrong: it produces a **warning** (section 10.2).
-Inside a block `[...]` it is an error.
+Inside a block `[...]` it is an error. The repeat tokens of section 8.7
+are bar checks too.
+
+### 8.7 Repeats
+
+Repeats are written as on a score and expanded before interpretation,
+after patterns and groups:
+
+    |: body :|                           body twice
+    |: body |1. end1 :| |2. end2 ||      body end1 body end2
+
+- `|:` opens the repeated section; without it the section starts at the
+  beginning of the text (or of the voice), or after the previous repeat.
+- Without endings, `:|` closes the section, which is played twice.
+- With endings, the body is followed by `|1.`; ending k is closed by
+  `:|` and MUST be followed by `|k+1.` (`:|2.` is the same as `:| |2.`);
+  the last ending is closed by `||` or by the end of the text. There are
+  as many passes as endings, at least two.
+- Repeats do not nest. `|:`, `:|`, `|N.` and `||` are bar checks.
+
+The expansion inserts, at the cursor, zero-length events of kind
+`repeat`: `start` before pass 1, `again` (with `value` = pass number)
+before each following pass, `ending` (with `value` = its number) before
+each ending, `end` after the last pass. A `||` outside a repeat is just a
+bar check. A repeat that is open, closed twice, wrongly numbered or with
+a single ending is an error.
+
+### 8.8 Text indications
+
+`$"text"` places a **text indication** (rit., dolce, a tempo…) at the
+cursor: an event of kind `text` with `name` = the text and duration 0.
+It does not change the sound: tempo and dynamics are changed by their
+own commands.
 
 ---
 
@@ -623,6 +690,8 @@ conforming parser MUST report at least these errors:
   as required by sections 7.3 and 7.5;
 - an automation value outside its range; a hairpin on a rest or inside
   an open `expr` ramp;
+- an unknown mark, or a mark other than `$fermata` on a rest; a repeat
+  not written as required by section 8.7;
 - a tie or slur not used as required by sections 6.9 and 6.10; a swing
   value outside 50-80;
 - an undefined pattern, a too-deep or cyclic reference, an unresolvable
@@ -639,7 +708,8 @@ beat 0 and each bar lasts `4 × num / den` beats of the meter in force
 12.4) is checked at its absolute position. The checks are processed in
 time order with a running **shift** (initially 0):
 
-1. expected = position − shift;
+1. expected = position − shift; if expected is 0 (the start of the
+   song) the check is correct and nothing changes;
 2. find the bar line nearest to *expected*, never the one at beat 0; on
    a tie, the earlier one; let it start bar k;
 3. delta = expected − that line. If delta ≠ 0, report "bar k−1 has
@@ -663,7 +733,7 @@ Interpreting a track produces a list of events. Each event has:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `kind` | string | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker`, `control` |
+| `kind` | string | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker`, `control`, `repeat`, `text` |
 | `start` | number | start, in beats from the beginning of the track |
 | `duration` | number | duration in beats (0 for `sustain` and `tempo_marker`, and for `control` without a ramp) |
 | `velocity` | 1-127 | current velocity (default 80) |
@@ -680,6 +750,7 @@ Interpreting a track produces a list of events. Each event has:
 | `curve` | string | ramp curve: `lin`, `exp`, `log`, `s` (`control` ramps) |
 | `slur` | string | `start`, `continue`, `stop` (slurred events, section 6.10) |
 | `swing` | list | [pair, ratio] while swing is on (section 7.6) |
+| `decorations` | list | marks of the event (section 6.11) |
 | `voice` | integer | voice number (1 outside voice blocks) |
 | `lyric` | string | syllable (sung events) |
 
@@ -778,6 +849,17 @@ audible track:
 - `slide` → the first pitch with pitch-bend ramps (bend range set to 24
   semitones via RPN 0);
 - `sustain` → CC 64; tempo markers and per-bar changes → set-tempo;
+- marks: `$accent` × 1.25 and `$marcato` × 1.4 on the velocity (at most
+  127); `$tr` alternates the note and the next pitch above in the song's
+  key (C if none) in 1/8-beat steps, starting and ending on the note;
+  `$mordent` plays note, next pitch below, note and `$turn` above, note,
+  below, note, each ornament note 1/8 beat long except the last;
+  `$fermata` halves the tempo of the whole song during the event;
+- repeats are played as expanded; the score export prints a repeat (and
+  its endings) instead of the written-out music when it starts and ends
+  on bar lines, no note crosses its boundaries and every pass is the same
+  as the first in every track; `text` events are printed as words above
+  the staff;
 - note times with swing → the sounding times of section 7.6;
 - slurred events (except the last) with no articulation → legato;
 - `control` → control change: `vol` CC 7 (× track volume / 100), `expr`
@@ -806,6 +888,13 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.2** — repeats `|: :|` with endings `|1.` `|2.` and `||` (section
+8.7), marks `$accent`, `$marcato`, `$tenuto`, `$fermata`, `$tr`,
+`$mordent`, `$turn` (section 6.11), text indications `$"…"` (section
+8.8); `repeat` events also for groups `N(…)` with N ≥ 2; a bar check at
+the very start of the song is always correct. The events of a 2.1 text
+are the same, plus the `repeat` events of its groups.
 
 **2.1** — ties `~` (section 6.9), slurs `( )` (section 6.10), swing
 `swing=N` / `swing16=N` (section 7.6), the automations `ccN=` and `bend=`

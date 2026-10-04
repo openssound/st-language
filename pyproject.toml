@@ -12,7 +12,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "st-language"
-version = "2.1.0"
+version = "2.2.0"
 description = "ST-language: text music notation (notes, chords, drums, voices, lyrics) with MIDI, MusicXML and ABC export"
 readme = "st_language/README.md"
 requires-python = ">=3.9"
