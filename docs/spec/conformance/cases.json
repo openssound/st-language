@@ -1937,6 +1937,91 @@
      },
      {
       "start": 1.0,
+      "duration": 3.0,
+      "kind": "slide",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slide_points": [
+       [
+        "d",
+        4
+       ],
+       [
+        "c",
+        4
+       ]
+      ],
+      "slide_segment_durations": [
+       2.0,
+       1.0,
+       0.0
+      ]
+     },
+     {
+      "start": 4.0,
+      "duration": 3.0,
+      "kind": "slide",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slide_points": [
+       [
+        "d",
+        4
+       ]
+      ],
+      "slide_segment_durations": [
+       1.0,
+       2.0
+      ]
+     },
+     {
+      "start": 7.0,
+      "duration": 0.5,
+      "kind": "slide",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slide_points": [
+       [
+        "d",
+        4
+       ]
+      ],
+      "slide_segment_durations": [
+       0.5,
+       0.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "slides-hold-and-chains",
+   "input": "2c*4>3d*4 c*4>d*4>c*4 2c*4>2d*4>3c*4 c*4>0d*4",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 5.0,
+      "kind": "slide",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slide_points": [
+       [
+        "d",
+        4
+       ]
+      ],
+      "slide_segment_durations": [
+       2.0,
+       3.0
+      ]
+     },
+     {
+      "start": 5.0,
       "duration": 2.0,
       "kind": "slide",
       "velocity": 80,
@@ -1959,8 +2044,31 @@
       ]
      },
      {
-      "start": 3.0,
-      "duration": 3.0,
+      "start": 7.0,
+      "duration": 7.0,
+      "kind": "slide",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slide_points": [
+       [
+        "d",
+        4
+       ],
+       [
+        "c",
+        4
+       ]
+      ],
+      "slide_segment_durations": [
+       2.0,
+       2.0,
+       3.0
+      ]
+     },
+     {
+      "start": 14.0,
+      "duration": 1.0,
       "kind": "slide",
       "velocity": 80,
       "letter": "c",
@@ -1973,24 +2081,6 @@
       ],
       "slide_segment_durations": [
        1.0,
-       2.0
-      ]
-     },
-     {
-      "start": 6.0,
-      "duration": 0.5,
-      "kind": "slide",
-      "velocity": 80,
-      "letter": "c",
-      "octave": 4,
-      "slide_points": [
-       [
-        "d",
-        4
-       ]
-      ],
-      "slide_segment_durations": [
-       0.5,
        0.0
       ]
      }
@@ -2761,6 +2851,13 @@
   {
    "id": "error-tempo-range",
    "input": "tempo=0 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-slide-zero-duration",
+   "input": "0c*4>d*4",
    "expect": {
     "error": true
    }

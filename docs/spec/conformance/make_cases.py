@@ -55,6 +55,7 @@ CASES = [
     ("blocks", "[c e g] 2[c*3 g*3] [kick snare] [C e*5]", {}),
     ("percussion", "kick snare hihat hihat_open crash ride 2kick", {}),
     ("slides", "c*4>d*4 2c*4>d*4>c*4 c*4>2d*4 8: c*4>d*4", {}),
+    ("slides-hold-and-chains", "2c*4>3d*4 c*4>d*4>c*4 2c*4>2d*4>3c*4 c*4>0d*4", {}),
     # --- struttura
     ("repeat-groups", "2(c d) 3(e) 2(f 2(g))", {}),
     ("patterns", "%Riff 2%Riff c", {"patterns": {"Riff": "8: c d"}}),
@@ -96,6 +97,7 @@ CASES = [
     ("error-old-chord-octave", "C7/3", {}),
     ("error-old-tempo", "120§ c", {}),
     ("error-tempo-range", "tempo=0 c", {}),
+    ("error-slide-zero-duration", "0c*4>d*4", {}),
     # --- avvisi (il testo e' valido)
     ("warning-bar-missing", "4: c d e | f g a b |", {}),
     ("warning-bar-extra", "8: c d e f g a b c d | e", {}),

@@ -280,15 +280,15 @@ dell'evento (il tempo che occupa); per come suona vedi la sezione 13.
 
 `c*4>d*4` (tipo `slide`): un portamento continuo attraverso due o piu'
 altezze (*tappe*). Siano le tappe p₁…pₙ con moltiplicatori facoltativi
-m₁…mₙ:
+m₁…mₙ. I segmenti sono n:
 
-- se nessuna tappa dopo la prima ha un moltiplicatore (**forma
-  storica**), la durata totale e' `(m₁ o 1) × unita'`, divisa in parti
-  uguali fra le n-1 rampe; l'ultimo segmento (la tenuta sull'altezza
-  finale) vale 0;
-- altrimenti (**forma per tappa**) il segmento i dura `(mᵢ o 1) × unita'`:
-  i primi n-1 sono rampe dalla tappa i alla i+1, l'ultimo e' la tenuta
-  sull'altezza finale.
+- per i < n, il segmento i e' la rampa dalla tappa i alla i+1 e dura
+  `(mᵢ o 1) × unita'`;
+- il segmento n e' la tenuta sull'altezza finale e dura `(mₙ o 0) × unita'`.
+
+Cosi' `c*4>d*4` dura un'unita' come una nota, `c*4>d*4>c*4` (sale e
+rilascia) due, `2c*4>3d*4` sale in 2 unita' e resta ferma per 3. Uno
+slide di durata totale 0 e' un errore.
 
 L'evento porta la prima altezza, le tappe successive e le durate dei
 segmenti.
@@ -676,10 +676,9 @@ intestazioni si scrivono come indicato.
 | --- | --- |
 | `Pattern %Nome:` | i token del pattern |
 | `Traccia Nome [Strumento]:` | testo della traccia |
-| `Nome — Strumento:` (o `-`) | testo della traccia |
 | `Piano:`, `Piano 2:` (il nome di uno strumento conosciuto, indice facoltativo) | testo della traccia `Piano` / `Piano 2` |
 | `Box Traccia "Nome" \|quarto:` | un box della traccia `Traccia` che comincia a `quarto` |
-| `Strumento Nome:` / `Instrument Nome:` | definizione di strumento (`type: violin`, oppure `program=40 ottava=3 range=36-96 voicing=spread percussione=no`; `volume` e `pan` facoltativi) |
+| `Strumento Nome:` | definizione di strumento (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`) |
 | `Mixer Traccia:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) di una traccia |
 
 I corpi di tracce e box conservano gli **a capo** (i commenti finiscono a
@@ -774,7 +773,11 @@ non sono piu' validi; `/` e' solo il basso alternativo), il comando di
 tempo e' `tempo=N` al posto di `N§`. Nel file di brano un'intestazione
 corta di traccia vuole uno spazio prima dell'indice (`Guitar 2:`;
 `Guitar2:` e' lo strumento `Guitar2`). I testi con le forme tolte non
-sono validi.
+sono validi. Gli slide hanno una regola sola (sezione 6.8): non c'e' piu'
+la vecchia forma in cui una catena senza moltiplicatori dopo la prima
+tappa divideva un'unita' fra le sue rampe. Il file di brano non accetta
+piu' i blocchi alternativi `Instrument Nome:` (con `type:`, `volume`,
+`pan`) ne' le intestazioni di traccia `Nome — Strumento:`.
 
 **1.1** — automazioni (`vol=`, `expr=`, `pan=`, `mod=`, `rev=`,
 `cho=`, sezione 7.5) con le loro rampe, curve delle rampe (`>>exp`,

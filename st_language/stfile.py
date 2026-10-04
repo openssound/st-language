@@ -10,7 +10,7 @@ blocchi propri dell'applicazione (effetti, plugin, clip audio).
 import re
 from typing import List, Optional, Tuple
 
-from .instruments import InstrumentProfile, resolve_instrument_type
+from .instruments import InstrumentProfile
 
 
 RE_TEMPO = re.compile(r"^Tempo:\s*(\d+)\s*BPM$", re.IGNORECASE)
@@ -35,8 +35,9 @@ RE_BAR_VALUE = re.compile(r"(\d+)\s*:\s*(\d+(?:/\d+)?)")
 
 RE_PATTERN_HDR = re.compile(r"^Pattern\s+%(\w+):$")
 
-# "Strumento Nome:" (italiano) o "Instrument Nome:" (inglese) sono sinonimi.
-RE_INSTRUMENT_HDR = re.compile(r"^(?:Strumento|Instrument)\s+(\w+):$")
+# "Strumento Nome:" definisce uno strumento personalizzato (program=..., vedi
+# _parse_instrument_body).
+RE_INSTRUMENT_HDR = re.compile(r"^Strumento\s+(\w+):$")
 
 # "Mixer Nome:" persiste volume/pan/mute/solo della traccia "Nome".
 RE_MIXER_HDR = re.compile(r"^Mixer\s+(.+?):$")
@@ -105,16 +106,12 @@ def short_track_header(line: str, instrument_names) -> Optional[Tuple[str, str]]
 # rinomina) - vedi funzionalita' 2.
 RE_TRACK_HDR_EXPLICIT = re.compile(r"^Traccia\s+(.+?)\s*\[(\w+)\]\s*:$")
 
-# Formato esplicito alternativo "Nome — Strumento:" (trattino lungo o normale
-# circondato da spazi), equivalente al precedente ma piu' leggibile.
-RE_TRACK_HDR_DASH = re.compile(r"^(.+?)\s+(?:—|-)\s+(\w+)\s*:$")
-
 RE_KV_EQUALS = re.compile(r"(\w+)=([\w.-]+)")
 
 RE_KV_COLON = re.compile(r"(\w+):\s*([\w.-]+)")
 
 _TRACK_HDR_PATTERNS = (RE_TEMPO, RE_METRICA, RE_MASTER, RE_KEY, RE_PATTERN_HDR, RE_TRACK_HDR,
-                        RE_TRACK_HDR_EXPLICIT, RE_TRACK_HDR_DASH, RE_MIXER_HDR, RE_BOX_HDR,
+                        RE_TRACK_HDR_EXPLICIT, RE_MIXER_HDR, RE_BOX_HDR,
                         RE_AUDIO_HDR, RE_EFFECTS_HDR, RE_MASTER_CHAIN_HDR)
 
 VOLUME_MAX = 200  # 100 = guadagno originale (unita'), fino a 200 = raddoppio percepito
@@ -167,40 +164,27 @@ def _convert_volume(raw: str) -> int:
     l'originale, valori minori la riducono."""
     return max(0, min(VOLUME_MAX, round(float(raw))))
 
-def _parse_instrument_body(name: str, body: str) -> Tuple[InstrumentProfile, Optional[Tuple[int, int]]]:
-    """Ritorna (profilo_strumento, (volume, pan)_o_None). Supporta sia il
-    formato con 'type:' (piu' leggibile, es. 'type: electric_bass') sia il
-    formato originale con 'program=' esplicito."""
-    kv = _parse_kv_body(body)
-
-    if "type" in kv:
-        profile = resolve_instrument_type(kv["type"], name)
-    else:
-        range_low, range_high = 40, 88
-        if "range" in kv and "-" in kv["range"]:
-            lo, hi = kv["range"].split("-", 1)
-            try:
-                range_low, range_high = int(lo), int(hi)
-            except ValueError:
-                pass
-        profile = InstrumentProfile(
-            name=name,
-            gm_program=int(kv.get("program", 0)),
-            is_percussion=_si(kv.get("percussione"), False),
-            default_octave=int(kv.get("ottava", 4)),
-            range_low=range_low,
-            range_high=range_high,
-            polyphonic=_si(kv.get("poly"), True),
-            voicing_style=kv.get("voicing", "spread"),
-        )
-
-    mixer = None
-    if "volume" in kv or "pan" in kv:
-        volume = _convert_volume(kv["volume"]) if "volume" in kv else 100
-        pan = _convert_pan_to_0_127(kv["pan"]) if "pan" in kv else 64
-        mixer = (volume, pan)
-
-    return profile, mixer
+def _parse_instrument_body(name: str, body: str) -> InstrumentProfile:
+    """Lo strumento di un blocco 'Strumento Nome:' (program=40 percussione=no
+    ottava=3 range=36-96 poly=si voicing=spread)."""
+    kv = dict(RE_KV_EQUALS.findall(body))
+    range_low, range_high = 40, 88
+    if "range" in kv and "-" in kv["range"]:
+        lo, hi = kv["range"].split("-", 1)
+        try:
+            range_low, range_high = int(lo), int(hi)
+        except ValueError:
+            pass
+    return InstrumentProfile(
+        name=name,
+        gm_program=int(kv.get("program", 0)),
+        is_percussion=_si(kv.get("percussione"), False),
+        default_octave=int(kv.get("ottava", 4)),
+        range_low=range_low,
+        range_high=range_high,
+        polyphonic=_si(kv.get("poly"), True),
+        voicing_style=kv.get("voicing", "spread"),
+    )
 
 def _parse_mixer_body(body: str) -> dict:
     """Estrae {volume, pan, mute, solo} (solo le chiavi presenti) da un
