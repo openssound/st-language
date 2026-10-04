@@ -55,6 +55,16 @@ CASES = [
     ("slurs-in-groups", "2(c( d) e)", {}),
     ("swing", "swing=66 8: c d e f swing16=60 16: g a b c swing=50 8: d e", {}),
     ("swing-in-voices", "swing=62 { 8: c d ; 4e } f", {}),
+    # --- ritornelli, segni, indicazioni di testo (2.2)
+    ("repeats", "4: |: c d e f :| g a b c |", {}),
+    ("repeats-from-start", "4: c d e f :| g", {}),
+    ("repeats-endings", "4: |: c d e f |1. g a b c :| |2. 4g || 4c", {}),
+    ("repeats-three-endings", "4: |: 4c |1. 4d :|2. 4e :|3. 4f", {}),
+    ("repeats-in-voices", "{ 4: |: c d e f :| ; 8e }", {}),
+    ("marks", "c$accent d$marcato$tenuto e$fermata f$tr g$mordent a$turn r$fermata [c e]$accent C7$tr", {}),
+    ("marks-with-tie-and-value", "c'2$accent~ c'4$fermata", {}),
+    ("text-indications", '$"dolce" c d $"rit." e f', {}),
+    ("bar-checks-at-start", "4: | c d e f | |: g a b c :|", {}),
     ("automations-cc-and-bend", "cc74=20 >>exp 2c cc74=100 bend=-2 c bend=0.5 >> d bend=0", {}),
     ("hairpins-follow-expression", "expr=100 2c< vol=60 >> d< e vol=90", {}),
     # --- accordi, blocchi, percussioni
@@ -119,6 +129,13 @@ CASES = [
     ("error-swing-range", "swing=90 c", {}),
     ("error-cc-number", "cc121=10 c", {}),
     ("error-bend-range", "bend=30 c", {}),
+    ("error-repeat-not-closed", "|: c d", {}),
+    ("error-repeat-nested", "|: c |: d :| :|", {}),
+    ("error-repeat-ending-number", "c |2. d", {}),
+    ("error-repeat-single-ending", "|: c |1. d ||", {}),
+    ("error-repeat-ending-sequence", "|: c |1. d :| e", {}),
+    ("error-unknown-mark", "c$wobble", {}),
+    ("error-mark-on-rest", "r$accent", {}),
     # --- avvisi (il testo e' valido)
     ("warning-bar-missing", "4: c d e | f g a b |", {}),
     ("warning-bar-extra", "8: c d e f g a b c d | e", {}),
@@ -181,7 +198,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "2.1", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.2", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 

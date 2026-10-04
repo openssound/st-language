@@ -1,5 +1,5 @@
 {
- "spec_version": "2.1",
+ "spec_version": "2.2",
  "cases": [
   {
    "id": "notes-basic",
@@ -1753,6 +1753,13 @@
     "events": [
      {
       "start": 0.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 0.0,
       "duration": 1.0,
       "kind": "note",
       "velocity": 80,
@@ -1779,6 +1786,14 @@
      },
      {
       "start": 3.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 3.0,
       "duration": 1.0,
       "kind": "note",
       "velocity": 80,
@@ -1802,6 +1817,13 @@
       "velocity": 80,
       "letter": "e",
       "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
      }
     ]
    }
@@ -1979,6 +2001,921 @@
        1.0,
        0.62
       ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "repeats",
+   "input": "4: |: c d e f :| g a b c |",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "repeats-from-start",
+   "input": "4: c d e f :| g",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "repeats-endings",
+   "input": "4: |: c d e f |1. g a b c :| |2. 4g || 4c",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "ending",
+      "value": 1
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 12.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "ending",
+      "value": 2
+     },
+     {
+      "start": 12.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 16.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 16.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "repeats-three-endings",
+   "input": "4: |: 4c |1. 4d :|2. 4e :|3. 4f",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 0.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "ending",
+      "value": 1
+     },
+     {
+      "start": 4.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 8.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 12.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "ending",
+      "value": 2
+     },
+     {
+      "start": 12.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 16.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 3
+     },
+     {
+      "start": 16.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 20.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "ending",
+      "value": 3
+     },
+     {
+      "start": 20.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 24.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     }
+    ]
+   }
+  },
+  {
+   "id": "repeats-in-voices",
+   "input": "{ 4: |: c d e f :| ; 8e }",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 0.0,
+      "duration": 8.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "voice": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "marks",
+   "input": "c$accent d$marcato$tenuto e$fermata f$tr g$mordent a$turn r$fermata [c e]$accent C7$tr",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "decorations": [
+       "accent"
+      ]
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "decorations": [
+       "marcato",
+       "tenuto"
+      ]
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "decorations": [
+       "fermata"
+      ]
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4,
+      "decorations": [
+       "tr"
+      ]
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4,
+      "decorations": [
+       "mordent"
+      ]
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4,
+      "decorations": [
+       "turn"
+      ]
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "rest",
+      "velocity": 80,
+      "decorations": [
+       "fermata"
+      ]
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "c",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "e",
+        "octave": 4
+       }
+      ],
+      "decorations": [
+       "accent"
+      ]
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C7",
+      "octave": 4,
+      "decorations": [
+       "tr"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "marks-with-tie-and-value",
+   "input": "c'2$accent~ c'4$fermata",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 3.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "decorations": [
+       "accent",
+       "fermata"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text-indications",
+   "input": "$\"dolce\" c d $\"rit.\" e f",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "text",
+      "velocity": 80,
+      "name": "dolce"
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "text",
+      "velocity": 80,
+      "name": "rit."
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "bar-checks-at-start",
+   "input": "4: | c d e f | |: g a b c :|",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 12.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
      }
     ]
    }
@@ -2614,6 +3551,13 @@
     "events": [
      {
       "start": 0.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 0.0,
       "duration": 1.0,
       "kind": "note",
       "velocity": 80,
@@ -2627,6 +3571,14 @@
       "velocity": 80,
       "letter": "d",
       "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
      },
      {
       "start": 2.0,
@@ -2646,11 +3598,33 @@
      },
      {
       "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 4.0,
       "duration": 1.0,
       "kind": "note",
       "velocity": 80,
       "letter": "e",
       "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
      },
      {
       "start": 5.0,
@@ -2662,11 +3636,33 @@
      },
      {
       "start": 6.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 3
+     },
+     {
+      "start": 6.0,
       "duration": 1.0,
       "kind": "note",
       "velocity": 80,
       "letter": "e",
       "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 7.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
      },
      {
       "start": 7.0,
@@ -2678,11 +3674,26 @@
      },
      {
       "start": 8.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 8.0,
       "duration": 1.0,
       "kind": "note",
       "velocity": 80,
       "letter": "g",
       "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
      },
      {
       "start": 9.0,
@@ -2694,11 +3705,33 @@
      },
      {
       "start": 10.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 10.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 10.0,
       "duration": 1.0,
       "kind": "note",
       "velocity": 80,
       "letter": "f",
       "octave": 4
+     },
+     {
+      "start": 11.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
      },
      {
       "start": 11.0,
@@ -2710,11 +3743,33 @@
      },
      {
       "start": 12.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 12.0,
       "duration": 1.0,
       "kind": "note",
       "velocity": 80,
       "letter": "g",
       "octave": 4
+     },
+     {
+      "start": 13.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 13.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
      }
     ]
    }
@@ -3469,6 +4524,55 @@
   {
    "id": "error-bend-range",
    "input": "bend=30 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-repeat-not-closed",
+   "input": "|: c d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-repeat-nested",
+   "input": "|: c |: d :| :|",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-repeat-ending-number",
+   "input": "c |2. d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-repeat-single-ending",
+   "input": "|: c |1. d ||",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-repeat-ending-sequence",
+   "input": "|: c |1. d :| e",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-unknown-mark",
+   "input": "c$wobble",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-mark-on-rest",
+   "input": "r$accent",
    "expect": {
     "error": true
    }
