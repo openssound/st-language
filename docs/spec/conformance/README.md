@@ -1,11 +1,11 @@
 # ST-language conformance suite
 
 `cases.json` lists test cases for the [ST-language specification](../ST-language.md).
-A parser conforms to version 2.2 if it gives, for every case, the result
+A parser conforms to version 2.3 if it gives, for every case, the result
 under `expect`.
 
 ```json
-{"spec_version": "2.2", "cases": [
+{"spec_version": "2.3", "cases": [
   {"id": "notes-basic", "input": "c d e f g a b",
    "expect": {"events": [{"start": 0.0, "duration": 1.0, "kind": "note",
                           "velocity": 80, "letter": "c", "octave": 4}, ...]}},
@@ -40,6 +40,6 @@ gives exactly these results.
 ---
 
 La suite di conformita' di ST-language: per ogni caso, il risultato che un
-parser conforme alla versione 2.2 deve dare (vedi la [specifica in
+parser conforme alla versione 2.3 deve dare (vedi la [specifica in
 italiano](../ST-language.it.md), sezione 14). Formato dei casi descritto
 sopra, in inglese.

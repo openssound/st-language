@@ -1,6 +1,7 @@
 {
  "')' chiude una legatura di portamento mai aperta": "')' closes a slur that was never opened",
  "'>>' / '<<' deve seguire un comando di velocity (N@), di tempo (tempo=N) o un'automazione (vol=, expr=, pan=, mod=, rev=, cho=)": "'>>' / '<<' must follow a velocity (N@) or tempo (tempo=N) command or an automation (vol=, expr=, pan=, mod=, rev=, cho=)",
+ "'^' e ',' cambiano l'ottava solo nel modo relativo (rel:)": "'^' and ',' change the octave only in relative mode (rel:)",
  "-o vale con un solo file": "-o works with a single file only",
  "Blocco '[' non chiuso": "Block '[' not closed",
  "Blocco di voci '{0}' non chiuso": "Voice block '{0}' not closed",
@@ -43,6 +44,7 @@
  "Testo cantato '\"' non chiuso": "Lyrics '\"' not closed",
  "Tipo di scala non valido: '{scale_type}' (validi: {0})": "Invalid scale type: '{scale_type}' (valid: {0})",
  "Token non riconosciuto dalla grammatica": "Token not recognised by the grammar",
+ "Tonalita' con troppe alterazioni: '{key}' (usa quella enarmonica)": "Key with too many accidentals: '{key}' (use the enharmonic one)",
  "Tonalita' non valida: '{key}'": "Invalid key: '{key}'",
  "Un ritornello con le caselle ne vuole almeno due (|1. e |2.)": "A repeat with endings needs at least two (|1. and |2.)",
  "Una legatura (~ o parentesi) non puo' attraversare un blocco di voci: chiudila prima": "A tie or slur (~ or parenthesis) cannot cross a voice block: close it first",

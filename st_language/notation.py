@@ -314,7 +314,10 @@ RE_REST = re.compile(r"^(\d*)r$")
 # automaticamente con '♭' quando viene battuta subito dopo una lettera nota, per
 # evitare l'ambiguita' visiva tra la 'b' di alterazione e la lettera nota 'b' (Si).
 # Ottava: '*n' (es. c*5); senza, quella di default dello strumento.
-RE_NOTE = re.compile(r"^(\d*)([a-g])([#b♭-]?)(?:\*(\d+))?([!x_])?$")
+# Alterazione: anche 'n' (o '♮', bequadro) per togliere quella della
+# tonalita' (key=, vedi _PitchState). Ottava: '*n' esplicita, oppure nel
+# modo relativo (rel:) '^' e ',' per salire o scendere di un'ottava.
+RE_NOTE = re.compile(r"^(\d*)([a-g])([#b♭n♮-]?)(\*\d+|[\^,]+)?([!x_])?$")
 # Suffisso opzionale '.stile' (es. Cmaj7.drop2) per forzare il voicing:
 # vedi core.chords.ALL_VOICINGS per l'elenco degli stili validi. La classe
 # di caratteri della qualita' include '#' per accordi come '7#9' e '°' per
@@ -338,9 +341,9 @@ RE_PERC = re.compile(r"^(\d*)([a-z][a-z_0-9]*)$")
 # moltiplicatore di durata (es. 2c*4>3d*4, vedi _slide_segment_durations
 # per la semantica): il gruppo catturato e' l'intera catena grezza, da
 # ripassare a RE_SLIDE_POINT tappa per tappa dopo lo split su '>'.
-_SLIDE_POINT_PATTERN = r"\d*[a-g][#b♭-]?(?:\*\d+)?"
+_SLIDE_POINT_PATTERN = r"\d*[a-g][#b♭n♮-]?(?:\*\d+|[\^,]+)?"
 RE_SLIDE = re.compile(rf"^({_SLIDE_POINT_PATTERN}(?:>{_SLIDE_POINT_PATTERN})+)$")
-RE_SLIDE_POINT = re.compile(r"^(\d*)([a-g])([#b♭-]?)(?:\*(\d+))?$")
+RE_SLIDE_POINT = re.compile(r"^(\d*)([a-g])([#b♭n♮-]?)(\*\d+|[\^,]+)?$")
 
 
 def _check_pitch_range(letter: str, octave: int, tok: str) -> None:
@@ -352,20 +355,93 @@ def _check_pitch_range(letter: str, octave: int, tok: str) -> None:
         raise NotationError(tr("Nota fuori dall'estensione MIDI (la piu' acuta e' g*9)"), tok)
 
 
-def _parse_slide_points(chain: str, default_octave: int) -> List[Tuple[Optional[int], str, int]]:
+LETTERS = "cdefgab"
+# Modo delle ottave: 'rel:' (relative, come in LilyPond) e 'abs:' (assolute,
+# il default); tonalita' delle note: 'key=G', 'key=Dm', 'key=off'.
+RE_PITCH_MODE = re.compile(r"^(rel|abs):$")
+RE_KEY_MODE = re.compile(r"^key=(?:([A-G][#b♭-]?m?)|off)$")
+_LETTER_FIFTHS = {"f": -1, "c": 0, "g": 1, "d": 2, "a": 3, "e": 4, "b": 5}
+
+
+def key_signature_alters(name: str) -> Dict[str, str]:
+    """Le alterazioni della tonalita' (es. 'G' -> {'f': '#'}, 'Dm' ->
+    {'b': 'b'}): lettera nota -> '#' o 'b'."""
+    m = re.match(r"^([A-G])([#b♭-]?)(m?)$", name)
+    if not m:
+        raise NotationError(tr("Tonalita' non valida: '{key}'", key=name))
+    letter, accidental, minor = m.groups()
+    fifths = _LETTER_FIFTHS[letter.lower()] + (7 if accidental == "#" else -7 if accidental else 0)
+    fifths -= 3 if minor else 0
+    if not -7 <= fifths <= 7:
+        raise NotationError(tr("Tonalita' con troppe alterazioni: '{key}' (usa quella enarmonica)", key=name))
+    if fifths >= 0:
+        return {letter: "#" for letter in "fcgdaeb"[:fifths]}
+    return {letter: "b" for letter in "beadgcf"[:-fifths]}
+
+
+class _PitchState:
+    """Come si leggono le altezze delle note: ottave assolute o relative
+    (rel:, ogni nota senza '*n' va all'ottava piu' vicina alla precedente,
+    contando le lettere: al piu' una quarta sopra o sotto; '^' e ',' la
+    spostano di un'ottava), e le alterazioni della tonalita' (key=)."""
+
+    def __init__(self, default_octave: int):
+        self.default_octave = default_octave
+        self.relative = False
+        self.ref: Tuple[str, int] = ("c", default_octave)   # lettera e ottava dell'ultima nota
+        self.alters: Dict[str, str] = {}
+        self.stack: List[Tuple[str, int]] = []               # riferimento all'inizio dei ritornelli
+
+    def copy(self) -> "_PitchState":
+        other = _PitchState(self.default_octave)
+        other.relative, other.ref, other.alters = self.relative, self.ref, dict(self.alters)
+        return other
+
+    def set_relative(self, relative: bool) -> None:
+        self.relative = relative
+        self.ref = ("c", self.default_octave)
+
+    def nearest_octave(self, letter: str) -> int:
+        """L'ottava di 'letter' piu' vicina alla nota precedente (rel:)."""
+        ref_letter, ref_octave = self.ref
+        base = ref_octave * 7 + LETTERS.index(ref_letter)
+        step = (LETTERS.index(letter) - LETTERS.index(ref_letter)) % 7
+        return (base + step if step <= 3 else base + step - 7) // 7
+
+    def resolve(self, letter: str, accidental: str, mark: Optional[str], tok: str) -> Tuple[str, int]:
+        """(lettera con alterazione, ottava) di una nota scritta."""
+        if accidental in ("n", "♮"):
+            accidental = ""
+        elif not accidental:
+            accidental = self.alters.get(letter, "")
+        if mark and mark[0] == "*":
+            octave = int(mark[1:])
+        elif self.relative:
+            octave = self.nearest_octave(letter) + (mark or "").count("^") - (mark or "").count(",")
+        elif mark:
+            raise NotationError(tr("'^' e ',' cambiano l'ottava solo nel modo relativo (rel:)"), tok)
+        else:
+            octave = self.default_octave
+        _check_pitch_range(letter + accidental, octave, tok)
+        self.ref = (letter, octave)
+        return letter + accidental, octave
+
+
+def _parse_slide_points(chain: str, default_octave: int, pitch: Optional["_PitchState"] = None
+                        ) -> List[Tuple[Optional[int], str, int]]:
     """Scompone la catena grezza catturata da RE_SLIDE (gia' validata nella
     sua interezza dal match esterno) in [(moltiplicatore_esplicito_o_None,
     lettera[+alterazione], ottava), ...], una tappa per ogni punto del
     bending, nell'ordine in cui compaiono. Il moltiplicatore e' None se
     quella tappa non ne aveva uno scritto (vedi _slide_segment_durations)."""
+    pitch = pitch or _PitchState(default_octave)
     points = []
     for point_str in chain.split(">"):
         pm = RE_SLIDE_POINT.match(point_str)
-        mult_s, letter, acc, octv = pm.groups()
+        mult_s, letter, acc, mark = pm.groups()
         mult = int(mult_s) if mult_s else None
-        octave = int(octv) if octv else default_octave
-        _check_pitch_range(letter + acc, octave, chain)
-        points.append((mult, letter + acc, octave))
+        name, octave = pitch.resolve(letter, acc, mark, chain)
+        points.append((mult, name, octave))
     return points
 
 
@@ -558,45 +634,173 @@ class Pattern:
 # esiste piu' nella grammatica), resta una utility generica di supporto.
 # ---------------------------------------------------------------------------
 
-def transpose_tokens(tokens: List[str], semitones: int, default_octave: int) -> List[str]:
-    if semitones == 0:
-        return tokens
-    from .chords import transpose_pitch, transpose_chord_root
+_MAJOR_KEY_NAMES = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]
+_MINOR_KEY_NAMES = ["Cm", "C#m", "Dm", "Ebm", "Em", "Fm", "F#m", "Gm", "G#m", "Am", "Bbm", "Bm"]
 
-    def transpose_one(tok: str) -> str:
-        m = RE_NOTE.match(tok)
-        if m:
-            mult, letter, accidental, octv, modifier = m.groups()
-            octave = int(octv) if octv else default_octave
-            new_letter, new_octave = transpose_pitch(letter + accidental, octave, semitones)
-            return f"{mult or ''}{new_letter}*{new_octave}{modifier or ''}"
-        m = RE_CHORD.match(tok)
-        if m:
-            mult, letter, accidental, suffix, voicing, bass, octv, modifier = m.groups()
-            symbol = letter + accidental + suffix
-            try:
-                new_symbol = transpose_chord_root(symbol, semitones)
-            except ValueError:
-                return tok
-            voicing_part = f".{voicing}" if voicing else ""
-            bass_part = ""
-            if bass:
-                new_bass_letter, _ = transpose_pitch(bass, 4, semitones)
-                bass_part = f"/{new_bass_letter.upper()}"
-            octv_part = f"*{octv}" if octv else ""
-            return f"{mult or ''}{new_symbol}{voicing_part}{bass_part}{octv_part}{modifier or ''}"
-        return tok  # percussioni, pause, comandi di stato: invariati
 
-    def transpose_token(tok: str) -> str:
+def _transpose_key_name(name: str, semitones: int) -> str:
+    """La tonalita' trasposta, scritta con meno alterazioni possibili."""
+    from .chords import note_name_to_pc
+    minor = name.endswith("m")
+    pc = (note_name_to_pc(name[:-1] if minor else name) + semitones) % 12
+    return (_MINOR_KEY_NAMES if minor else _MAJOR_KEY_NAMES)[pc]
+
+
+class PitchRewriter:
+    """Riscrive le note di un testo token per token, nell'ordine, tenendo il
+    filo del modo relativo e della tonalita': trasposizione (semitones) e/o
+    conversione al modo relativo (to_relative=True) e a una tonalita'
+    (to_key='G', '' per nessuna). Si usa come funzione da passare a
+    rewrite_tokens (un oggetto per testo, perche' ricorda lo stato)."""
+
+    def __init__(self, semitones: int, default_octave: int, to_relative: Optional[bool] = None,
+                 to_key: Optional[str] = None):
+        self.semitones = semitones
+        self.src = _PitchState(default_octave)
+        self.dst = _PitchState(default_octave)
+        self.to_relative, self.to_key = to_relative, to_key
+        if to_relative is not None:
+            self.dst.set_relative(to_relative)
+        if to_key is not None:
+            self.dst.alters = key_signature_alters(to_key) if to_key else {}
+        self._body_end: List[Tuple[Tuple[str, int], Tuple[str, int]]] = []
+
+    def __call__(self, tok: str) -> str:
+        m = RE_VOICES.match(tok)
+        if m:
+            src, dst = self.src, self.dst
+            voices = []
+            for voice in split_voices(m.group(1)):
+                self.src, self.dst = src.copy(), dst.copy()
+                voices.append(" ".join(t for t in (self(t) for t in tokenize(voice)) if t))
+            self.src, self.dst = src, dst
+            return "{ " + " ; ".join(voices) + " }"
+        m = RE_REPEAT_GROUP.match(tok)
+        if m:
+            mult_s, inner = m.groups()
+            return f"{mult_s}(" + " ".join(t for t in (self(t) for t in tokenize(inner)) if t) + ")"
+        m = RE_PITCH_MODE.match(tok)
+        if m:
+            self.src.set_relative(m.group(1) == "rel")
+            if self.to_relative is not None:
+                return ""
+            self.dst.set_relative(m.group(1) == "rel")
+            return tok
+        m = RE_KEY_MODE.match(tok)
+        if m:
+            self.src.alters = key_signature_alters(m.group(1)) if m.group(1) else {}
+            if self.to_key is not None:
+                return ""
+            name = _transpose_key_name(m.group(1), self.semitones) if m.group(1) else None
+            self.dst.alters = key_signature_alters(name) if name else {}
+            return f"key={name}" if name else tok
+        if RE_ENDING.match(tok) or RE_REPEAT_END_ENDING.match(tok):
+            # nel testo espanso ogni casella segue il corpo del ritornello
+            number = int(re.search(r"(\d)\.$", tok).group(1))
+            if number == 1:
+                self._body_end.append((self.src.ref, self.dst.ref))
+            elif self._body_end:
+                self.src.ref, self.dst.ref = self._body_end[-1]
+            return tok
+        if tok.startswith(LYRIC_QUOTE) or tok.startswith("$") or tok in (BAR_CHECK, REPEAT_START, REPEAT_END,
+                                                                            DOUBLE_BAR):
+            return tok
         base, value = split_note_value(tok)
         mm = re.match(r"^(\d*)\[(.*)\]$", base)
         if mm:
             mult_s, inner = mm.groups()
-            sub = [transpose_one(st) for st in inner.split()]
-            return f"{mult_s}[{' '.join(sub)}]{value}"
-        return transpose_one(base) + value if value else transpose_one(tok)
+            self._block_refs = []
+            atoms = [self._atom(t) for t in inner.split()]
+            first = [k for k, t in enumerate(inner.split()) if RE_NOTE.match(t)]
+            if first:
+                self.src.ref, self.dst.ref = self._block_refs[first[0]]
+            return f"{mult_s}[{' '.join(atoms)}]{value}"
+        m = RE_SLIDE.match(base)
+        if m:
+            mult_s = re.match(r"^\d*", base).group()
+            points = []
+            for point in m.group(1).split(">"):
+                pm = RE_SLIDE_POINT.match(point)
+                points.append(self._note(pm.group(1), pm.group(2), pm.group(3), pm.group(4), "", point))
+            return ">".join(points) + value
+        return self._atom(base) + value
 
-    return [map_nested_tokens(tok, transpose_token) for tok in tokens]
+    _block_refs: List[tuple] = []
+
+    def _atom(self, tok: str) -> str:
+        m = RE_NOTE.match(tok)
+        if m:
+            mult, letter, accidental, mark, modifier = m.groups()
+            out = self._note(mult, letter, accidental, mark, modifier, tok)
+            self._block_refs = self._block_refs + [(self.src.ref, self.dst.ref)]
+            return out
+        self._block_refs = self._block_refs + [None]
+        m = RE_CHORD.match(tok)
+        if m and self.semitones:
+            from .chords import transpose_chord_root, transpose_pitch
+            mult, letter, accidental, suffix, voicing, bass, octv, modifier = m.groups()
+            try:
+                new_symbol = transpose_chord_root(letter + accidental + suffix, self.semitones)
+            except ValueError:
+                return tok
+            bass_part = f"/{transpose_pitch(bass, 4, self.semitones)[0].upper()}" if bass else ""
+            return (f"{mult or ''}{new_symbol}{'.' + voicing if voicing else ''}{bass_part}"
+                    f"{'*' + octv if octv else ''}{modifier or ''}")
+        return tok
+
+    def _note(self, mult, letter, accidental, mark, modifier, tok) -> str:
+        from .chords import pitch_to_midi
+        name, octave = self.src.resolve(letter, accidental or "", mark, tok)
+        midi = pitch_to_midi(name, octave) + self.semitones
+        if self.semitones == 0 and not self.dst.alters and not self.src.alters:
+            new_name, new_octave = (letter + (accidental or "") if accidental not in ("n", "♮") else letter), octave
+        else:
+            new_name, new_octave = self._spell(midi)
+        base = new_name[0]
+        keep_explicit = (mark or "").startswith("*") and self.to_relative is None
+        if self.dst.relative and not keep_explicit:
+            shift = new_octave - self.dst.nearest_octave(base)
+            octave_part = "^" * shift if shift > 0 else "," * -shift
+        else:
+            octave_part = f"*{new_octave}"
+        self.dst.ref = (base, new_octave)
+        return f"{mult or ''}{new_name}{octave_part}{modifier or ''}"
+
+    def _spell(self, midi: int) -> Tuple[str, int]:
+        """Come scrivere l'altezza midi nella tonalita' di destinazione."""
+        from .chords import midi_to_pitch, note_name_to_pc
+        alters = self.dst.alters
+        for letter in LETTERS:
+            accidental = alters.get(letter, "")
+            pc = note_name_to_pc(letter + accidental)
+            if pc == midi % 12:
+                octave = (midi - pc) // 12 - 1
+                if letter == "c" and accidental == "b":
+                    octave += 1          # do bemolle: l'ottava della lettera e' quella sopra
+                elif letter == "b" and accidental == "#":
+                    octave -= 1
+                return letter, octave
+        name, octave = midi_to_pitch(midi)
+        if len(name) == 1 and name in alters:
+            name += "n"                  # la tonalita' la altererebbe: bequadro
+        return name, octave
+
+
+def transpose_tokens(tokens: List[str], semitones: int, default_octave: int) -> List[str]:
+    """I token trasposti di 'semitones' (vedi PitchRewriter)."""
+    if semitones == 0:
+        return tokens
+    rewriter = PitchRewriter(semitones, default_octave)
+    return [rewriter(tok) for tok in tokens]
+
+
+def relative_text(text: str, default_octave: int, key: Optional[str] = None) -> str:
+    """Il testo riscritto con le ottave relative (rel:) e, se data, la
+    tonalita' (key=): stesse note, impaginazione e commenti come prima."""
+    rewriter = PitchRewriter(0, default_octave, to_relative=True, to_key=key or "")
+    body = rewrite_tokens(text, rewriter)
+    header = "rel:" + (f" key={key}" if key else "")
+    return header + " " + body.lstrip()
 
 
 def map_nested_tokens(tok: str, fn) -> str:
@@ -643,7 +847,9 @@ def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
             if name not in patterns:
                 raise NotationError(tr("Pattern '%{name}' non definito", name=name), t)
             body = expand_patterns(patterns[name].tokens, patterns, midi_dir, default_octave, _depth + 1)
-            out.extend(body * mult)
+            # un pattern si legge per conto suo (ottave assolute, nessuna
+            # tonalita'), qualunque sia il modo della traccia che lo usa
+            out.extend([f"{_MARK}push"] + body * mult + [f"{_MARK}pop"])
             continue
 
         m = RE_MIDI_REF.match(t)
@@ -837,16 +1043,15 @@ def _split_voicing_modifier(voicing: Optional[str], modifier: Optional[str]):
     return voicing, modifier
 
 
-def _parse_atom(tok: str, default_octave: int):
+def _parse_atom(tok: str, default_octave: int, pitch: Optional[_PitchState] = None):
     """Ritorna un dict {kind, letter/symbol/name, octave, mult} per nota/accordo/percussione."""
     m = RE_NOTE.match(tok)
     if m:
-        mult, letter, accidental, octv, modifier = m.groups()
+        mult, letter, accidental, mark, modifier = m.groups()
         articulation = {"!": "staccato", "x": "mute", "_": "legato"}.get(modifier)
-        octave = int(octv) if octv else default_octave
-        _check_pitch_range(letter + accidental, octave, tok)
+        name, octave = (pitch or _PitchState(default_octave)).resolve(letter, accidental, mark, tok)
         return {
-            "kind": "note", "letter": letter + accidental,
+            "kind": "note", "letter": name,
             "octave": octave,
             "mult": int(mult) if mult else 1,
             "articulation": articulation,
@@ -947,7 +1152,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                          extras: Optional[dict] = None,
                          pending_lyrics: Optional[List["Event"]] = None,
                          initial_controls: Optional[Dict[str, float]] = None,
-                         initial_swing: Optional[Tuple[float, float]] = None
+                         initial_swing: Optional[Tuple[float, float]] = None,
+                         initial_pitch: Optional["_PitchState"] = None
                          ) -> Tuple[List[Event], Fraction, Fraction]:
     """Come parse_tokens, ma ritorna anche la posizione finale esatta (in
     beat, Fraction) e la griglia attiva alla fine. Griglia e posizione sono
@@ -990,6 +1196,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
     pending_tie: Optional[Event] = None
     slur_notes: Optional[List[Event]] = None
     swing = initial_swing
+    pitch = initial_pitch.copy() if initial_pitch is not None else _PitchState(default_octave)
+    saved_pitch: List[_PitchState] = []      # modo delle altezze fuori dai pattern
     # Automazioni: valore corrente di ogni controllo e rampe aperte
     # ({nome: (inizio, valore di partenza, curva)}), indipendenti fra loro.
     controls: Dict[str, float] = dict(initial_controls or CONTROL_DEFAULTS)
@@ -1102,11 +1310,37 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 # check_bar_lines (avviso, non errore).
                 continue
 
+            if tok == f"{_MARK}push":
+                saved_pitch.append(pitch)
+                pitch = _PitchState(default_octave)
+                continue
+            if tok == f"{_MARK}pop":
+                if saved_pitch:
+                    pitch = saved_pitch.pop()
+                continue
+
             if tok.startswith(_MARK):
                 # inizio, ripetizione, casella o fine di un ritornello (vedi expand_repeats)
                 name, _, number = tok[1:].partition(":")
                 events.append(Event(start=float(cursor), duration=0.0, kind="repeat", name=name,
                                     value=int(number) if number else None, voice=voice))
+                # nel modo relativo ogni passaggio riparte dalla stessa nota
+                if name == "start":
+                    pitch.stack.append(pitch.ref)
+                elif name == "again" and pitch.stack:
+                    pitch.ref = pitch.stack[-1]
+                elif name == "end" and pitch.stack:
+                    pitch.stack.pop()
+                continue
+
+            m = RE_PITCH_MODE.match(tok)
+            if m:
+                pitch.set_relative(m.group(1) == "rel")
+                continue
+
+            m = RE_KEY_MODE.match(tok)
+            if m:
+                pitch.alters = key_signature_alters(m.group(1)) if m.group(1) else {}
                 continue
 
             m = RE_TEXT.match(tok)
@@ -1147,7 +1381,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                         voice_tokens, default_octave, grid_beats, lenient, voice_ranges,
                         initial_velocity=velocity, voice=voice + k, extras=None,
                         pending_lyrics=lyric_targets if k == 0 else None,
-                        initial_controls=controls, initial_swing=swing)
+                        initial_controls=controls, initial_swing=swing, initial_pitch=pitch)
                     for ev in sub_events:
                         ev.start += float(cursor)
                         if ev.kind == "control":
@@ -1300,7 +1534,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
 
             m = RE_SLIDE.match(tok)
             if m:
-                points = _parse_slide_points(m.group(1), default_octave)
+                points = _parse_slide_points(m.group(1), default_octave, pitch)
                 segment_durations = _slide_segment_durations(points, unit)
                 dur = sum(segment_durations)
                 if dur <= 0:
@@ -1326,7 +1560,10 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 sub_toks = inner.split()
                 if not sub_toks:
                     raise NotationError(tr("Blocco simultaneo vuoto"), tok)
-                items = [_parse_atom(st, default_octave) for st in sub_toks]
+                items = [_parse_atom(st, default_octave, pitch) for st in sub_toks]
+                first_note = next((it for it in items if it["kind"] == "note"), None)
+                if first_note is not None:       # rel: dopo il blocco si riparte dalla sua prima nota
+                    pitch.ref = (first_note["letter"][0], first_note["octave"])
                 dur = unit * mult
                 _sounding(Event(start=float(cursor), duration=float(dur), kind="block",
                                 velocity=velocity, items=items), dur, hairpin, tie, slur, note_start, tokens[index],
@@ -1335,7 +1572,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 continue
 
             # nota / accordo / percussione singoli
-            atom = _parse_atom(tok, default_octave)
+            atom = _parse_atom(tok, default_octave, pitch)
             dur = unit * atom["mult"]
             start, duration = float(cursor), float(dur)
             if atom["kind"] == "note":

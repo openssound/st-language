@@ -1,6 +1,7 @@
 {
  "')' chiude una legatura di portamento mai aperta": "')' ferme une liaison qui n'a jamais été ouverte",
  "'>>' / '<<' deve seguire un comando di velocity (N@), di tempo (tempo=N) o un'automazione (vol=, expr=, pan=, mod=, rev=, cho=)": "'>>' / '<<' doit suivre une commande de vélocité (N@), de tempo (tempo=N) ou une automation (vol=, expr=, pan=, mod=, rev=, cho=)",
+ "'^' e ',' cambiano l'ottava solo nel modo relativo (rel:)": "'^' et ',' changent l'octave seulement en mode relatif (rel:)",
  "-o vale con un solo file": "-o ne vaut qu'avec un seul fichier",
  "Blocco '[' non chiuso": "Bloc '[' non fermé",
  "Blocco di voci '{0}' non chiuso": "Bloc de voix '{0}' non fermé",
@@ -43,6 +44,7 @@
  "Testo cantato '\"' non chiuso": "Paroles '\"' non fermées",
  "Tipo di scala non valido: '{scale_type}' (validi: {0})": "Type de gamme non valide : '{scale_type}' (valides : {0})",
  "Token non riconosciuto dalla grammatica": "Token non reconnu par la grammaire",
+ "Tonalita' con troppe alterazioni: '{key}' (usa quella enarmonica)": "Tonalité avec trop d'altérations : '{key}' (utilisez l'enharmonique)",
  "Tonalita' non valida: '{key}'": "Tonalité non valide : '{key}'",
  "Un ritornello con le caselle ne vuole almeno due (|1. e |2.)": "Une reprise avec des cases en demande au moins deux (|1. et |2.)",
  "Una legatura (~ o parentesi) non puo' attraversare un blocco di voci: chiudila prima": "Une liaison (~ ou parenthèse) ne peut pas traverser un bloc de voix : fermez-la avant",

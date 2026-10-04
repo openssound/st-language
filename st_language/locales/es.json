@@ -1,6 +1,7 @@
 {
  "')' chiude una legatura di portamento mai aperta": "')' cierra una ligadura de expresión que nunca se abrió",
  "'>>' / '<<' deve seguire un comando di velocity (N@), di tempo (tempo=N) o un'automazione (vol=, expr=, pan=, mod=, rev=, cho=)": "'>>' / '<<' debe seguir a un comando de velocidad (N@), de tempo (tempo=N) o a una automatización (vol=, expr=, pan=, mod=, rev=, cho=)",
+ "'^' e ',' cambiano l'ottava solo nel modo relativo (rel:)": "'^' y ',' cambian la octava solo en el modo relativo (rel:)",
  "-o vale con un solo file": "-o solo vale con un único archivo",
  "Blocco '[' non chiuso": "Bloque '[' sin cerrar",
  "Blocco di voci '{0}' non chiuso": "Bloque de voces '{0}' sin cerrar",
@@ -43,6 +44,7 @@
  "Testo cantato '\"' non chiuso": "Letra '\"' sin cerrar",
  "Tipo di scala non valido: '{scale_type}' (validi: {0})": "Tipo de escala no válido: '{scale_type}' (válidos: {0})",
  "Token non riconosciuto dalla grammatica": "Token no reconocido por la gramática",
+ "Tonalita' con troppe alterazioni: '{key}' (usa quella enarmonica)": "Tonalidad con demasiadas alteraciones: '{key}' (usa la enarmónica)",
  "Tonalita' non valida: '{key}'": "Tonalidad no válida: '{key}'",
  "Un ritornello con le caselle ne vuole almeno due (|1. e |2.)": "Una repetición con casillas necesita al menos dos (|1. y |2.)",
  "Una legatura (~ o parentesi) non puo' attraversare un blocco di voci: chiudila prima": "Una ligadura (~ o paréntesis) no puede atravesar un bloque de voces: ciérrala antes",

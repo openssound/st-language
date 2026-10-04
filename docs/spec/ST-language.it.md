@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.2** · Implementazione di riferimento: la libreria Python
+**Versione 2.3** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -110,7 +110,8 @@ La grammatica di ogni tipo di token (EBNF; `digit` e' 0-9, `letter` e'
 A-Z o a-z, `word` sono una o piu' lettere, cifre o `_`):
 
 ```ebnf
-token        = grid | velocity | tempo | ramp | control | swing | sustain
+token        = grid | velocity | tempo | ramp | control | swing | pitch-mode
+             | key-mode | sustain
              | bar-check | repeat | text | lyric | pattern-ref | midi-ref
              | group | voices | sounding ;
 
@@ -124,6 +125,8 @@ control      = control-name "=" [ "-" ] number [ "." digit { digit } ] ;
 control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" | "bend"
              | "cc" number ;                                  (* vol=80  cc74=30 *)
 swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
+pitch-mode   = "rel:" | "abs:" ;
+key-mode     = "key=" ( root [ "m" ] | "off" ) ;                (* key=G  key=Dm *)
 sustain      = "SON" | "SOFF" ;
 bar-check    = "|" ;
 repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| |1. *)
@@ -142,8 +145,8 @@ mark         = "$" ( "accent" | "marcato" | "tenuto" | "fermata" | "tr"
 hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
-accidental   = "#" | "b" | "♭" | "-" ;
-octave       = "*" number ;
+accidental   = "#" | "b" | "♭" | "-" | "n" | "♮" ;
+octave       = "*" number | ( "^" | "," ) { "^" | "," } ;
 modifier     = "!" | "x" | "_" ;
 chord        = [ number ] root quality [ "." style ] [ "/" bass ]
                [ "*" number ] [ modifier ] ;
@@ -201,6 +204,8 @@ tempo corrente, che parte da 0) e uno **stato corrente**:
 | velocity | 80 | comandi di velocity |
 | valori delle automazioni | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0, `bend` 0, `ccN` 0 | comandi di automazione (sezione 7.5) |
 | swing | spento | comandi di swing (sezione 7.6) |
+| modo delle altezze | `abs:` | `rel:` / `abs:` (sezione 5) |
+| tonalita' | nessuna (`key=off`) | `key=` (sezione 5) |
 | ottava di default | quella dello strumento (4 se manca) | — |
 
 **Griglia.** `N:` imposta l'unita' a 4/N quarti: `4:` semiminima, `8:`
@@ -220,12 +225,37 @@ testi cantati non occupano tempo.
 ## 5. Altezze
 
 Una nota e' una lettera `a`-`g` con un'alterazione facoltativa: `#`
-(diesis), `b`, `♭` o `-` (bemolle; `-` e' una scorciatoia di digitazione).
-`b` da sola e' la nota Si; `bb` e' Si bemolle.
+(diesis), `b`, `♭` o `-` (bemolle; `-` e' una scorciatoia di digitazione),
+`n` o `♮` (bequadro). `b` da sola e' la nota Si; `bb` e' Si bemolle.
 
-L'**ottava** segue `*`: `c*4` e' il Do centrale.
-Se manca si usa l'ottava di default dello strumento. Il numero di nota
-MIDI e'
+**Tonalita'.** `key=K` (K una tonalita' come in `key=G`, `key=Bb`,
+`key=F#m`) da' a ogni nota successiva **senza** alterazione
+l'alterazione di K: con `key=G`, `f` e' Fa diesis; con `key=Dm`, `b` e'
+Si bemolle. Un'alterazione scritta vale solo per la sua nota (non si
+trascina fino alla fine della battuta); `n` o `♮` toglie quella della
+tonalita' (`fn` e' Fa con `key=G`). `key=off` (lo stato iniziale) non da'
+alterazioni. L'armatura di K e' un numero n: per la lettera F −1, C 0,
+G 1, D 2, A 3, E 4, B 5, piu' 7 per `#`, meno 7 per un bemolle, meno 3
+per `m`. Con n > 0 sono diesis le prime n lettere di F C G D A E B, con
+n < 0 sono bemolli le prime −n di B E A D G C F; |n| > 7 e' un errore.
+La tonalita' non vale per gli accordi, le cui sigle sono assolute.
+
+**Ottava.** `*n` da' l'ottava esplicita: `c*4` e' il Do centrale. Senza,
+l'ottava dipende dal **modo delle altezze**:
+
+- `abs:` (assoluto, lo stato iniziale): l'ottava di default dello
+  strumento. `^` e `,` sono errori.
+- `rel:` (relativo): l'ottava che mette la nota **piu' vicina** alla
+  precedente contando le lettere, cioe' al piu' una quarta sopra o sotto
+  (dopo `b`, `c` sale; dopo `c`, `g` scende); poi ogni `^` la alza di
+  un'ottava e ogni `,` la abbassa. La nota precedente e' l'ultima nota o
+  tappa di slide letta, ottave esplicite comprese; dopo un blocco `[...]`
+  e' la prima nota del blocco; accordi e percussioni non contano. `rel:`
+  parte dal Do dell'ottava di default (quindi la prima nota e' quella
+  piu' vicina a lui).
+
+`rel:` e `abs:` possono stare ovunque; ogni `rel:` riparte dal Do
+dell'ottava di default. Il numero di nota MIDI e'
 
 ```
 midi = (ottava + 1) × 12 + pc(lettera) + alterazione
@@ -508,7 +538,11 @@ partitura possa scriverle come ritornello.
 `%Nome` inserisce i token del pattern `Nome` (definito nel brano, sezione
 12); `N%Nome` li inserisce N volte. Un pattern puo' richiamarne altri;
 una catena di riferimenti piu' profonda di 32 livelli (o un ciclo) e' un
-errore, come un pattern non definito.
+errore, come un pattern non definito. Le note di un pattern si leggono
+nello stato iniziale delle altezze (`abs:`, nessuna tonalita') qualunque
+sia il modo della traccia, e dopo il riferimento modo, tonalita' e nota
+precedente della traccia sono quelli di prima: un pattern suona uguale
+in ogni traccia.
 
 ### 8.3 Riferimenti MIDI
 
@@ -522,8 +556,9 @@ errore.
 `{ v₁ ; v₂ ; … }` contiene **voci** che partono insieme nel punto del
 cursore. Ogni voce e' una sequenza di token interpretata per conto suo:
 
-- parte con l'unita' di griglia, la velocity, lo swing e i valori delle
-  automazioni correnti (e l'ottava di default); i cambi di stato dentro
+- parte con l'unita' di griglia, la velocity, lo swing, i valori delle
+  automazioni, il modo delle altezze, la tonalita' e la nota precedente
+  correnti (e l'ottava di default); i cambi di stato dentro
   una voce restano li', tranne i valori delle automazioni (sezione 7.5),
   che sono di tutta la traccia;
 - i suoi eventi partono dalla posizione del blocco; la voce k (contando
@@ -586,6 +621,10 @@ dell'interpretazione, dopo pattern e gruppi:
   passaggi sono tanti quante le caselle, almeno due.
 - I ritornelli non si annidano. `|:`, `:|`, `|N.` e `||` sono controlli di
   battuta.
+- Nel modo relativo ogni passaggio riparte dalla nota precedente che il
+  ritornello aveva all'inizio (cosi' ogni passaggio ha le stesse altezze),
+  e ogni casella riparte dalla nota che chiude il corpo; lo stesso vale per
+  i passaggi di un gruppo `N(...)`.
 
 L'espansione inserisce nel punto del cursore eventi di tipo `repeat`
 lunghi zero: `start` prima del primo passaggio, `again` (con `value` = il
@@ -708,6 +747,8 @@ conforme DEVE segnalare almeno questi errori:
 - velocity fuori da 1-127; griglia con N = 0; valore di nota diverso da
   1, 2, 4, 8, 16, 32, 64;
 - una nota fuori dall'intervallo MIDI 0-127;
+- `^` o `,` fuori dal modo relativo; una tonalita' non valida o con piu' di
+  7 alterazioni;
 - una rampa che non segue un comando di velocity, di tempo o di
   automazione, o non chiusa come richiesto dalle sezioni 7.3 e 7.5;
 - un valore di automazione fuori dal suo intervallo; una forcella su una
@@ -762,7 +803,7 @@ ha:
 | `start` | numero | inizio, in quarti dall'inizio della traccia |
 | `duration` | numero | durata in quarti (0 per `sustain` e `tempo_marker`, e per `control` senza rampa) |
 | `velocity` | 1-127 | velocity corrente (di default 80) |
-| `letter`, `octave` | | altezza della nota (`note`, prima tappa di `slide`) |
+| `letter`, `octave` | | altezza della nota (`note`, prima tappa di `slide`), con l'alterazione che suona: compresa quella della tonalita', nessuna per un bequadro, l'ottava risolta |
 | `symbol`, `voicing`, `bass`, `octave` | | accordo (`chord`) |
 | `name` | stringa | nome della percussione (`percussion`); `on`/`off` (`sustain`); nome dell'automazione (`control`) |
 | `items` | elenco | atomi di un `block`: ciascuno con `kind` e i suoi campi |
@@ -847,7 +888,9 @@ ordine di inizio:
   riempie di pause su una griglia di sedicesimi: `16: Nr` con N =
   round(vuoto / 0,25);
 - ogni box porta `4: 80@ ` seguito dal suo testo (cosi' un box parte
-  sempre dallo stato di default); un box il cui testo contiene `//` e'
+  sempre dallo stato di default); se il testo di un box della traccia
+  contiene `rel:`, `abs:`, `key=` o `swing`, il prefisso e' `4: 80@ abs:
+  key=off swing=50 `; un box il cui testo contiene `//` e'
   seguito da un a capo;
 - le parti si uniscono con spazi; la fine di un box e' il suo inizio piu'
   la fine del suo ultimo evento.
@@ -922,6 +965,11 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.3** — ottave relative `rel:` / `abs:` con `^` e `,`, la tonalita'
+`key=K` con il bequadro `n` / `♮` (sezione 5); pattern letti nello stato
+iniziale delle altezze. Ogni testo valido 2.2 e' valido anche in 2.3, con
+gli stessi eventi.
 
 **2.2** — ritornelli `|: :|` con le caselle `|1.` `|2.` e `||` (sezione
 8.7), segni `$accent`, `$marcato`, `$tenuto`, `$fermata`, `$tr`,
