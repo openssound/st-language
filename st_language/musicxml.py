@@ -124,6 +124,8 @@ class _Item:
     voice: int = 1
     lyric: Optional[str] = None            # sillaba come scritta ("Ma-", "_")
     lyric_xml: str = ""                    # <lyric> gia' pronto (vedi _mark_lyrics)
+    slur: Optional[str] = None             # legatura di portamento: start/continue/stop
+    swing: Optional[Tuple[float, float]] = None
 
 
 @dataclass
@@ -216,7 +218,7 @@ def _track_items(events: List[Event], instrument, flats: bool, grid: Optional[in
         if ev.kind in ("rest", "tempo_marker") or end <= start:
             continue
         item = _Item(start, end, articulation=ev.articulation, velocity=ev.velocity,
-                     voice=ev.voice, lyric=ev.lyric)
+                     voice=ev.voice, lyric=ev.lyric, slur=ev.slur, swing=ev.swing)
         if ev.kind in ("note", "slide"):
             item.pitches.append(_spell_letter(ev.letter, ev.octave))
         elif ev.kind == "chord":
@@ -278,6 +280,21 @@ def _wedge_directions(wedges: List[Tuple[Fraction, Fraction, str]], end: Fractio
         directions.append(_Direction(stop, _direction_xml(
             f'<wedge type="stop" number="{number}"/>', 1, placement="below")))
     return directions
+
+
+def _swing_changes(items: List[_Item]) -> List[Tuple[Fraction, str]]:
+    """Dove lo swing comincia, cambia o finisce: la partitura scrive le note
+    diritte con l'indicazione "Swing" (o "Swing 16") e "Straight"."""
+    out, current = [], None
+    for item in sorted(items, key=lambda i: i.start):
+        swing = tuple(item.swing) if item.swing else None
+        if swing != current:
+            if swing is None:
+                out.append((item.start, "Straight"))
+            else:
+                out.append((item.start, "Swing" if swing[0] >= 1 else "Swing 16"))
+            current = swing
+    return out
 
 
 def _monophonic(items: List[_Item]) -> List[_Item]:
@@ -594,6 +611,10 @@ def _entry_xml(entry: _Entry, divisions: int, voice: int, staff: int, drum_ids: 
             notations += _tuplet_notation(entry)
         if entry.first_of_item and item.articulation in _ARTICULATIONS and i == 0:
             notations += f"<articulations><{_ARTICULATIONS[item.articulation]}/></articulations>"
+        if i == 0 and entry.first_of_item and item.slur == "start":
+            notations += '<slur type="start" number="1"/>'
+        if i == 0 and not entry.tie_start and item.slur == "stop":
+            notations += '<slur type="stop" number="1"/>'
         if notations:
             note += f"<notations>{notations}</notations>"
         if entry.first_of_item and i == 0:
@@ -749,6 +770,8 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
             for t, mark in _dynamic_changes(_monophonic([i for i in items if i.voice == first_voice])):
                 directions.append(_Direction(t, _direction_xml(
                     f"<dynamics><{mark}/></dynamics>", 1, placement="below")))
+            for t, words in _swing_changes([i for i in items if i.voice == first_voice]):
+                directions.append(_Direction(t, _direction_xml(f"<words>{words}</words>", 1)))
         for t, kind in pedals:
             directions.append(_Direction(t, _direction_xml(
                 f'<pedal type="{kind}" line="yes"/>', len(clefs), placement="below")))

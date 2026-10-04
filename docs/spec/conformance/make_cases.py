@@ -48,6 +48,14 @@ CASES = [
     ("automations-in-voices", "{ c vol=30 ; d d } expr=100 e<", {}),
     ("ramp-curves-velocity", "20@ >>exp c d e f 100@ tempo=60 >>log g a b tempo=120 c", {}),
     ("hairpins", "2c< d> e'2< [c e g]> 4: C7!< c>e<", {}),
+    # --- legature, swing, ccN e bend (2.1)
+    ("ties", "4: 2c 2d~ | 2d 2e | c#~ db C7~ C7 [c e]~ | [e c] c~ 100@ c~ c", {}),
+    ("ties-with-values", "c'2~ c'8 r'8 e'4.~ e'8", {}),
+    ("slurs", "c( d r e f) [c e]( d~ d) C( G7)", {}),
+    ("slurs-in-groups", "2(c( d) e)", {}),
+    ("swing", "swing=66 8: c d e f swing16=60 16: g a b c swing=50 8: d e", {}),
+    ("swing-in-voices", "swing=62 { 8: c d ; 4e } f", {}),
+    ("automations-cc-and-bend", "cc74=20 >>exp 2c cc74=100 bend=-2 c bend=0.5 >> d bend=0", {}),
     ("hairpins-follow-expression", "expr=100 2c< vol=60 >> d< e vol=90", {}),
     # --- accordi, blocchi, percussioni
     ("chords", "C Am7 G7 Cmaj7 F#m7b5 Bb Ebdim7 Dsus4 E5 C°", {}),
@@ -98,6 +106,19 @@ CASES = [
     ("error-old-tempo", "120§ c", {}),
     ("error-tempo-range", "tempo=0 c", {}),
     ("error-slide-zero-duration", "0c*4>d*4", {}),
+    ("error-tie-different-note", "c~ d", {}),
+    ("error-tie-to-rest", "c~ r", {}),
+    ("error-tie-not-continued", "c d~", {}),
+    ("error-tie-on-percussion", "kick~ kick", {}),
+    ("error-tie-across-voices", "c~ { c ; e }", {}),
+    ("error-slur-not-closed", "c( d e", {}),
+    ("error-slur-not-opened", "c d)", {}),
+    ("error-slur-nested", "c( d( e) f)", {}),
+    ("error-slur-single-note", "c() d", {}),
+    ("error-slur-on-rest", "r( c d)", {}),
+    ("error-swing-range", "swing=90 c", {}),
+    ("error-cc-number", "cc121=10 c", {}),
+    ("error-bend-range", "bend=30 c", {}),
     # --- avvisi (il testo e' valido)
     ("warning-bar-missing", "4: c d e | f g a b |", {}),
     ("warning-bar-extra", "8: c d e f g a b c d | e", {}),
@@ -160,7 +181,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "2.0", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.1", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 
