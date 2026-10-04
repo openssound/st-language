@@ -1,5 +1,5 @@
 {
- "spec_version": "2.2",
+ "spec_version": "2.3",
  "cases": [
   {
    "id": "notes-basic",
@@ -2000,6 +2000,719 @@
       "swing": [
        1.0,
        0.62
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "relative-octaves",
+   "input": "rel: c d e f g a b c c, g c^ b,, d*6 e",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 3
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 2
+     },
+     {
+      "start": 12.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 6
+     },
+     {
+      "start": 13.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 6
+     }
+    ]
+   }
+  },
+  {
+   "id": "relative-blocks-slides-chords",
+   "input": "rel: [e g c] d c>e>g c C7 a",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "e",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "g",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "c",
+        "octave": 5
+       }
+      ]
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 2.0,
+      "kind": "slide",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slide_points": [
+       [
+        "e",
+        4
+       ],
+       [
+        "g",
+        4
+       ]
+      ],
+      "slide_segment_durations": [
+       1.0,
+       1.0,
+       0.0
+      ]
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C7",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "relative-voices-and-repeats",
+   "input": "rel: e { g a ; c b, } f |: g a b c :| d 2(c, d) e",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 2,
+      "voice": 2
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 8.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 12.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 12.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5
+     },
+     {
+      "start": 13.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 13.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 14.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 15.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 15.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 16.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 17.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 17.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "relative-default-octave",
+   "input": "rel: g b d",
+   "octave": 3,
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 2
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 2
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "relative-patterns-are-absolute",
+   "input": "rel: g, %R a",
+   "patterns": {
+    "R": "c e"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 2
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "key-accidentals",
+   "input": "key=G f g f# fn f♮ C key=Bb b e a key=Ebm a key=off b",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "bb",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "eb",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "ab",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "key-with-relative",
+   "input": "key=D rel: d e f g a b c d",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c#",
+      "octave": 5
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5
+     }
+    ]
+   }
+  },
+  {
+   "id": "key-in-blocks-and-slides",
+   "input": "key=F [b d f] b>c",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "bb",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "d",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "f",
+        "octave": 4
+       }
+      ]
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "slide",
+      "velocity": 80,
+      "letter": "bb",
+      "octave": 4,
+      "slide_points": [
+       [
+        "c",
+        4
+       ]
+      ],
+      "slide_segment_durations": [
+       1.0,
+       0.0
       ]
      }
     ]
@@ -4566,6 +5279,34 @@
   {
    "id": "error-unknown-mark",
    "input": "c$wobble",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-octave-mark-not-relative",
+   "input": "c^ d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-key-invalid",
+   "input": "key=H c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-key-too-many-accidentals",
+   "input": "key=G# c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-relative-out-of-range",
+   "input": "rel: c*9 a^",
    "expect": {
     "error": true
    }

@@ -15,6 +15,7 @@ audio, riverbero), che e' proprio dell'applicazione.
 """
 
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -123,6 +124,10 @@ _FILL_GRID_TOKEN = "16:"
 # e' autosufficiente come il corpo di un Pattern e non deve ereditare lo
 # stato lasciato dal riempimento del vuoto o dal box precedente.
 _DEFAULT_STATE_PREFIX = "4: 80@ "
+# Se i box usano anche questi comandi di stato, il prefisso li rimette a
+# posto: ottave assolute, nessuna tonalita', niente swing.
+_STATE_RESET_RE = re.compile(r"(?:^|\s)(?:rel:|abs:|key=|swing(?:16)?=)")
+_FULL_STATE_PREFIX = "4: 80@ abs: key=off swing=50 "
 
 
 def clip_duration_beats(text: str, patterns: Dict[str, Pattern], default_octave: int) -> float:
@@ -145,6 +150,7 @@ def flatten_clips_to_text(clips: List["Clip"], patterns: Dict[str, Pattern], def
     if not clips:
         return ""
     ordered = sorted(clips, key=lambda c: c.start_beat)
+    prefix = _FULL_STATE_PREFIX if any(_STATE_RESET_RE.search(c.text) for c in ordered) else _DEFAULT_STATE_PREFIX
     parts: List[str] = []
     cursor = 0.0
     for clip in ordered:
@@ -156,7 +162,7 @@ def flatten_clips_to_text(clips: List["Clip"], patterns: Dict[str, Pattern], def
         body = clip.text.strip()
         if COMMENT_MARK in body:
             body += "\n"   # un commento in fondo al box non deve inghiottire il box dopo
-        parts.append(_DEFAULT_STATE_PREFIX + body)
+        parts.append(prefix + body)
         duration = clip_duration_beats(clip.text, patterns, default_octave)
         cursor = clip.start_beat + duration
     return " ".join(p for p in parts if p)

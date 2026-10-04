@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.2** · Reference implementation: the `st_language` Python
+**Version 2.3** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -106,7 +106,8 @@ The grammar of each kind of token (EBNF; `digit` is 0-9, `letter` is
 A-Z or a-z, `word` is one or more letters, digits or `_`):
 
 ```ebnf
-token        = grid | velocity | tempo | ramp | control | swing | sustain
+token        = grid | velocity | tempo | ramp | control | swing | pitch-mode
+             | key-mode | sustain
              | bar-check | repeat | text | lyric | pattern-ref | midi-ref
              | group | voices | sounding ;
 
@@ -120,6 +121,8 @@ control      = control-name "=" [ "-" ] number [ "." digit { digit } ] ;
 control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" | "bend"
              | "cc" number ;                                  (* vol=80  cc74=30 *)
 swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
+pitch-mode   = "rel:" | "abs:" ;
+key-mode     = "key=" ( root [ "m" ] | "off" ) ;                (* key=G  key=Dm *)
 sustain      = "SON" | "SOFF" ;
 bar-check    = "|" ;
 repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| |1. *)
@@ -138,8 +141,8 @@ mark         = "$" ( "accent" | "marcato" | "tenuto" | "fermata" | "tr"
 hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
-accidental   = "#" | "b" | "♭" | "-" ;
-octave       = "*" number ;
+accidental   = "#" | "b" | "♭" | "-" | "n" | "♮" ;
+octave       = "*" number | ( "^" | "," ) { "^" | "," } ;
 modifier     = "!" | "x" | "_" ;
 chord        = [ number ] root quality [ "." style ] [ "/" bass ]
                [ "*" number ] [ modifier ] ;
@@ -197,6 +200,8 @@ time, starting at 0) and a **current state**:
 | velocity | 80 | velocity tokens |
 | automation values | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0, `bend` 0, `ccN` 0 | control tokens (section 7.5) |
 | swing | off | swing tokens (section 7.6) |
+| pitch mode | `abs:` | `rel:` / `abs:` (section 5) |
+| key | none (`key=off`) | `key=` (section 5) |
 | default octave | given by the instrument (4 if none) | — |
 
 **Grid.** `N:` sets the unit to 4/N beats: `4:` quarter note, `8:`
@@ -216,11 +221,37 @@ lyrics take no time.
 ## 5. Pitch
 
 A note is a letter `a`-`g` with an optional accidental: `#` (sharp),
-`b`, `♭` or `-` (flat; `-` is a typing shortcut). `b` alone is the note
-B; `bb` is B-flat.
+`b`, `♭` or `-` (flat; `-` is a typing shortcut), `n` or `♮` (natural).
+`b` alone is the note B; `bb` is B-flat.
 
-The **octave** follows `*`: `c*4` is middle C. When
-absent, the instrument's default octave is used. The MIDI note number is
+**Key.** `key=K` (K a key as in `key=G`, `key=Bb`, `key=F#m`) gives
+every following note **without** an accidental the accidental of K:
+with `key=G`, `f` is F-sharp; with `key=Dm`, `b` is B-flat. An explicit
+accidental applies to its note only (there is no carrying through the
+bar); `n` or `♮` cancels the key's accidental (`fn` is F with
+`key=G`). `key=off` (the initial state) gives no accidentals. The
+signature of K is a number n: for the letter F −1, C 0, G 1, D 2, A 3,
+E 4, B 5, plus 7 for `#`, minus 7 for a flat, minus 3 for `m`. With
+n > 0 the first n letters of F C G D A E B are sharp, with n < 0 the
+first −n letters of B E A D G C F are flat; |n| > 7 is an error. The key does not apply to chords,
+whose symbols are absolute.
+
+**Octave.** `*n` gives the octave explicitly: `c*4` is middle C. Without
+it the octave depends on the **pitch mode**:
+
+- `abs:` (absolute, the initial state): the instrument's default
+  octave. `^` and `,` are errors.
+- `rel:` (relative): the octave that puts the note **nearest** to the
+  previous one counting letters, that is at most a fourth above or below
+  (from `b`, `c` goes up; from `c`, `g` goes down); each `^` then raises
+  the note by an octave and each `,` lowers it. The previous note is the
+  last note or slide tap read, explicit octaves included; after a block
+  `[...]` it is the block's first note; chords and percussion do not
+  count. `rel:` starts from c in the default octave (so the first note is
+  the one nearest to it).
+
+`rel:` and `abs:` may appear anywhere; each `rel:` starts again from c
+in the default octave. The MIDI note number is
 
 ```
 midi = (octave + 1) × 12 + pc(letter) + alteration
@@ -495,7 +526,10 @@ repeat.
 `%Name` inserts the tokens of the pattern `Name` (defined in the song,
 section 12); `N%Name` inserts them N times. Patterns may reference other
 patterns; a reference chain deeper than 32 levels (or a cycle) is an
-error, as is an undefined pattern.
+error, as is an undefined pattern. The notes of a pattern are read in
+the initial pitch state (`abs:`, no key) whatever the track's mode is,
+and after the reference the track's mode, key and previous note are the
+ones before it, so a pattern sounds the same in every track.
 
 ### 8.3 MIDI references
 
@@ -508,8 +542,8 @@ parser without a library MUST report such a reference as an error.
 `{ v₁ ; v₂ ; … }` contains **voices** that start together at the cursor.
 Each voice is a token sequence interpreted on its own:
 
-- it starts with the current grid unit, velocity, swing and automation
-  values (and the default octave); state changes inside a voice stay inside it,
+- it starts with the current grid unit, velocity, swing, automation
+  values, pitch mode, key and previous note (and the default octave); state changes inside a voice stay inside it,
   except automation values (section 7.5), which belong to the whole
   track;
 - its events start at the block's position; voice k (counting from 1)
@@ -570,6 +604,10 @@ after patterns and groups:
   the last ending is closed by `||` or by the end of the text. There are
   as many passes as endings, at least two.
 - Repeats do not nest. `|:`, `:|`, `|N.` and `||` are bar checks.
+- In relative mode every pass starts from the previous note the repeat
+  had at its start (so every pass has the same pitches), and every
+  ending starts from the note that ends the body; the same holds for the
+  passes of a group `N(...)`.
 
 The expansion inserts, at the cursor, zero-length events of kind
 `repeat`: `start` before pass 1, `again` (with `value` = pass number)
@@ -686,6 +724,8 @@ conforming parser MUST report at least these errors:
 - velocity outside 1-127; grid with N = 0; note value other than 1, 2,
   4, 8, 16, 32, 64;
 - a note outside MIDI 0-127;
+- `^` or `,` outside relative mode; a key that is not valid or has more
+  than 7 accidentals;
 - a ramp not after a velocity, tempo or control command, or not closed
   as required by sections 7.3 and 7.5;
 - an automation value outside its range; a hairpin on a rest or inside
@@ -737,7 +777,7 @@ Interpreting a track produces a list of events. Each event has:
 | `start` | number | start, in beats from the beginning of the track |
 | `duration` | number | duration in beats (0 for `sustain` and `tempo_marker`, and for `control` without a ramp) |
 | `velocity` | 1-127 | current velocity (default 80) |
-| `letter`, `octave` | | note pitch (`note`, first tap of `slide`) |
+| `letter`, `octave` | | note pitch (`note`, first tap of `slide`), with the accidental that sounds: the key's one included, none for a natural, the octave resolved |
 | `symbol`, `voicing`, `bass`, `octave` | | chord (`chord`) |
 | `name` | string | drum name (`percussion`); `on`/`off` (`sustain`); automation name (`control`) |
 | `items` | list | atoms of a `block`: each with `kind` and its fields |
@@ -818,7 +858,9 @@ beat:
   filled with rests on a sixteenth grid: `16: Nr` with N = round(gap /
   0.25);
 - each box contributes `4: 80@ ` followed by its text (so a box always
-  starts from the default state); a box whose text contains `//` is
+  starts from the default state); when the text of any box of the track
+  contains `rel:`, `abs:`, `key=` or `swing`, the prefix is `4: 80@ abs:
+  key=off swing=50 `; a box whose text contains `//` is
   followed by a line break;
 - the parts are joined with spaces; a box's end is its start plus the
   end of its last event.
@@ -888,6 +930,11 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.3** — relative octaves `rel:` / `abs:` with `^` and `,`, the key
+`key=K` with the natural `n` / `♮` (section 5); patterns read in the
+initial pitch state. Every valid 2.2 text is valid 2.3 text with the
+same events.
 
 **2.2** — repeats `|: :|` with endings `|1.` `|2.` and `||` (section
 8.7), marks `$accent`, `$marcato`, `$tenuto`, `$fermata`, `$tr`,

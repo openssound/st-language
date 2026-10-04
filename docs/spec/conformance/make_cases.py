@@ -55,6 +55,15 @@ CASES = [
     ("slurs-in-groups", "2(c( d) e)", {}),
     ("swing", "swing=66 8: c d e f swing16=60 16: g a b c swing=50 8: d e", {}),
     ("swing-in-voices", "swing=62 { 8: c d ; 4e } f", {}),
+    # --- ottave relative e tonalita' (2.3)
+    ("relative-octaves", "rel: c d e f g a b c c, g c^ b,, d*6 e", {}),
+    ("relative-blocks-slides-chords", "rel: [e g c] d c>e>g c C7 a", {}),
+    ("relative-voices-and-repeats", "rel: e { g a ; c b, } f |: g a b c :| d 2(c, d) e", {}),
+    ("relative-default-octave", "rel: g b d", {"octave": 3}),
+    ("relative-patterns-are-absolute", "rel: g, %R a", {"patterns": {"R": "c e"}}),
+    ("key-accidentals", "key=G f g f# fn f♮ C key=Bb b e a key=Ebm a key=off b", {}),
+    ("key-with-relative", "key=D rel: d e f g a b c d", {}),
+    ("key-in-blocks-and-slides", "key=F [b d f] b>c", {}),
     # --- ritornelli, segni, indicazioni di testo (2.2)
     ("repeats", "4: |: c d e f :| g a b c |", {}),
     ("repeats-from-start", "4: c d e f :| g", {}),
@@ -135,6 +144,10 @@ CASES = [
     ("error-repeat-single-ending", "|: c |1. d ||", {}),
     ("error-repeat-ending-sequence", "|: c |1. d :| e", {}),
     ("error-unknown-mark", "c$wobble", {}),
+    ("error-octave-mark-not-relative", "c^ d", {}),
+    ("error-key-invalid", "key=H c", {}),
+    ("error-key-too-many-accidentals", "key=G# c", {}),
+    ("error-relative-out-of-range", "rel: c*9 a^", {}),
     ("error-mark-on-rest", "r$accent", {}),
     # --- avvisi (il testo e' valido)
     ("warning-bar-missing", "4: c d e | f g a b |", {}),
@@ -198,7 +211,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "2.2", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.3", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 
