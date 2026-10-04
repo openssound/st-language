@@ -21,6 +21,7 @@
  "Rampa di velocity ('>>'/'<<' dopo N@ o una dinamica) aperta ma mai richiusa da un altro N@/dinamica prima di questo cambio di tempo (tempo=N): chiudila con un altro N@ prima, oppure sposta tempo=N dopo la chiusura": "Rampe de vélocité ('>>'/'<<' après N@ ou une nuance) ouverte mais jamais refermée par un autre N@/nuance avant ce changement de tempo (tempo=N) : fermez-la avec un autre N@ avant, ou déplacez tempo=N après la fermeture",
  "Riferimento a pattern o file MIDI troppo profondo o ciclico": "Référence à un pattern ou fichier MIDI trop profonde ou circulaire",
  "Simbolo di accordo non valido: '{symbol}'": "Symbole d'accord non valide : '{symbol}'",
+ "Slide di durata nulla": "Slide de durée nulle",
  "Stile di voicing sconosciuto: '{voicing}'. Ammessi: {0}": "Style de voicing inconnu : '{voicing}'. Autorisés : {0}",
  "Tempo fuori range (1-999 BPM)": "Tempo hors limites (1-999 BPM)",
  "Testo cantato '\"' non chiuso": "Paroles '\"' non fermées",

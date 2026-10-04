@@ -297,8 +297,8 @@ RE_CHORD = re.compile(
 )
 RE_PERC = re.compile(r"^(\d*)([a-z][a-z_0-9]*)$")
 # Portamento/slide tra due o piu' note: c*4>d*4,
-# oppure una catena c*4>d*4>c*4 (bend-and-release: sale e poi rilascia,
-# tutto entro la stessa unita' di griglia). Ogni tappa puo' avere un proprio
+# oppure una catena c*4>d*4>c*4 (bend-and-release: sale e poi rilascia).
+# Ogni tappa puo' avere un proprio
 # moltiplicatore di durata (es. 2c*4>3d*4, vedi _slide_segment_durations
 # per la semantica): il gruppo catturato e' l'intera catena grezza, da
 # ripassare a RE_SLIDE_POINT tappa per tappa dopo lo split su '>'.
@@ -321,9 +321,7 @@ def _parse_slide_points(chain: str, default_octave: int) -> List[Tuple[Optional[
     sua interezza dal match esterno) in [(moltiplicatore_esplicito_o_None,
     lettera[+alterazione], ottava), ...], una tappa per ogni punto del
     bending, nell'ordine in cui compaiono. Il moltiplicatore e' None se
-    quella tappa non ne aveva uno scritto esplicitamente (per distinguere
-    la modalita' legacy da quella con durate per tappa, vedi
-    _slide_segment_durations)."""
+    quella tappa non ne aveva uno scritto (vedi _slide_segment_durations)."""
     points = []
     for point_str in chain.split(">"):
         pm = RE_SLIDE_POINT.match(point_str)
@@ -337,30 +335,18 @@ def _parse_slide_points(chain: str, default_octave: int) -> List[Tuple[Optional[
 
 def _slide_segment_durations(points: List[Tuple[Optional[int], str, int]],
                               grid_beats: Fraction) -> List[Fraction]:
-    """Ritorna la durata (in beat) di ciascun segmento di uno slide a
-    catena: per le tappe 1..N-1 e' la durata della rampa che PARTE da quella
-    tappa verso la successiva; per l'ultima e' quanto la nota resta ferma
-    sull'altezza d'arrivo dopo la rampa finale (un'attesa, non avendo una
-    tappa successiva verso cui rampare) - lista di N valori totali (N-1
-    rampe + 1 attesa), la cui somma e' la durata complessiva dell'evento.
+    """Durata (in beat) di ciascun segmento di uno slide, una per tappa:
+    per le tappe 1..N-1 e' la rampa che PARTE da quella tappa verso la
+    successiva e vale il suo moltiplicatore (1 se manca) per l'unita'; per
+    l'ultima e' quanto la nota resta ferma sull'altezza d'arrivo e vale il
+    suo moltiplicatore (0 se manca: lo slide finisce arrivando).
 
-    Se nessuna tappa OLTRE la prima ha un proprio moltiplicatore esplicito
-    (caso comune: 'c*4>d*4' o '5c*4>d*4>c*4'), si resta in modalita' LEGACY
-    per compatibilita' con tutti i progetti gia' scritti: un solo
-    moltiplicatore prima dell'intera catena (sulla prima tappa, o 1 se
-    omesso) fissa la durata TOTALE, suddivisa in parti uguali tra le sole
-    rampe (nessuna attesa finale) - esattamente il comportamento del
-    progetto prima di poter dare una durata propria a ogni tappa. Basta un
-    moltiplicatore esplicito su una qualunque tappa successiva alla prima
-    per attivare invece la modalita' per-tappa (una tappa senza il proprio
-    moltiplicatore vale implicitamente 1, come una nota bare)."""
-    explicit_beyond_first = any(mult is not None for mult, _, _ in points[1:])
-    num_ramps = len(points) - 1
-    if not explicit_beyond_first:
-        total_mult = points[0][0] if points[0][0] is not None else 1
-        seg_duration = (total_mult * grid_beats) / num_ramps
-        return [seg_duration] * num_ramps + [Fraction(0)]
-    return [(mult if mult is not None else 1) * grid_beats for mult, _, _ in points]
+    c*4>d*4 dura cosi' un'unita' come una nota; 2c*4>3d*4 sale in 2 e resta
+    ferma per 3; c*4>d*4>c*4 (bend-and-release) sale in 1 e scende in 1."""
+    durations = [(mult if mult is not None else 1) * grid_beats for mult, _, _ in points[:-1]]
+    last_mult = points[-1][0]
+    durations.append((last_mult or 0) * grid_beats)
+    return durations
 
 
 def split_note_value(tok: str) -> Tuple[str, str]:
@@ -972,6 +958,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 points = _parse_slide_points(m.group(1), default_octave)
                 segment_durations = _slide_segment_durations(points, unit)
                 dur = sum(segment_durations)
+                if dur <= 0:
+                    raise NotationError(tr("Slide di durata nulla"), tok)
                 _, first_letter, first_octave = points[0]
                 _add(Event(
                     start=float(cursor), duration=float(dur), kind="slide", velocity=velocity,

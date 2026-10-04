@@ -23,7 +23,7 @@ from .notation import Event, Pattern, COMMENT_MARK, parse_track_text, tokenize
 from .stfile import (
     RE_AMBIENTE, RE_AUDIO_HDR, RE_BOX_HDR, RE_EFFECTS_HDR, RE_INSTRUMENT_HDR, RE_KEY, RE_MASTER,
     RE_MASTER_CHAIN_HDR, RE_METRICA, RE_METRICA_LIST_HDR, RE_MIXER_HDR, RE_PATTERN_HDR, RE_SYNTH_HDR,
-    RE_TEMPO, RE_TEMPO_LIST_HDR, RE_TRACK_HDR, RE_TRACK_HDR_DASH, RE_TRACK_HDR_EXPLICIT, short_track_header,
+    RE_TEMPO, RE_TEMPO_LIST_HDR, RE_TRACK_HDR, RE_TRACK_HDR_EXPLICIT, short_track_header,
     _extract_box_blocks, _extract_named_blocks, _parse_bar_value_list, _parse_instrument_body,
     _parse_mixer_body,
 )
@@ -178,12 +178,8 @@ def read_song(text: str, name: str = "ST") -> Song:
     """Il brano descritto da un file di progetto .st (vedi la specifica)."""
     lines = text.splitlines()
     song = Song(name=name)
-    instrument_mixer = {}
     for inst_name, body in _extract_named_blocks(lines, RE_INSTRUMENT_HDR):
-        profile, mixer = _parse_instrument_body(inst_name, body)
-        song.instruments[inst_name] = profile
-        if mixer is not None:
-            instrument_mixer[inst_name] = mixer
+        song.instruments[inst_name] = _parse_instrument_body(inst_name, body)
     mixers = {n: _parse_mixer_body(body) for n, body in _extract_named_blocks(lines, RE_MIXER_HDR)}
 
     mode = None
@@ -202,8 +198,6 @@ def read_song(text: str, name: str = "ST") -> Song:
                 song.tracks.append(part)
             else:
                 part = song.add_track(current_name, current_instrument, body)
-            if current_instrument in instrument_mixer:
-                part.volume, part.pan = instrument_mixer[current_instrument]
             for key, value in mixers.get(current_name, {}).items():
                 if hasattr(part, key):
                     setattr(part, key, value)
@@ -266,7 +260,7 @@ def read_song(text: str, name: str = "ST") -> Song:
                 flush()
             mode, current_name = "skip", None       # letti a parte, o propri di SoundText
             continue
-        m = RE_TRACK_HDR_EXPLICIT.match(line) or RE_TRACK_HDR_DASH.match(line)
+        m = RE_TRACK_HDR_EXPLICIT.match(line)
         if m:
             if mode:
                 flush()

@@ -272,14 +272,16 @@ event (the time it occupies); see section 13 for how it sounds.
 ### 6.8 Slides
 
 `c*4>d*4` (kind `slide`): a continuous glide through two or more pitches
-(*taps*). Let the taps be p₁…pₙ with optional multipliers m₁…mₙ:
+(*taps*). Let the taps be p₁…pₙ with optional multipliers m₁…mₙ. There
+are n segments:
 
-- If no tap after the first has a multiplier (**legacy form**), the
-  total duration is `(m₁ or 1) × unit`, divided equally among the n-1
-  glides; the last segment (the hold on the final pitch) is 0.
-- Otherwise (**per-tap form**), segment i lasts `(mᵢ or 1) × unit`: the
-  first n-1 are glides from tap i to tap i+1, the last is a hold on the
-  final pitch.
+- for i < n, segment i is the glide from tap i to tap i+1 and lasts
+  `(mᵢ or 1) × unit`;
+- segment n is the hold on the final pitch and lasts `(mₙ or 0) × unit`.
+
+So `c*4>d*4` lasts one unit like a note, `c*4>d*4>c*4` (bend and release)
+two, `2c*4>3d*4` glides for 2 units and holds for 3. A slide whose total
+duration is 0 is an error.
 
 The event carries the first pitch, the following taps and the segment
 durations.
@@ -651,10 +653,9 @@ are case-insensitive; the other headers are written as shown.
 | --- | --- |
 | `Pattern %Name:` | the pattern's tokens |
 | `Traccia Name [Instrument]:` | track text |
-| `Name — Instrument:` (or `-`) | track text |
 | `Piano:`, `Piano 2:` (a known instrument name, optional index) | text of the track `Piano` / `Piano 2` |
 | `Box Track "Name" \|beat:` | a box of the track `Track` starting at `beat` |
-| `Strumento Name:` / `Instrument Name:` | instrument definition (`type: violin`, or `program=40 ottava=3 range=36-96 voicing=spread percussione=no`; optional `volume`, `pan`) |
+| `Strumento Name:` | instrument definition (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`) |
 | `Mixer Track:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) of a track |
 
 Track and box bodies keep their **line breaks** (comments end at line
@@ -743,6 +744,11 @@ are no longer valid; `/` is only the alternate bass), the tempo command
 is `tempo=N` instead of `N§`. In the song file a short track header needs
 a space before the index (`Guitar 2:`; `Guitar2:` is the instrument
 `Guitar2`). Texts using the removed forms are invalid.
+Slides have a single rule (section 6.8): the old "legacy" form, where a
+chain without multipliers after the first tap divided one unit among its
+glides, is gone. The song file no longer accepts the alternative
+`Instrument Name:` blocks (with `type:`, `volume`, `pan`) and the
+`Name — Instrument:` track headers.
 
 **1.1** — automations (`vol=`, `expr=`, `pan=`, `mod=`, `rev=`,
 `cho=`, section 7.5) with their ramps, ramp curves (`>>exp`, `>>log`,
