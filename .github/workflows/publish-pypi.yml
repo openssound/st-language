@@ -5,8 +5,13 @@ name: Publish st-language
 # repository, e' PyPI a fidarsi di questo workflow (vedi
 # docs/PUBBLICARE_SU_PYPI.md per la configurazione, da fare una volta).
 #
-#   - tag  st-language-vX.Y.Z   -> prova e pubblica su PyPI
+#   - tag  st-language-vX.Y.Z   -> prova e pubblica su PyPI, poi allega lo sdist
+#                                  e la wheel alla release di GitHub
 #   - esecuzione manuale        -> prova e pubblica su TestPyPI (o su PyPI)
+#
+# Il "Source code (zip)" di una release GitHub e' generato da GitHub e
+# contiene tutto il repository (SoundText compreso): non si puo' cambiare.
+# Per questo alla release si allegano i file della sola libreria.
 on:
   push:
     tags: ["st-language-v*"]
@@ -127,3 +132,34 @@ jobs:
 
       - name: Pubblica
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  # Dopo la pubblicazione: lo sdist (libreria, specifica, suite di
+  # conformita' ed esempi) e la wheel si allegano alla release del tag, che
+  # se manca si crea qui. Servono i permessi di scrittura, solo per questo job.
+  github-release:
+    name: allega i file alla release di GitHub
+    needs: publish-pypi
+    if: startsWith(github.ref, 'refs/tags/st-language-v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Scarica il pacchetto
+        uses: actions/download-artifact@v4
+        with:
+          name: st-language-dist
+          path: dist/
+
+      - name: Allega sdist e wheel alla release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#st-language-v}"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --latest=false \
+              --title "st-language $version" \
+              --notes "ST-language $version, la libreria Python della notazione di SoundText: pip install st-language==$version. I file allegati sono la libreria con la specifica, la suite di conformita' e gli esempi (sdist) e la wheel; il pulsante Source code di GitHub contiene invece tutto il repository di SoundText."
+          fi
+          gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
