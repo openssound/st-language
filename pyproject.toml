@@ -3,33 +3,48 @@
 # stcheck, st2mid, st2musicxml, st2abc e st2mtxt. SoundText (l'applicazione) non si
 # installa da qui: vedi README.md e requirements.txt.
 #
-#     pip install .                 # dalla cartella del repository
+#     pip install st-language       # da PyPI
+#     pip install .                 # oppure dalla cartella del repository
 #     st-language check brano.st
+#
+# Come si pubblica una versione: docs/PUBBLICARE_SU_PYPI.md.
 
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "st-language"
 version = "2.4.0"
-description = "ST-language: text music notation (notes, chords, drums, voices, lyrics) with MIDI, MusicXML and ABC export"
+description = "ST-language: text music notation (notes, chords, drums, voices, lyrics) with MIDI, MusicXML, ABC and MTXT export"
 readme = "st_language/README.md"
 requires-python = ">=3.9"
-license = {text = "GPL-3.0-or-later"}
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 authors = [{name = "Sergio Scolaro"}]
-keywords = ["music", "notation", "midi", "musicxml", "abc", "text", "chords"]
+keywords = ["music", "notation", "midi", "musicxml", "abc", "mtxt", "text", "chords", "lilypond"]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-    "Topic :: Multimedia :: Sound/Audio :: MIDI",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Topic :: Multimedia :: Sound/Audio :: MIDI",
+    "Topic :: Multimedia :: Sound/Audio :: Editors",
+    "Topic :: Text Processing :: Markup",
 ]
 dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/Crsvss/soundtext"
 Specification = "https://github.com/Crsvss/soundtext/blob/main/docs/spec/ST-language.md"
+Changelog = "https://github.com/Crsvss/soundtext/blob/main/docs/spec/ST-language.md#appendix-a-changes"
+Issues = "https://github.com/Crsvss/soundtext/issues"
 
 [project.scripts]
 st-language = "st_language.cli:main"
@@ -41,6 +56,7 @@ st2mtxt = "st_language.cli:mtxt_main"
 
 [tool.setuptools]
 packages = ["st_language"]
+include-package-data = false
 
 [tool.setuptools.package-data]
 st_language = ["locales/*.json", "README.md"]

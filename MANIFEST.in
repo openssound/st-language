@@ -1,0 +1,15 @@
+# Cosa entra nello sdist di st-language (la libreria in st_language/): la
+# specifica e la suite di conformita' si', i test no (provano anche
+# SoundText, che non e' nel pacchetto).
+include LICENSE
+include st_language/README.md
+prune tests
+prune core
+prune gui
+prune examples
+prune docs
+prune songs
+prune midi
+prune assets
+prune licenses
+prune locales

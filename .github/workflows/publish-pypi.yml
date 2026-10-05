@@ -1,0 +1,129 @@
+name: Publish st-language
+
+# Pubblica la libreria ST-language (st_language/, pyproject.toml) su PyPI.
+# Si usa il "trusted publishing" di PyPI: niente password o token nel
+# repository, e' PyPI a fidarsi di questo workflow (vedi
+# docs/PUBBLICARE_SU_PYPI.md per la configurazione, da fare una volta).
+#
+#   - tag  st-language-vX.Y.Z   -> prova e pubblica su PyPI
+#   - esecuzione manuale        -> prova e pubblica su TestPyPI (o su PyPI)
+on:
+  push:
+    tags: ["st-language-v*"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Dove pubblicare"
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: costruisci il pacchetto
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout codice
+        uses: actions/checkout@v7
+
+      - name: Imposta Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # Il tag deve dire la stessa versione del pacchetto: un tag
+      # st-language-v2.5.0 su un pyproject fermo a 2.4.0 pubblicherebbe una
+      # versione diversa da quella annunciata.
+      - name: Controlla che il tag corrisponda alla versione
+        shell: bash
+        run: |
+          pkg=$(python -c "import re; print(re.search(r'^version = \"([^\"]+)\"', open('pyproject.toml').read(), re.M).group(1))")
+          lib=$(python -c "import re; print(re.search(r'__version__ = \"([^\"]+)\"', open('st_language/__init__.py').read()).group(1))")
+          echo "pyproject.toml: $pkg - st_language/__init__.py: $lib"
+          test "$pkg" = "$lib" || { echo "::error::Le due versioni non coincidono"; exit 1; }
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME#st-language-v}"
+            test "$tag" = "$pkg" || { echo "::error::Il tag ($tag) non coincide con la versione ($pkg)"; exit 1; }
+          fi
+
+      - name: Costruisci sdist e wheel
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          twine check --strict dist/*
+
+      - name: Conserva il pacchetto
+        uses: actions/upload-artifact@v4
+        with:
+          name: st-language-dist
+          path: dist/
+          if-no-files-found: error
+
+  test:
+    name: prova la wheel (python ${{ matrix.python }})
+    needs: build
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: true
+      matrix:
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - name: Checkout codice
+        uses: actions/checkout@v7
+
+      - name: Imposta Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Scarica il pacchetto
+        uses: actions/download-artifact@v4
+        with:
+          name: st-language-dist
+          path: dist/
+
+      - name: Installa la wheel e prova la libreria installata
+        run: |
+          python -m pip install dist/*.whl
+          python docs/spec/conformance/run_installed.py
+
+  publish-testpypi:
+    name: pubblica su TestPyPI
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    runs-on: ubuntu-24.04
+    environment: testpypi
+    permissions:
+      id-token: write          # trusted publishing
+    steps:
+      - name: Scarica il pacchetto
+        uses: actions/download-artifact@v4
+        with:
+          name: st-language-dist
+          path: dist/
+
+      - name: Pubblica
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    name: pubblica su PyPI
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/st-language-v') || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
+    runs-on: ubuntu-24.04
+    environment: pypi
+    permissions:
+      id-token: write          # trusted publishing
+    steps:
+      - name: Scarica il pacchetto
+        uses: actions/download-artifact@v4
+        with:
+          name: st-language-dist
+          path: dist/
+
+      - name: Pubblica
+        uses: pypa/gh-action-pypi-publish@release/v1
