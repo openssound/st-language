@@ -6,7 +6,7 @@ modulation, effect sends, with curved ramps and hairpins), several
 voices and lyrics — and this is
 its reference implementation: a pure-Python library (no dependencies)
 with command-line tools to check songs and export them to **MIDI**,
-**MusicXML** and **ABC**. It is the notation engine of
+**MusicXML**, **ABC** and **MTXT**. It is the notation engine of
 [SoundText](https://github.com/Crsvss/soundtext), usable on its own.
 
 ```
@@ -23,8 +23,12 @@ Piano:
 ## Install
 
 ```bash
-pip install .            # from the SoundText repository
+pip install st-language
 ```
+
+Python 3.9 or later, no other packages needed. To work on the library
+itself: `pip install .` from the
+[SoundText repository](https://github.com/Crsvss/soundtext).
 
 ## Command line
 

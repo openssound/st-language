@@ -15,7 +15,11 @@ import sys
 from dataclasses import asdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-sys.path.insert(0, ROOT)
+# Con ST_LANGUAGE_INSTALLED=1 si usa la libreria installata (pip install
+# st-language) e non quella della cartella del repository: serve a
+# run_installed.py per provare il pacchetto pubblicato.
+if not os.environ.get("ST_LANGUAGE_INSTALLED"):
+    sys.path.insert(0, ROOT)
 
 from st_language import Pattern, notation_warnings, parse_track_text, tokenize, validate_track_text  # noqa: E402
 
