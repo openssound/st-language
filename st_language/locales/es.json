@@ -1,7 +1,7 @@
 {
  "')' chiude una legatura di portamento mai aperta": "')' cierra una ligadura de expresión que nunca se abrió",
  "'>>' / '<<' deve seguire un comando di velocity (N@), di tempo (tempo=N) o un'automazione (vol=, expr=, pan=, mod=, rev=, cho=)": "'>>' / '<<' debe seguir a un comando de velocidad (N@), de tempo (tempo=N) o a una automatización (vol=, expr=, pan=, mod=, rev=, cho=)",
- "'^' e ',' cambiano l'ottava solo nel modo relativo (rel:)": "'^' y ',' cambian la octava solo en el modo relativo (rel:)",
+ "'*+' e '*-' cambiano l'ottava solo nel modo relativo (rel:)": "'*+' y '*-' cambian la octava solo en el modo relativo (rel:)",
  "-o vale con un solo file": "-o solo vale con un único archivo",
  "Blocco '[' non chiuso": "Bloque '[' sin cerrar",
  "Blocco di voci '{0}' non chiuso": "Bloque de voces '{0}' sin cerrar",

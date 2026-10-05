@@ -113,7 +113,7 @@ token        = grid | velocity | tempo | ramp | control | swing | shift
 
 grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
-dynamic      = "ppp" | "pp" | "p" | "mp" | "mf" | "f" | "ff" | "fff" ;
+dynamic      = "pppp" | "ppp" | "pp" | "p" | "mp" | "mf" | "f" | "ff" | "fff" | "ffff" ;
 tempo        = "tempo=" number ;                               (* tempo=120 *)
 ramp         = ( ">>" | "<<" ) [ curve ] ;                       (* >>  >>exp *)
 curve        = "lin" | "exp" | "log" | "s" ;
@@ -142,8 +142,8 @@ mark         = "$" ( "accent" | "marcato" | "tenuto" | "fermata" | "tr"
 hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
-accidental   = "#" | "b" | "♭" | "-" | "n" | "♮" ;
-octave       = "*" number | ( "^" | "," ) { "^" | "," } ;
+accidental   = "#" | "b" | "♭" | "n" | "♮" ;
+octave       = "*" number | "*" "+" { "+" } | "*" "-" { "-" } ;
 modifier     = "!" | "x" | "_" ;
 chord        = [ number ] root quality [ "." style ] [ "/" bass ]
                [ "*" number ] [ modifier ] ;
@@ -223,7 +223,7 @@ lyrics take no time.
 ## 5. Pitch
 
 A note is a letter `a`-`g` with an optional accidental: `#` (sharp),
-`b`, `♭` or `-` (flat; `-` is a typing shortcut), `n` or `♮` (natural).
+`b` or `♭` (flat), `n` or `♮` (natural).
 `b` alone is the note B; `bb` is B-flat.
 
 **Key.** `key=K` (K a key as in `key=G`, `key=Bb`, `key=F#m`) gives
@@ -242,11 +242,11 @@ whose symbols are absolute.
 it the octave depends on the **pitch mode**:
 
 - `abs:` (absolute, the initial state): the instrument's default
-  octave. `^` and `,` are errors.
+  octave. `*+` and `*-` are errors.
 - `rel:` (relative): the octave that puts the note **nearest** to the
   previous one counting letters, that is at most a fourth above or below
-  (from `b`, `c` goes up; from `c`, `g` goes down); each `^` then raises
-  the note by an octave and each `,` lowers it. The previous note is the
+  (from `b`, `c` goes up; from `c`, `g` goes down); each `+` of `*+`, `*++`... then raises
+  the note by an octave and each `-` of `*-`, `*--`... lowers it. The previous note is the
   last note or slide tap read, explicit octaves included; after a block
   `[...]` it is the block's first note; chords and percussion do not
   count. `rel:` starts from c in the default octave (so the first note is
@@ -397,9 +397,9 @@ marks do not change the event's `start`, `duration` and `velocity`.
 `N@` sets the velocity (1-127; outside is an error). Classical dynamics
 are fixed velocities:
 
-| ppp | pp | p | mp | mf | f | ff | fff |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 20 | 40 | 60 | 75 | 90 | 105 | 120 | 127 |
+| pppp | ppp | pp | p | mp | mf | f | ff | fff | ffff |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 10 | 23 | 36 | 49 | 62 | 75 | 88 | 101 | 114 | 127 |
 
 ### 7.2 Tempo
 
@@ -745,7 +745,7 @@ conforming parser MUST report at least these errors:
 - velocity outside 1-127; grid with N = 0; note value other than 1, 2,
   4, 8, 16, 32, 64;
 - a note outside MIDI 0-127;
-- `^` or `,` outside relative mode; a key that is not valid or has more
+- `*+` or `*-` outside relative mode; a key that is not valid or has more
   than 7 accidentals;
 - a ramp not after a velocity, tempo or control command, or not closed
   as required by sections 7.3 and 7.5;
@@ -818,8 +818,8 @@ Interpreting a track produces a list of events. Each event has:
 
 Events appear in interpretation order (all events of the first voice of
 a block, then the second voice, …), which is not necessarily sorted by
-`start`. The note letter keeps the accidental as written (`eb`, `e♭`,
-`e-` are all `e` with a flat for pitch purposes).
+`start`. The note letter keeps the accidental as written (`eb` and
+`e♭` are both `e` with a flat for pitch purposes).
 
 ---
 
@@ -974,7 +974,7 @@ MIDI, more than 15 melodic tracks use more ports instead of sharing
 channels (section 13). Every valid 2.3 text is valid 2.4 text with the
 same events.
 
-**2.3** — relative octaves `rel:` / `abs:` with `^` and `,`, the key
+**2.3** — relative octaves `rel:` / `abs:` with `*+` and `*-`, the key
 `key=K` with the natural `n` / `♮` (section 5); patterns read in the
 initial pitch state. Every valid 2.2 text is valid 2.3 text with the
 same events.

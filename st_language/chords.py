@@ -53,12 +53,12 @@ CHORD_QUALITIES = {
 # La classe di caratteri include '#' per poter esprimere qualita' come
 # '7#9' (Hendrix chord) direttamente nel suffisso, non solo come
 # alterazione della fondamentale (gruppo precedente).
-# Alterazione: '#' per diesis; 'b', '♭' (simbolo musicale reale) o '-' per bemolle,
-# tra loro equivalenti (vedi note_name_to_pc). '-' e' pensato come scorciatoia di
-# digitazione: l'editor la sostituisce automaticamente con '♭' non appena viene
+# Alterazione: '#' per diesis; 'b' o '♭' (simbolo musicale reale) per bemolle,
+# tra loro equivalenti (vedi note_name_to_pc). Il '-' non e' un bemolle: e' solo una
+# scorciatoia di digitazione: l'editor la sostituisce automaticamente con '♭' non appena viene
 # digitata subito dopo una lettera nota (vedi gui/voicing_picker.py), per evitare
 # l'ambiguita' visiva tra la 'b' di alterazione e la 'b' lettera-nota (Si).
-CHORD_RE = re.compile(r"^([A-G])([#b♭-]?)([A-Za-z0-9#°]*)$")
+CHORD_RE = re.compile(r"^([A-G])([#b♭]?)([A-Za-z0-9#°]*)$")
 
 
 @dataclass
@@ -105,7 +105,7 @@ SCALE_TYPES = ("diatonica", "pentatonica", "blues")
 # minore (naturale), es. 'C', 'F#', 'Ebm', 'Am' - stessa convenzione usata da
 # mido per i messaggi meta 'key_signature' del MIDI, cosi' import/export non
 # richiedono alcuna conversione di formato.
-KEY_RE = re.compile(r"^([A-Ga-g])([#b♭-]?)(m?)$")
+KEY_RE = re.compile(r"^([A-Ga-g])([#b♭]?)(m?)$")
 
 
 def parse_key_signature(key: str) -> Tuple[int, bool]:
@@ -119,7 +119,7 @@ def parse_key_signature(key: str) -> Tuple[int, bool]:
     pc = PITCH_CLASS[letter.upper()]
     if accidental == "#":
         pc += 1
-    elif accidental in ("b", "♭", "-"):
+    elif accidental in ("b", "♭"):
         pc -= 1
     return pc % 12, bool(minor_suffix)
 
@@ -155,7 +155,7 @@ def _letter_semitones(letter: str) -> int:
     if len(letter) > 1:
         if letter[1] == "#":
             semitones += 1
-        elif letter[1] in ("b", "♭", "-"):
+        elif letter[1] in ("b", "♭"):
             semitones -= 1
     return semitones
 

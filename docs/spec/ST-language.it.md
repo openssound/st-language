@@ -117,7 +117,7 @@ token        = grid | velocity | tempo | ramp | control | swing | shift
 
 grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
-dynamic      = "ppp" | "pp" | "p" | "mp" | "mf" | "f" | "ff" | "fff" ;
+dynamic      = "pppp" | "ppp" | "pp" | "p" | "mp" | "mf" | "f" | "ff" | "fff" | "ffff" ;
 tempo        = "tempo=" number ;                               (* tempo=120 *)
 ramp         = ( ">>" | "<<" ) [ curve ] ;                       (* >>  >>exp *)
 curve        = "lin" | "exp" | "log" | "s" ;
@@ -146,8 +146,8 @@ mark         = "$" ( "accent" | "marcato" | "tenuto" | "fermata" | "tr"
 hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
-accidental   = "#" | "b" | "♭" | "-" | "n" | "♮" ;
-octave       = "*" number | ( "^" | "," ) { "^" | "," } ;
+accidental   = "#" | "b" | "♭" | "n" | "♮" ;
+octave       = "*" number | "*" "+" { "+" } | "*" "-" { "-" } ;
 modifier     = "!" | "x" | "_" ;
 chord        = [ number ] root quality [ "." style ] [ "/" bass ]
                [ "*" number ] [ modifier ] ;
@@ -227,7 +227,7 @@ testi cantati non occupano tempo.
 ## 5. Altezze
 
 Una nota e' una lettera `a`-`g` con un'alterazione facoltativa: `#`
-(diesis), `b`, `♭` o `-` (bemolle; `-` e' una scorciatoia di digitazione),
+(diesis), `b` o `♭` (bemolle),
 `n` o `♮` (bequadro). `b` da sola e' la nota Si; `bb` e' Si bemolle.
 
 **Tonalita'.** `key=K` (K una tonalita' come in `key=G`, `key=Bb`,
@@ -246,11 +246,11 @@ La tonalita' non vale per gli accordi, le cui sigle sono assolute.
 l'ottava dipende dal **modo delle altezze**:
 
 - `abs:` (assoluto, lo stato iniziale): l'ottava di default dello
-  strumento. `^` e `,` sono errori.
+  strumento. `*+` e `*-` sono errori.
 - `rel:` (relativo): l'ottava che mette la nota **piu' vicina** alla
   precedente contando le lettere, cioe' al piu' una quarta sopra o sotto
-  (dopo `b`, `c` sale; dopo `c`, `g` scende); poi ogni `^` la alza di
-  un'ottava e ogni `,` la abbassa. La nota precedente e' l'ultima nota o
+  (dopo `b`, `c` sale; dopo `c`, `g` scende); poi ogni `+` di `*+`, `*++`... la alza di
+  un'ottava e ogni `-` di `*-`, `*--`... la abbassa. La nota precedente e' l'ultima nota o
   tappa di slide letta, ottave esplicite comprese; dopo un blocco `[...]`
   e' la prima nota del blocco; accordi e percussioni non contano. `rel:`
   parte dal Do dell'ottava di default (quindi la prima nota e' quella
@@ -406,9 +406,9 @@ segni non cambiano `start`, `duration` e `velocity` dell'evento.
 `N@` imposta la velocity (1-127; fuori e' un errore). Le dinamiche
 classiche sono velocity fisse:
 
-| ppp | pp | p | mp | mf | f | ff | fff |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 20 | 40 | 60 | 75 | 90 | 105 | 120 | 127 |
+| pppp | ppp | pp | p | mp | mf | f | ff | fff | ffff |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 10 | 23 | 36 | 49 | 62 | 75 | 88 | 101 | 114 | 127 |
 
 ### 7.2 Tempo
 
@@ -770,7 +770,7 @@ conforme DEVE segnalare almeno questi errori:
 - velocity fuori da 1-127; griglia con N = 0; valore di nota diverso da
   1, 2, 4, 8, 16, 32, 64;
 - una nota fuori dall'intervallo MIDI 0-127;
-- `^` o `,` fuori dal modo relativo; una tonalita' non valida o con piu' di
+- `*+` o `*-` fuori dal modo relativo; una tonalita' non valida o con piu' di
   7 alterazioni;
 - una rampa che non segue un comando di velocity, di tempo o di
   automazione, o non chiusa come richiesto dalle sezioni 7.3 e 7.5;
@@ -847,7 +847,7 @@ ha:
 Gli eventi compaiono nell'ordine di interpretazione (tutti gli eventi
 della prima voce di un blocco, poi della seconda, …), non per forza in
 ordine di `start`. La lettera della nota conserva l'alterazione come
-scritta (`eb`, `e♭`, `e-` sono tutte un Mi bemolle per l'altezza).
+scritta (`eb` ed `e♭` sono un Mi bemolle per l'altezza).
 
 ---
 
@@ -1014,7 +1014,7 @@ nel MIDI, oltre 15 tracce melodiche usano piu' porte invece di
 condividere i canali (sezione 13). Ogni testo valido 2.3 e' valido anche
 in 2.4, con gli stessi eventi.
 
-**2.3** — ottave relative `rel:` / `abs:` con `^` e `,`, la tonalita'
+**2.3** — ottave relative `rel:` / `abs:` con `*+` e `*-`, la tonalita'
 `key=K` con il bequadro `n` / `♮` (sezione 5); pattern letti nello stato
 iniziale delle altezze. Ogni testo valido 2.2 e' valido anche in 2.3, con
 gli stessi eventi.
