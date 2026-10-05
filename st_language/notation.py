@@ -302,22 +302,23 @@ NOTE_VALUES = (1, 2, 4, 8, 16, 32, 64)
 _DOT_SCALE = {0: Fraction(1), 1: Fraction(3, 2), 2: Fraction(7, 4)}
 # Blocco di voci { voce1 ; voce2 ... }: sequenze che partono insieme.
 RE_VOICES = re.compile(r"^\{(.*)\}$", re.DOTALL)
-# Velocity: numero esplicito oppure dinamica classica (ppp/pp/p/mp/mf/f/ff/fff)
+# Velocity: numero esplicito oppure dinamica classica (pppp/ppp/pp/p/mp/mf/f/ff/fff/ffff)
 DYNAMICS_TO_VELOCITY = {
-    "ppp": 20, "pp": 40, "p": 60, "mp": 75, "mf": 90, "f": 105, "ff": 120, "fff": 127,
+    "pppp": 10, "ppp": 23, "pp": 36, "p": 49, "mp": 62,
+    "mf": 75, "f": 88, "ff": 101, "fff": 114, "ffff": 127,
 }
-RE_VELOCITY = re.compile(r"^(ppp|pp|p|mp|mf|fff|ff|f|\d+)@$")
+RE_VELOCITY = re.compile(r"^(pppp|ppp|pp|p|mp|mf|ffff|fff|ff|f|\d+)@$")
 RE_REST = re.compile(r"^(\d*)r$")
 # Nota melodica, con modificatore opzionale finale: '!' staccato, 'x' mute, '_' legato.
-# Alterazione: '#' diesis; 'b', '♭' o '-' bemolle (equivalenti, vedi core.chords.
-# note_name_to_pc). '-' e' una scorciatoia di digitazione: l'editor la sostituisce
-# automaticamente con '♭' quando viene battuta subito dopo una lettera nota, per
-# evitare l'ambiguita' visiva tra la 'b' di alterazione e la lettera nota 'b' (Si).
+# Alterazione: '#' diesis; 'b' o '♭' bemolle (equivalenti, vedi core.chords.
+# note_name_to_pc). Il '-' NON e' un bemolle nel linguaggio: e' solo una scorciatoia
+# di digitazione dell'editor, che lo sostituisce con '♭' quando viene battuto subito
+# dopo una lettera nota (per evitare l'ambiguita' con la lettera nota 'b').
 # Ottava: '*n' (es. c*5); senza, quella di default dello strumento.
 # Alterazione: anche 'n' (o '♮', bequadro) per togliere quella della
 # tonalita' (key=, vedi _PitchState). Ottava: '*n' esplicita, oppure nel
-# modo relativo (rel:) '^' e ',' per salire o scendere di un'ottava.
-RE_NOTE = re.compile(r"^(\d*)([a-g])([#b♭n♮-]?)(\*\d+|[\^,]+)?([!x_])?$")
+# modo relativo (rel:) '*+' e '*-' per salire o scendere di un'ottava.
+RE_NOTE = re.compile(r"^(\d*)([a-g])([#b♭n♮]?)(\*\d+|\*\++|\*-+)?([!x_])?$")
 # Suffisso opzionale '.stile' (es. Cmaj7.drop2) per forzare il voicing:
 # vedi core.chords.ALL_VOICINGS per l'elenco degli stili validi. La classe
 # di caratteri della qualita' include '#' per accordi come '7#9' e '°' per
@@ -331,8 +332,8 @@ RE_NOTE = re.compile(r"^(\d*)([a-g])([#b♭n♮-]?)(\*\d+|[\^,]+)?([!x_])?$")
 # una 'x' finale e' il modificatore (Cmaj7x = Cmaj7 stoppato), non parte
 # della qualita' (nessuna qualita' finisce con 'x').
 RE_CHORD = re.compile(
-    r"^(\d*)([A-G])([#b♭-]?)([A-Za-z0-9#°]*?)(?:\.([A-Za-z0-9]+))?"
-    r"(?:/([A-G][#b♭-]?))?(?:\*(\d+))?([!x_])?$"
+    r"^(\d*)([A-G])([#b♭]?)([A-Za-z0-9#°]*?)(?:\.([A-Za-z0-9]+))?"
+    r"(?:/([A-G][#b♭]?))?(?:\*(\d+))?([!x_])?$"
 )
 RE_PERC = re.compile(r"^(\d*)([a-z][a-z_0-9]*)$")
 # Portamento/slide tra due o piu' note: c*4>d*4,
@@ -341,9 +342,9 @@ RE_PERC = re.compile(r"^(\d*)([a-z][a-z_0-9]*)$")
 # moltiplicatore di durata (es. 2c*4>3d*4, vedi _slide_segment_durations
 # per la semantica): il gruppo catturato e' l'intera catena grezza, da
 # ripassare a RE_SLIDE_POINT tappa per tappa dopo lo split su '>'.
-_SLIDE_POINT_PATTERN = r"\d*[a-g][#b♭n♮-]?(?:\*\d+|[\^,]+)?"
+_SLIDE_POINT_PATTERN = r"\d*[a-g][#b♭n♮]?(?:\*\d+|\*\++|\*-+)?"
 RE_SLIDE = re.compile(rf"^({_SLIDE_POINT_PATTERN}(?:>{_SLIDE_POINT_PATTERN})+)$")
-RE_SLIDE_POINT = re.compile(r"^(\d*)([a-g])([#b♭n♮-]?)(\*\d+|[\^,]+)?$")
+RE_SLIDE_POINT = re.compile(r"^(\d*)([a-g])([#b♭n♮]?)(\*\d+|\*\++|\*-+)?$")
 
 
 def _check_pitch_range(letter: str, octave: int, tok: str) -> None:
@@ -359,14 +360,14 @@ LETTERS = "cdefgab"
 # Modo delle ottave: 'rel:' (relative, come in LilyPond) e 'abs:' (assolute,
 # il default); tonalita' delle note: 'key=G', 'key=Dm', 'key=off'.
 RE_PITCH_MODE = re.compile(r"^(rel|abs):$")
-RE_KEY_MODE = re.compile(r"^key=(?:([A-G][#b♭-]?m?)|off)$")
+RE_KEY_MODE = re.compile(r"^key=(?:([A-G][#b♭]?m?)|off)$")
 _LETTER_FIFTHS = {"f": -1, "c": 0, "g": 1, "d": 2, "a": 3, "e": 4, "b": 5}
 
 
 def key_signature_alters(name: str) -> Dict[str, str]:
     """Le alterazioni della tonalita' (es. 'G' -> {'f': '#'}, 'Dm' ->
     {'b': 'b'}): lettera nota -> '#' o 'b'."""
-    m = re.match(r"^([A-G])([#b♭-]?)(m?)$", name)
+    m = re.match(r"^([A-G])([#b♭]?)(m?)$", name)
     if not m:
         raise NotationError(tr("Tonalita' non valida: '{key}'", key=name))
     letter, accidental, minor = m.groups()
@@ -382,7 +383,7 @@ def key_signature_alters(name: str) -> Dict[str, str]:
 class _PitchState:
     """Come si leggono le altezze delle note: ottave assolute o relative
     (rel:, ogni nota senza '*n' va all'ottava piu' vicina alla precedente,
-    contando le lettere: al piu' una quarta sopra o sotto; '^' e ',' la
+    contando le lettere: al piu' una quarta sopra o sotto; '*+' e '*-' la
     spostano di un'ottava), e le alterazioni della tonalita' (key=)."""
 
     def __init__(self, default_octave: int):
@@ -414,12 +415,12 @@ class _PitchState:
             accidental = ""
         elif not accidental:
             accidental = self.alters.get(letter, "")
-        if mark and mark[0] == "*":
+        if mark and mark[1:].isdigit():
             octave = int(mark[1:])
         elif self.relative:
-            octave = self.nearest_octave(letter) + (mark or "").count("^") - (mark or "").count(",")
+            octave = self.nearest_octave(letter) + (mark.count("+") - mark.count("-") if mark else 0)
         elif mark:
-            raise NotationError(tr("'^' e ',' cambiano l'ottava solo nel modo relativo (rel:)"), tok)
+            raise NotationError(tr("'*+' e '*-' cambiano l'ottava solo nel modo relativo (rel:)"), tok)
         else:
             octave = self.default_octave
         _check_pitch_range(letter + accidental, octave, tok)
@@ -767,10 +768,10 @@ class PitchRewriter:
         else:
             new_name, new_octave = self._spell(midi)
         base = new_name[0]
-        keep_explicit = (mark or "").startswith("*") and self.to_relative is None
+        keep_explicit = (mark or "")[1:].isdigit() and self.to_relative is None
         if self.dst.relative and not keep_explicit:
             shift = new_octave - self.dst.nearest_octave(base)
-            octave_part = "^" * shift if shift > 0 else "," * -shift
+            octave_part = ("*" + "+" * shift if shift > 0 else "*" + "-" * -shift) if shift else ""
         else:
             octave_part = f"*{new_octave}"
         self.dst.ref = (base, new_octave)

@@ -1,7 +1,7 @@
 {
  "')' chiude una legatura di portamento mai aperta": "')' closes a slur that was never opened",
  "'>>' / '<<' deve seguire un comando di velocity (N@), di tempo (tempo=N) o un'automazione (vol=, expr=, pan=, mod=, rev=, cho=)": "'>>' / '<<' must follow a velocity (N@) or tempo (tempo=N) command or an automation (vol=, expr=, pan=, mod=, rev=, cho=)",
- "'^' e ',' cambiano l'ottava solo nel modo relativo (rel:)": "'^' and ',' change the octave only in relative mode (rel:)",
+ "'*+' e '*-' cambiano l'ottava solo nel modo relativo (rel:)": "'*+' and '*-' change the octave only in relative mode (rel:)",
  "-o vale con un solo file": "-o works with a single file only",
  "Blocco '[' non chiuso": "Block '[' not closed",
  "Blocco di voci '{0}' non chiuso": "Voice block '{0}' not closed",

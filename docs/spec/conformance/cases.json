@@ -69,64 +69,7 @@
    "id": "notes-accidentals",
    "input": "c# db d♭ d- eb b bb",
    "expect": {
-    "events": [
-     {
-      "start": 0.0,
-      "duration": 1.0,
-      "kind": "note",
-      "velocity": 80,
-      "letter": "c#",
-      "octave": 4
-     },
-     {
-      "start": 1.0,
-      "duration": 1.0,
-      "kind": "note",
-      "velocity": 80,
-      "letter": "db",
-      "octave": 4
-     },
-     {
-      "start": 2.0,
-      "duration": 1.0,
-      "kind": "note",
-      "velocity": 80,
-      "letter": "d♭",
-      "octave": 4
-     },
-     {
-      "start": 3.0,
-      "duration": 1.0,
-      "kind": "note",
-      "velocity": 80,
-      "letter": "d-",
-      "octave": 4
-     },
-     {
-      "start": 4.0,
-      "duration": 1.0,
-      "kind": "note",
-      "velocity": 80,
-      "letter": "eb",
-      "octave": 4
-     },
-     {
-      "start": 5.0,
-      "duration": 1.0,
-      "kind": "note",
-      "velocity": 80,
-      "letter": "b",
-      "octave": 4
-     },
-     {
-      "start": 6.0,
-      "duration": 1.0,
-      "kind": "note",
-      "velocity": 80,
-      "letter": "bb",
-      "octave": 4
-     }
-    ]
+    "error": true
    }
   },
   {
@@ -644,7 +587,7 @@
       "start": 2.0,
       "duration": 1.0,
       "kind": "note",
-      "velocity": 40,
+      "velocity": 36,
       "letter": "e",
       "octave": 4
      },
@@ -652,7 +595,7 @@
       "start": 3.0,
       "duration": 1.0,
       "kind": "note",
-      "velocity": 90,
+      "velocity": 75,
       "letter": "f",
       "octave": 4
      },
@@ -660,7 +603,7 @@
       "start": 4.0,
       "duration": 1.0,
       "kind": "note",
-      "velocity": 127,
+      "velocity": 114,
       "letter": "g",
       "octave": 4
      }
@@ -676,7 +619,7 @@
       "start": 0.0,
       "duration": 1.0,
       "kind": "note",
-      "velocity": 60,
+      "velocity": 49,
       "letter": "c",
       "octave": 4
      },
@@ -684,7 +627,7 @@
       "start": 1.0,
       "duration": 1.0,
       "kind": "note",
-      "velocity": 80,
+      "velocity": 66,
       "letter": "d",
       "octave": 4
      },
@@ -692,7 +635,7 @@
       "start": 2.0,
       "duration": 1.0,
       "kind": "note",
-      "velocity": 100,
+      "velocity": 84,
       "letter": "e",
       "octave": 4
      },
@@ -700,7 +643,7 @@
       "start": 3.0,
       "duration": 1.0,
       "kind": "note",
-      "velocity": 120,
+      "velocity": 101,
       "letter": "f",
       "octave": 4
      },
@@ -708,7 +651,7 @@
       "start": 4.0,
       "duration": 1.0,
       "kind": "note",
-      "velocity": 120,
+      "velocity": 101,
       "letter": "g",
       "octave": 4
      }
@@ -2007,7 +1950,7 @@
   },
   {
    "id": "relative-octaves",
-   "input": "rel: c d e f g a b c c, g c^ b,, d*6 e",
+   "input": "rel: c d e f g a b c c*- g c*+ b*-- d*6 e",
    "expect": {
     "events": [
      {
@@ -2213,7 +2156,7 @@
   },
   {
    "id": "relative-voices-and-repeats",
-   "input": "rel: e { g a ; c b, } f |: g a b c :| d 2(c, d) e",
+   "input": "rel: e { g a ; c b*- } f |: g a b c :| d 2(c*- d) e",
    "expect": {
     "events": [
      {
@@ -2460,7 +2403,7 @@
   },
   {
    "id": "relative-patterns-are-absolute",
-   "input": "rel: g, %R a",
+   "input": "rel: g*- %R a",
    "patterns": {
     "R": "c e"
    },
@@ -5469,7 +5412,7 @@
   },
   {
    "id": "error-octave-mark-not-relative",
-   "input": "c^ d",
+   "input": "c*+ d",
    "expect": {
     "error": true
    }
@@ -5490,7 +5433,7 @@
   },
   {
    "id": "error-relative-out-of-range",
-   "input": "rel: c*9 a^",
+   "input": "rel: c*9 a*+",
    "expect": {
     "error": true
    }

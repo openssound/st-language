@@ -190,7 +190,7 @@ def key_fifths(key: str) -> Optional[Tuple[int, str]]:
         written = key.strip()[1:2]
         if written == "#":
             fifths = sharp
-        elif written in ("b", "♭", "-"):
+        elif written in ("b", "♭"):
             fifths = flat
         elif minor:          # la tonica scritta senza alterazione: Re#m, Sol#m e Sibm restano i piu' comuni
             fifths = sharp if pc in (3, 8) else flat
@@ -215,7 +215,7 @@ def _voiced_pitches(symbol: str, octave: int, voicing, bass, instrument, flats: 
     notes = voice_chord(chord, octave, instrument, voicing_override=voicing)
     if bass:
         notes = apply_bass_note(notes, bass, octave)
-    chord_flats = flats or (len(symbol) > 1 and symbol[1] in ("b", "♭", "-"))
+    chord_flats = flats or (len(symbol) > 1 and symbol[1] in ("b", "♭"))
     if len(symbol) > 1 and symbol[1] == "#":
         chord_flats = False
     return [_spell_midi(n, chord_flats) for n in notes if 0 <= n <= 127]
@@ -688,7 +688,7 @@ def _direction_xml(inner: str, staff: int, placement: str = "above", sound: str 
 
 def _harmony_xml(symbol: str, bass: Optional[str]) -> str:
     chord = parse_chord_symbol(symbol)
-    root_len = 2 if len(symbol) > 1 and symbol[1] in ("#", "b", "♭", "-") else 1
+    root_len = 2 if len(symbol) > 1 and symbol[1] in ("#", "b", "♭") else 1
     root = symbol[:root_len]
     suffix = symbol[root_len:]
     alter = 0 if root_len == 1 else (1 if root[1] == "#" else -1)
