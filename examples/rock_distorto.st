@@ -1,43 +1,29 @@
-// Rock distorto: un brano rock in Mi minore, 32 battute a 124 BPM.
-//
-// Chitarra solista con molta distorsione, batteria e basso in primo piano
-// (volumi alti nel mixer), con una chitarra ritmica di accompagnamento piu'
-// bassa e dietro. Forma:
-//   introduzione 4 + strofa 8 + ritornello 8 + assolo 8 + coda 4
-//   Strofa e assolo  Em | C | G | D  (due volte)
-//   Ritornello       C | G | D | Em  (due volte)
-// Cosa c'e' dentro:
-//   - la chitarra solista con il programma "Distortion Guitar" e velocity
-//     alte: il riff in pentatonica minore, il tema del ritornello a note
-//     lunghe e l'assolo con semicrome veloci e scivolate (nota>nota);
-//   - il basso a ottavi che "martella" la fondamentale, con la cassa;
-//   - la batteria rock: cassa e rullante sul 1-3 e 2-4, charleston sugli
-//     ottavi, il piatto crash sul primo colpo del ritornello e un fill in
-//     fondo a ogni sezione;
-//   - la chitarra ritmica doppiata a destra e a sinistra: power chord con il
-//     palm mute (ottavi staccati `!` a velocity bassa), colpi aperti accentati
-//     e galoppo di semicrome; nel ritornello power chord aperti;
-//   - la corona ($fermata) sull'ultimo accordo;
-//   - strumenti definiti nel file (chitarra distorta, basso a plettro).
-
 ST: 2.6
 Tempo: 124 BPM
 Metrica: 4/4
 Tonalita: Em
 
-Strumento Distorta:
-  program=30 percussione=no ottava=4 range=40-88 poly=no voicing=monophonic
-
-Strumento Ritmica:
-  program=29 percussione=no ottava=2 range=36-76 poly=si voicing=power
-
 Strumento Basso:
   program=34 percussione=no ottava=2 range=28-60 poly=no voicing=monophonic
 
+Strumento Ritmica:
+  program=29 percussione=no ottava=3 range=40-80 poly=si voicing=power
+
+Strumento Distorta:
+  program=30 percussione=no ottava=4 range=40-88 poly=no voicing=monophonic
+
+Drums:
+
+Basso:
+
+Ritmica:
+
+Ritmica 2:
+
+Distorta:
+
 Pattern %Rest:
   4: 4r |
-
-// ---------------------------------------------------------------- batteria
 
 Pattern %DrRock:
   16: 110@ [kick hihat] r 75@ hihat r 112@ [snare hihat] r 75@ hihat r 110@ [kick hihat] r 105@ [kick hihat] r 112@ [snare hihat] r 75@ hihat r |
@@ -53,8 +39,6 @@ Pattern %DrVerse4:
 
 Pattern %DrChorus4:
   3%DrChorus %DrFill
-
-// ---------------------------------------------------------------- basso
 
 Pattern %BsEm:
   key=Em 16: 110@ 2e*2 2e*2 2e*2 2e*2 2e*2 2e*2 2e*2 2g*2 |
@@ -73,12 +57,6 @@ Pattern %BsVerse4:
 
 Pattern %BsChorus4:
   %BsC %BsG %BsD %BsEm
-
-// ---------------------------------------------------------------- chitarra ritmica
-// Palm mute: ottavi staccati (`!`) a velocity bassa sulla fondamentale, poi i
-// colpi aperti e accentati che fanno respirare il riff. A: sei ottavi muti e
-// due colpi pieni; B: un galoppo di semicrome al posto dei primi due ottavi;
-// R: il ritornello, power chord aperti e accentati.
 
 Pattern %RtEmA:
   16: 72@ 2E.power! 2E.power! 2E.power! 2E.power! 2E.power! 2E.power! 112@ 2E.power 118@ 2E.power |
@@ -121,8 +99,6 @@ Pattern %RtVerse4:
 
 Pattern %RtChorus4:
   %RtCR %RtGR %RtDR %RtEmR
-
-// ---------------------------------------------------------------- chitarra solista
 
 Pattern %RiffEm:
   key=Em 16: 4e*4 2g*4 2a*4 4b*4 2a*4 2g*4 |
@@ -181,9 +157,34 @@ Pattern %SoloD2:
 Pattern %SoloAll:
   %SoloEm1 %SoloC1 %SoloG1 %SoloD1 %SoloEm2 %SoloC2 %SoloG2 %SoloD2
 
-// ================================================================ tracce
+Mixer Drums:
+  volume: 120 pan: 0.0 mute: no solo: no riverbero: 12
 
-Drums:
+Mixer Basso:
+  volume: 125 pan: 0.0 mute: no solo: no
+
+Mixer Ritmica:
+  volume: 80 pan: -0.7 mute: no solo: no riverbero: 10
+
+Mixer Ritmica 2:
+  volume: 80 pan: 0.7 mute: no solo: no riverbero: 10
+
+Mixer Distorta:
+  volume: 140 pan: 0.1 mute: no solo: no riverbero: 22
+
+Effetti Ritmica:
+  amplificatore: modello=british cassa=4x12 guadagno=28 bassi=7 medi=6 alti=6 presenza=6 potenza=45 livello=-12
+
+Effetti Ritmica 2:
+  amplificatore: modello=british cassa=4x12 guadagno=28 bassi=7 medi=6 alti=6 presenza=6 potenza=45 livello=-12
+
+Effetti Distorta:
+  distorsione: spinta=34 tono=65 livello=-10 mix=100
+  amplificatore: modello=high_gain cassa=4x12 guadagno=40 bassi=6 medi=6 alti=7 presenza=8 potenza=60 livello=-12
+  delay: suddivisione=1/8p tempo=375 ripetizioni=22 mix=14
+
+Catena master:
+  riverbero: stanza=60 smorzamento=40 ampiezza=100 mix=22 preset="Sala"
 
 Box Drums "Introduzione" |0:
   3%DrRock %DrFill
@@ -201,8 +202,6 @@ Box Drums "Coda" |112:
   %DrRock %DrRock %DrRock
   16: 118@ [kick crash] 15r |
 
-Basso:
-
 Box Basso "Introduzione" |0:
   4%BsEm
 
@@ -218,8 +217,6 @@ Box Basso "Assolo" |80:
 Box Basso "Coda" |112:
   %BsEm %BsC %BsD
   16: 100@ 16e*2$fermata |
-
-Ritmica:
 
 Box Ritmica "Introduzione" |8:
   2%RtEmA
@@ -237,8 +234,6 @@ Box Ritmica "Coda" |112:
   %RtEmA %RtCB %RtDA
   16: 80@ 16E.power$fermata |
 
-Ritmica 2:
-
 Box Ritmica 2 "Introduzione" |8:
   2%RtEmA
 
@@ -254,8 +249,6 @@ Box Ritmica 2 "Assolo" |80:
 Box Ritmica 2 "Coda" |112:
   %RtEmA %RtCB %RtDA
   16: 80@ 16E.power$fermata |
-
-Distorta:
 
 Box Distorta "Introduzione" |0:
   // due battute di silenzio, poi il riff
@@ -277,35 +270,3 @@ Box Distorta "Assolo" |80:
 Box Distorta "Coda" |112:
   vol=90 115@ %RiffEm %RiffC %RiffD
   16: 127@ 16e*5$fermata |
-
-// ================================================================ mixer
-
-Mixer Drums:
-  volume: 120 pan: 0 mute: no solo: no reverb: 12
-
-Mixer Basso:
-  volume: 125 pan: 0 mute: no solo: no
-
-Mixer Distorta:
-  volume: 140 pan: 0.1 mute: no solo: no reverb: 22
-
-Mixer Ritmica:
-  volume: 80 pan: -0.7 mute: no solo: no reverb: 10
-
-Mixer Ritmica 2:
-  volume: 80 pan: 0.7 mute: no solo: no reverb: 10
-
-// ================================================================ effetti
-// (blocchi dell'app SoundText: gli altri lettori li saltano e suonano la
-// chitarra col solo programma "Distortion Guitar")
-
-Effetti Distorta:
-  distorsione: spinta=34 tono=65 livello=-10 mix=100
-  amplificatore: modello=high_gain cassa=4x12 guadagno=40 bassi=6 medi=6 alti=7 presenza=8 potenza=60 livello=-12
-  delay: suddivisione=1/8p ripetizioni=22 mix=14
-
-Effetti Ritmica:
-  amplificatore: modello=british cassa=4x12 guadagno=28 bassi=7 medi=6 alti=6 presenza=6 potenza=45 livello=-12
-
-Effetti Ritmica 2:
-  amplificatore: modello=british cassa=4x12 guadagno=28 bassi=7 medi=6 alti=6 presenza=6 potenza=45 livello=-12
