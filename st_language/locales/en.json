@@ -114,5 +114,7 @@
  "⚠  Avviso: {msg} (e altri {n})": "⚠  Warning: {msg} (and {n} more)",
  "Battuta fuori range (1-{0})": "Bar out of range (1-{0})",
  "La legatura di valore (~) deve arrivare a una nota uguale, non a un'ancora di battuta": "The tie (~) must reach an equal note, not a bar anchor",
- "battuta {bar}: la traccia e' gia' {amount} oltre l'inizio": "bar {bar}: the track is already {amount} past the start"
+ "battuta {bar}: la traccia e' gia' {amount} oltre l'inizio": "bar {bar}: the track is already {amount} past the start",
+ "Trasposizione fuori range ({0}..{1} semitoni)": "Transposition out of range ({0}..{1} semitones)",
+ "La trasposizione porta la nota fuori dall'estensione MIDI": "The transposition takes the note out of the MIDI range"
 }

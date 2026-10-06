@@ -264,7 +264,8 @@ def tokenize(text: str) -> List[str]:
 # ---------------------------------------------------------------------------
 
 # %Nome puo' essere preceduto da un moltiplicatore di ripetizione (es. 3%Riff)
-RE_PATTERN_REF = re.compile(r"^(\d*)%(\w+)$")
+# e seguito dalla trasposizione in semitoni (es. %Tema+7, 2%Tema-3).
+RE_PATTERN_REF = re.compile(r"^(\d*)%(\w+?)([+-]\d+)?$")
 # &Nome richiama un file MIDI dalla libreria (ricerca ricorsiva nelle sottocartelle,
 # funzionalita' 5), con lo stesso moltiplicatore di ripetizione di %Nome. Il nome
 # puo' anche essere un percorso qualificato con sottocartella (es. &Blues/bass_line).
@@ -391,12 +392,45 @@ class _PitchState:
         self.relative = False
         self.ref: Tuple[str, int] = ("c", default_octave)   # lettera e ottava dell'ultima nota
         self.alters: Dict[str, str] = {}
+        self.key_name = ""                                   # la tonalita' scritta (key=G), se c'e'
         self.stack: List[Tuple[str, int]] = []               # riferimento all'inizio dei ritornelli
+        # Trasposizione in semitoni: 'outer' viene dai pattern richiamati
+        # con %Nome+N (e da quelli che li contengono), 'local' da transpose=.
+        self.outer = 0
+        self.local = 0
+
+    @property
+    def semitones(self) -> int:
+        return self.outer + self.local
 
     def copy(self) -> "_PitchState":
         other = _PitchState(self.default_octave)
         other.relative, other.ref, other.alters = self.relative, self.ref, dict(self.alters)
+        other.key_name, other.outer, other.local = self.key_name, self.outer, self.local
         return other
+
+    def spell_transposed(self, name: str, octave: int, semitones: int, tok: str) -> Tuple[str, int]:
+        """(lettera con alterazione, ottava) di una nota scritta come
+        'name' all'ottava 'octave', trasposta di 'semitones'. Se c'e' una
+        tonalita' si scrive nella tonalita' trasposta, altrimenti coi
+        bemolli se la nota scritta ne aveva uno, con i diesis negli altri
+        casi."""
+        from .chords import pitch_to_midi
+        midi = pitch_to_midi(name, octave) + semitones
+        if not 0 <= midi <= 127:
+            raise NotationError(tr("La trasposizione porta la nota fuori dall'estensione MIDI"), tok)
+        alters = (key_signature_alters(_transpose_key_name(self.key_name, semitones))
+                  if self.key_name else {})
+        flats = (any(a == "b" for a in alters.values()) if self.key_name
+                 else len(name) > 1 and name[1] in "b♭")
+        spelled, octave = spell_midi(midi, alters, flats)
+        # spell_midi dice come si scrive nel testo (la lettera da sola prende
+        # l'alterazione della tonalita'); l'evento porta il nome esplicito
+        if spelled.endswith("n"):
+            spelled = spelled[:-1]
+        elif spelled in alters:
+            spelled += alters[spelled]
+        return spelled, octave
 
     def set_relative(self, relative: bool) -> None:
         self.relative = relative
@@ -425,6 +459,8 @@ class _PitchState:
             octave = self.default_octave
         _check_pitch_range(letter + accidental, octave, tok)
         self.ref = (letter, octave)
+        if self.semitones:
+            return self.spell_transposed(letter + accidental, octave, self.semitones, tok)
         return letter + accidental, octave
 
 
@@ -579,6 +615,13 @@ SHIFT_RANGE = (-500, 500)
 # (con i silenzi che servono); se la traccia e' gia' oltre, resta dov'e' e
 # l'editor segnala l'avviso (vedi notation_warnings).
 RE_BAR_ANCHOR = re.compile(r"^bar=(\d+)$")
+
+# Trasposizione: 'transpose=N' sposta di N semitoni le note, gli accordi e
+# gli slide che seguono (0 per tornare all'altezza scritta); '%Nome+N' fa
+# suonare un pattern N semitoni sopra (o sotto, con '-') e poi torna
+# com'era.
+RE_TRANSPOSE = re.compile(r"^transpose=(-?\d+)$")
+TRANSPOSE_RANGE = (-60, 60)
 BAR_ANCHOR_MAX = 99999
 
 
@@ -653,6 +696,32 @@ class Pattern:
 
 _MAJOR_KEY_NAMES = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]
 _MINOR_KEY_NAMES = ["Cm", "C#m", "Dm", "Ebm", "Em", "Fm", "F#m", "Gm", "G#m", "Am", "Bbm", "Bm"]
+
+
+_FLAT_NAMES = ["c", "db", "d", "eb", "e", "f", "gb", "g", "ab", "a", "bb", "b"]
+
+
+def spell_midi(midi: int, alters: Dict[str, str], prefer_flat: bool = False) -> Tuple[str, int]:
+    """Come scrivere l'altezza midi in una tonalita' (le sue alterazioni,
+    lettera -> '#' o 'b'): una nota della scala senza alterazioni scritte,
+    le altre con un diesis o un bemolle (a scelta di prefer_flat)."""
+    from .chords import midi_to_pitch, note_name_to_pc
+    for letter in LETTERS:
+        accidental = alters.get(letter, "")
+        pc = note_name_to_pc(letter + accidental)
+        if pc == midi % 12:
+            octave = (midi - pc) // 12 - 1
+            if letter == "c" and accidental == "b":
+                octave += 1          # do bemolle: l'ottava della lettera e' quella sopra
+            elif letter == "b" and accidental == "#":
+                octave -= 1
+            return letter, octave
+    name, octave = midi_to_pitch(midi)
+    if prefer_flat and len(name) == 2:
+        name = _FLAT_NAMES[midi % 12]
+    if len(name) == 1 and name in alters:
+        name += "n"                  # la tonalita' la altererebbe: bequadro
+    return name, octave
 
 
 def _transpose_key_name(name: str, semitones: int) -> str:
@@ -785,22 +854,7 @@ class PitchRewriter:
 
     def _spell(self, midi: int) -> Tuple[str, int]:
         """Come scrivere l'altezza midi nella tonalita' di destinazione."""
-        from .chords import midi_to_pitch, note_name_to_pc
-        alters = self.dst.alters
-        for letter in LETTERS:
-            accidental = alters.get(letter, "")
-            pc = note_name_to_pc(letter + accidental)
-            if pc == midi % 12:
-                octave = (midi - pc) // 12 - 1
-                if letter == "c" and accidental == "b":
-                    octave += 1          # do bemolle: l'ottava della lettera e' quella sopra
-                elif letter == "b" and accidental == "#":
-                    octave -= 1
-                return letter, octave
-        name, octave = midi_to_pitch(midi)
-        if len(name) == 1 and name in alters:
-            name += "n"                  # la tonalita' la altererebbe: bequadro
-        return name, octave
+        return spell_midi(midi, self.dst.alters)
 
 
 def transpose_tokens(tokens: List[str], semitones: int, default_octave: int) -> List[str]:
@@ -859,14 +913,19 @@ def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
     for t in tokens:
         m = RE_PATTERN_REF.match(t)
         if m:
-            mult_s, name = m.groups()
+            mult_s, name, offset = m.groups()
             mult = int(mult_s) if mult_s else 1
             if name not in patterns:
                 raise NotationError(tr("Pattern '%{name}' non definito", name=name), t)
+            semitones = int(offset) if offset else 0
+            if not TRANSPOSE_RANGE[0] <= semitones <= TRANSPOSE_RANGE[1]:
+                raise NotationError(tr("Trasposizione fuori range ({0}..{1} semitoni)", *TRANSPOSE_RANGE), t)
             body = expand_patterns(patterns[name].tokens, patterns, midi_dir, default_octave, _depth + 1)
             # un pattern si legge per conto suo (ottave assolute, nessuna
-            # tonalita'), qualunque sia il modo della traccia che lo usa
-            out.extend([f"{_MARK}push"] + body * mult + [f"{_MARK}pop"])
+            # tonalita'), qualunque sia il modo della traccia che lo usa; la
+            # trasposizione in vigore, invece, lo accompagna (piu' la sua)
+            push = f"{_MARK}push:{semitones}" if semitones else f"{_MARK}push"
+            out.extend([push] + body * mult + [f"{_MARK}pop"])
             continue
 
         m = RE_MIDI_REF.match(t)
@@ -1060,6 +1119,28 @@ def _split_voicing_modifier(voicing: Optional[str], modifier: Optional[str]):
     return voicing, modifier
 
 
+def _transpose_chord(symbol: str, bass: Optional[str], octave: int, semitones: int,
+                     pitch: "_PitchState") -> Tuple[str, Optional[str], int]:
+    """L'accordo (simbolo, basso alternativo, ottava) trasposto: la
+    fondamentale e il basso cambiano nome (coi bemolli se la tonalita' li ha
+    o se la fondamentale scritta ne aveva uno), l'ottava segue quando la
+    fondamentale scavalca il Do."""
+    from .chords import parse_chord_symbol, note_name_to_pc
+    parsed = parse_chord_symbol(symbol)
+    flats = (any(a == "b" for a in key_signature_alters(_transpose_key_name(pitch.key_name, semitones)).values())
+             if pitch.key_name else (len(symbol) > 1 and symbol[1] in "b♭") or (bool(bass) and len(bass) > 1))
+    names = [n[0].upper() + n[1:] for n in (_FLAT_NAMES if flats else _SHARP_PC_NAMES)]
+    new_total = parsed.root_pc + semitones
+    new_symbol = names[new_total % 12] + parsed.quality
+    new_bass = None
+    if bass:
+        new_bass = names[(note_name_to_pc(bass) + semitones) % 12]
+    return new_symbol, new_bass, octave + new_total // 12
+
+
+_SHARP_PC_NAMES = ["c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b"]
+
+
 def _parse_atom(tok: str, default_octave: int, pitch: Optional[_PitchState] = None):
     """Ritorna un dict {kind, letter/symbol/name, octave, mult} per nota/accordo/percussione."""
     m = RE_NOTE.match(tok)
@@ -1087,9 +1168,13 @@ def _parse_atom(tok: str, default_octave: int, pitch: Optional[_PitchState] = No
                 tok,
             )
         articulation = {"!": "staccato", "x": "mute", "_": "legato"}.get(modifier)
+        octave = int(octv) if octv else default_octave
+        semitones = pitch.semitones if pitch is not None else 0
+        if semitones:
+            symbol, bass, octave = _transpose_chord(symbol, bass, octave, semitones, pitch)
         return {
             "kind": "chord", "symbol": symbol, "voicing": voicing, "bass": bass,
-            "octave": int(octv) if octv else default_octave,
+            "octave": octave,
             "mult": int(mult) if mult else 1,
             "articulation": articulation,
         }
@@ -1337,9 +1422,11 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 # check_bar_lines (avviso, non errore).
                 continue
 
-            if tok == f"{_MARK}push":
+            if tok == f"{_MARK}push" or tok.startswith(f"{_MARK}push:"):
                 saved_pitch.append(pitch)
-                pitch = _PitchState(default_octave)
+                fresh = _PitchState(default_octave)
+                fresh.outer = pitch.semitones + int(tok.partition(":")[2] or 0)
+                pitch = fresh
                 continue
             if tok == f"{_MARK}pop":
                 if saved_pitch:
@@ -1368,6 +1455,15 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             m = RE_KEY_MODE.match(tok)
             if m:
                 pitch.alters = key_signature_alters(m.group(1)) if m.group(1) else {}
+                pitch.key_name = m.group(1) or ""
+                continue
+
+            m = RE_TRANSPOSE.match(tok)
+            if m:
+                semitones = int(m.group(1))
+                if not TRANSPOSE_RANGE[0] <= semitones <= TRANSPOSE_RANGE[1]:
+                    raise NotationError(tr("Trasposizione fuori range ({0}..{1} semitoni)", *TRANSPOSE_RANGE), tok)
+                pitch.local = semitones
                 continue
 
             m = RE_TEXT.match(tok)

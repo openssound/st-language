@@ -107,6 +107,7 @@ A-Z or a-z, `word` is one or more letters, digits or `_`):
 
 ```ebnf
 token        = grid | velocity | tempo | ramp | control | swing | shift | anchor
+             | transpose
              | pitch-mode | key-mode | sustain
              | bar-check | repeat | text | lyric | pattern-ref | midi-ref
              | group | voices | sounding ;
@@ -123,6 +124,7 @@ control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" | "bend"
 swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
 shift        = "shift=" [ "-" ] number ;                        (* shift=-15 *)
 anchor       = "bar=" number ;                                  (* bar=29 *)
+transpose    = "transpose=" [ "-" ] number ;                    (* transpose=-3 *)
 pitch-mode   = "rel:" | "abs:" ;
 key-mode     = "key=" ( root [ "m" ] | "off" ) ;                (* key=G  key=Dm *)
 sustain      = "SON" | "SOFF" ;
@@ -130,7 +132,7 @@ bar-check    = "|" ;
 repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| |1. *)
 text         = '$"' { any character except '"' } '"' ;          (* $"rit." *)
 lyric        = '"' { any character except '"' } '"' ;
-pattern-ref  = [ number ] "%" word ;                            (* %Riff  3%Riff *)
+pattern-ref  = [ number ] "%" word [ ( "+" | "-" ) number ] ;      (* %Riff  3%Riff  %Riff+7 *)
 midi-ref     = [ number ] "&" ( word | "/" | "-" ) { word | "/" | "-" } ;
 group        = [ number ] "(" { token } ")" ;                   (* 4(c d) *)
 voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } *)
@@ -203,6 +205,7 @@ time, starting at 0) and a **current state**:
 | automation values | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0, `bend` 0, `tune` 0, `ccN` 0 | control tokens (section 7.5) |
 | swing | off | swing tokens (section 7.6) |
 | shift | 0 ms | `shift=` (section 7.7) |
+| transposition | 0 semitones | `transpose=`, `%Name+N` (section 7.8) |
 | pitch mode | `abs:` | `rel:` / `abs:` (section 5) |
 | key | none (`key=off`) | `key=` (section 5) |
 | default octave | given by the instrument (4 if none) | — |
@@ -529,6 +532,33 @@ before the start of the song. A voice block inherits the shift in force.
 pushing ahead) and for aligning a part with a recording; for written
 rhythms use note values, tuplets and swing.
 
+### 7.8 Transposition
+
+`transpose=N` (N an integer from −60 to 60) makes the following **notes,
+chords, slides and blocks** sound N semitones higher (N > 0) or lower
+(N < 0) than written; `transpose=0` returns to the written pitch. The
+events carry the transposed pitch: `letter` and `octave` of a note, the
+root `symbol`, `bass` and `octave` of a chord, the points of a slide and
+the items of a block. Percussion, rests and everything that is not a
+pitch are not affected. Relative octaves (`rel:`, section 5) are read on
+the written notes and the transposition is applied afterwards, and a
+voice block inherits the transposition in force.
+
+**Spelling.** If a key is in force (`key=K`), the transposed notes are
+spelled in the transposed key: `key=G` and `transpose=2` give A major, so
+a written F♯ becomes G♯ and a G becomes A; a key with flats gives flats.
+Without a key, a transposed note takes a flat if the written note had a
+flat and a sharp otherwise. A chord root and bass follow the same rule.
+A chord whose root passes the C changes octave (`B` +1 is `C` one octave
+higher), so a transposition of 12 raises every chord by an octave.
+
+A note or a chord that the transposition takes outside MIDI 0-127, or an
+N outside −60..60, is an error.
+
+**Patterns.** `%Name+N` and `%Name-N` (and `K%Name+N`) read the pattern
+transposed by N semitones **in addition to** the transposition in force
+(section 8.2); the number follows the name with no spaces.
+
 ---
 
 ## 8. Structure
@@ -552,6 +582,11 @@ error, as is an undefined pattern. The notes of a pattern are read in
 the initial pitch state (`abs:`, no key) whatever the track's mode is,
 and after the reference the track's mode, key and previous note are the
 ones before it, so a pattern sounds the same in every track.
+
+The **transposition** (section 7.8) is the exception: a pattern is read
+at the transposition in force at the reference, plus the number written
+after the name (`%Riff+7`, `3%Riff-12`). A `transpose=` inside the
+pattern is relative to that reference and ends with it.
 
 ### 8.3 MIDI references
 
@@ -780,7 +815,8 @@ conforming parser MUST report at least these errors:
 - a tie or slur not used as required by sections 6.9 and 6.10; a swing
   value outside 50-80; a shift outside −500..500 ms; a bar anchor that is
   not an integer from 1 to 99999, or that needs silence while a tie is
-  open;
+  open; a transposition outside −60..60 (`transpose=` or `%Name+N`) or
+  that takes a note out of MIDI 0-127;
 - an undefined pattern, a too-deep or cyclic reference, an unresolvable
   MIDI reference;
 - an empty block `[]` or an empty voice block.
@@ -999,7 +1035,8 @@ version if it gives the same result for every case.
 ## Appendix A: changes
 
 **2.5** — bar anchors `bar=N` (section 8.9) and the warning for a track
-that is past the bar. Every valid 2.4 text is valid 2.5 text with the same
+that is past the bar; transposition `transpose=N` and `%Name+N`
+(section 7.8). Every valid 2.4 text is valid 2.5 text with the same
 events.
 
 **2.4** — micro-timing `shift=N` in milliseconds (section 7.7) with the

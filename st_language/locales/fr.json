@@ -114,5 +114,7 @@
  "⚠  Avviso: {msg} (e altri {n})": "⚠  Avertissement : {msg} (et {n} autres)",
  "Battuta fuori range (1-{0})": "Mesure hors limites (1-{0})",
  "La legatura di valore (~) deve arrivare a una nota uguale, non a un'ancora di battuta": "La liaison de valeur (~) doit aboutir à une note identique, pas à une ancre de mesure",
- "battuta {bar}: la traccia e' gia' {amount} oltre l'inizio": "mesure {bar} : la piste a déjà dépassé le début de {amount}"
+ "battuta {bar}: la traccia e' gia' {amount} oltre l'inizio": "mesure {bar} : la piste a déjà dépassé le début de {amount}",
+ "Trasposizione fuori range ({0}..{1} semitoni)": "Transposition hors limites ({0}..{1} demi-tons)",
+ "La trasposizione porta la nota fuori dall'estensione MIDI": "La transposition fait sortir la note de l'étendue MIDI"
 }

@@ -5334,6 +5334,47 @@
    }
   },
   {
+   "id": "error-transpose-range",
+   "input": "transpose=61 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transpose-decimals",
+   "input": "transpose=1.5 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transpose-pattern-range",
+   "input": "%A+99",
+   "patterns": {
+    "A": "c"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transpose-out-of-midi",
+   "input": "c*9 transpose=12 c*5 transpose=60 c*8",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-pattern-slash-suffix",
+   "input": "%A/3",
+   "patterns": {
+    "A": "c"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
    "id": "error-anchor-zero",
    "input": "bar=0 c",
    "expect": {
@@ -5774,6 +5815,798 @@
       "kind": "note",
       "velocity": 90,
       "letter": "d",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-notes",
+   "input": "c d transpose=2 c d transpose=0 c transpose=-1 c e",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 3
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d#",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-octaves",
+   "input": "transpose=12 c*4 transpose=-12 c*4 e",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 3
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-chords",
+   "input": "C7 transpose=5 C7/E transpose=12 Cm/Eb*3 transpose=-7 Cm7/Bb Db/F",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C7",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "F7",
+      "bass": "A",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Cm",
+      "bass": "Eb",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Fm7",
+      "bass": "Eb",
+      "octave": 3
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Gb",
+      "bass": "Bb",
+      "octave": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-chord-across-c",
+   "input": "B transpose=1 B",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "B",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C",
+      "octave": 5
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-key-sharps",
+   "input": "key=G f g transpose=2 f g",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g#",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-key-flats",
+   "input": "key=Eb e a transpose=2 e a b",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "eb",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "ab",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "bb",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-key-minor",
+   "input": "key=Dm b a transpose=-3 b a",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "bb",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-without-key",
+   "input": "eb db*5 transpose=2 eb db*5 transpose=1 c",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "eb",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "db",
+      "octave": 5
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "eb",
+      "octave": 5
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c#",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-relative",
+   "input": "rel: g a b transpose=2 g a b",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 3
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 3
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 3
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 3
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 3
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c#",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-slides-and-blocks",
+   "input": "transpose=3 c>e*5 [c e g]'2 { c ; e }",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "slide",
+      "velocity": 80,
+      "letter": "d#",
+      "octave": 4,
+      "slide_points": [
+       [
+        "g",
+        5
+       ]
+      ],
+      "slide_segment_durations": [
+       1.0,
+       0.0
+      ]
+     },
+     {
+      "start": 1.0,
+      "duration": 2.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "d#",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "g",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "a#",
+        "octave": 4
+       }
+      ]
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d#",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4,
+      "voice": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-percussion-untouched",
+   "input": "transpose=5 kick r snare c",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "kick"
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "snare"
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-pattern-suffix",
+   "input": "%T %T+7 %T-5 2%T+2",
+   "patterns": {
+    "T": "4: c e g"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 3
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 3
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 4
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 12.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 13.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 4
+     },
+     {
+      "start": 14.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-pattern-inherits",
+   "input": "transpose=3 %T %T+4",
+   "patterns": {
+    "T": "4: c e g"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d#",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a#",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-pattern-nested",
+   "input": "%U+1",
+   "patterns": {
+    "T": "4: c e g",
+    "U": "%T+2 c"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d#",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a#",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c#",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transpose-set-inside-pattern",
+   "input": "%A %B %A+2",
+   "patterns": {
+    "A": "transpose=5 c d",
+    "B": "c"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
       "octave": 4
      }
     ]
