@@ -41,10 +41,10 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/Crsvss/soundtext"
-Specification = "https://github.com/Crsvss/soundtext/blob/main/docs/spec/ST-language.md"
-Changelog = "https://github.com/Crsvss/soundtext/blob/main/docs/spec/ST-language.md#appendix-a-changes"
-Issues = "https://github.com/Crsvss/soundtext/issues"
+Homepage = "https://github.com/openssound/st-language"
+Specification = "https://github.com/openssound/st-language/blob/main/docs/spec/ST-language.md"
+Changelog = "https://github.com/openssound/st-language/blob/main/docs/spec/ST-language.md#appendix-a-changes"
+Issues = "https://github.com/openssound/st-language/issues"
 
 [project.scripts]
 st-language = "st_language.cli:main"

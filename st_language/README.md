@@ -69,9 +69,9 @@ st.to_abc(song, "demo.abc")
 ## Specification
 
 The language and the `.st` song format are defined in the
-[ST-language specification](https://github.com/Crsvss/soundtext/blob/main/docs/spec/ST-language.md)
-(CC BY 4.0, also [in Italian](https://github.com/Crsvss/soundtext/blob/main/docs/spec/ST-language.it.md)),
-with a [conformance suite](https://github.com/Crsvss/soundtext/tree/main/docs/spec/conformance)
+[ST-language specification](https://github.com/openssound/st-language/blob/main/docs/spec/ST-language.md)
+(CC BY 4.0, also [in Italian](https://github.com/openssound/st-language/blob/main/docs/spec/ST-language.it.md)),
+with a [conformance suite](https://github.com/openssound/st-language/tree/main/docs/spec/conformance)
 for other implementations.
 
 ## License
