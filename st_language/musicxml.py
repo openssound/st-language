@@ -517,8 +517,10 @@ def _split_duration(q: Fraction):
     return out
 
 
-def _measures(metrica_map, end: Fraction) -> List[Tuple[Fraction, Fraction, int, int]]:
-    """[(inizio, lunghezza, numeratore, denominatore)] fino a coprire end."""
+def _measures(metrica_map, end: Fraction, pickup=0) -> List[Tuple[Fraction, Fraction, int, int]]:
+    """[(inizio, lunghezza, numeratore, denominatore)] fino a coprire end.
+    Con una battuta in levare di 'pickup' quarti, la prima battuta e' lunga
+    tanto (incompleta) e le altre partono da li'."""
     from .timing import RE_METRICA_VALUE
     changes = []
     for beat, sig in metrica_map:
@@ -530,6 +532,10 @@ def _measures(metrica_map, end: Fraction) -> List[Tuple[Fraction, Fraction, int,
     out = []
     t = Fraction(0)
     num, den = changes[0][1], changes[0][2]
+    pickup = Fraction(pickup or 0).limit_denominator(1 << 16)
+    if pickup > 0:
+        out.append((t, pickup, num, den))
+        t = pickup
     while t < end or not out:
         for beat, n, d in changes:
             if beat <= t:
@@ -835,7 +841,7 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
         tempo_map = [(_frac(b, grid), bpm) for b, bpm in
                      build_tempo_beat_map(project, tracks=tracks, events_by_track=events_by_track)]
         end = max([i.end for items, _ in parsed.values() for i in items] + [Fraction(0)])
-        measures = _measures(build_metrica_beat_map(project), end)
+        measures = _measures(build_metrica_beat_map(project), end, getattr(project, "pickup", 0))
         times = [m[0] for m in measures] + [m[0] + m[1] for m in measures]
         times += [t for t, _ in tempo_map]
         for items, pedals in parsed.values():
@@ -942,7 +948,11 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
         for number, (m_index, bar_marks) in enumerate(layout, 1):
             m_start, m_len, num, den = measures[m_index]
             left_bar, right_bar = _barline_xml(bar_marks, number == len(layout))
-            out.append(f'<measure number="{number}">')
+            # la battuta in levare e' la 0, "implicita" (incompleta)
+            pickup_bar = bool(getattr(project, "pickup", 0))
+            label = number - 1 if pickup_bar else number
+            implicit = ' implicit="yes"' if pickup_bar and number == 1 else ""
+            out.append(f'<measure number="{label}"{implicit}>')
             attributes = ""
             if number == 1:
                 attributes += f"<divisions>{divisions}</divisions>"

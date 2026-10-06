@@ -16,6 +16,7 @@
 // Forma (56 battute): introduzione 4, strofa 8, ritornello 8, strofa 8,
 // ritornello 8, ponte 8, ritornello 8, coda 4.
 
+ST: 2.6
 Tempo: 112 BPM
 Metrica: 4/4
 Tonalita: G

@@ -16,15 +16,18 @@ audio, riverbero), che e' proprio dell'applicazione.
 
 import os
 import re
+import warnings
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from .instruments import DEFAULT_INSTRUMENTS, InstrumentProfile, instrument_for
+from ._i18n import tr
 from .notation import Event, Meter, NotationError, Pattern, COMMENT_MARK, parse_track_text, tokenize
 from .stfile import (
     RE_AMBIENTE, RE_AUDIO_HDR, RE_BOX_HDR, RE_EFFECTS_HDR, RE_INSTRUMENT_HDR, RE_KEY, RE_MASTER,
     RE_MASTER_CHAIN_HDR, RE_METRICA, RE_METRICA_LIST_HDR, RE_MIXER_HDR, RE_PATTERN_HDR, RE_SYNTH_HDR,
     RE_TEMPO, RE_TEMPO_LIST_HDR, RE_TRACK_HDR, RE_TRACK_HDR_EXPLICIT, short_track_header,
+    RE_PICKUP, RE_ST_VERSION, LANGUAGE_VERSION, parse_pickup, instrument_blocks,
     _extract_box_blocks, _extract_named_blocks, _parse_bar_value_list, _parse_instrument_body,
     _parse_mixer_body,
 )
@@ -74,13 +77,15 @@ class Song:
     patterns: Dict[str, Pattern] = field(default_factory=dict)
     tracks: List[Part] = field(default_factory=list)
     instruments: Dict[str, InstrumentProfile] = field(default_factory=dict)   # dichiarati nel file
+    pickup: float = 0.0                    # battuta in levare, in quarti (Levare:)
+    st_version: Optional[tuple] = None     # versione dichiarata dal file (ST: 2.6), se c'e'
 
     def instrument(self, name: str) -> InstrumentProfile:
         return instrument_for(name, known={**DEFAULT_INSTRUMENTS, **self.instruments})
 
     def meter(self) -> Meter:
         """Dove cominciano le battute del brano (per le ancore bar=N)."""
-        return Meter(self.time_sig, self.metrica_changes)
+        return Meter(self.time_sig, self.metrica_changes, self.pickup)
 
     def add_track(self, name: str, instrument="Piano", text: str = "") -> Part:
         profile = instrument if isinstance(instrument, InstrumentProfile) else self.instrument(instrument)
@@ -125,15 +130,12 @@ FILL_GRID_BEATS = 0.25
 _FILL_GRID_TOKEN = "16:"
 
 
-# Stato di default del parser (core.notation.parse_tokens): griglia 1/4,
-# velocity 80. Va reimposto esplicitamente prima di ogni box, perche' un box
-# e' autosufficiente come il corpo di un Pattern e non deve ereditare lo
-# stato lasciato dal riempimento del vuoto o dal box precedente.
-_DEFAULT_STATE_PREFIX = "4: 80@ "
-# Se i box usano anche questi comandi di stato, il prefisso li rimette a
-# posto: ottave assolute, nessuna tonalita', niente swing ne' trasposizione.
-_STATE_RESET_RE = re.compile(r"(?:^|\s)(?:rel:|abs:|key=|swing(?:16)?=|shift=|transpose=)")
-_FULL_STATE_PREFIX = "4: 80@ abs: key=off swing=50 shift=0 transpose=0 "
+# Ogni box e' autosufficiente come il corpo di un Pattern: non deve
+# ereditare lo stato lasciato dal riempimento del vuoto o dal box
+# precedente. 'reset:' riporta tutto allo stato iniziale (griglia, velocity,
+# swing, spostamento, trasposizione, modo delle altezze, tonalita'), anche
+# per i comandi di stato che verranno.
+_DEFAULT_STATE_PREFIX = "reset: "
 
 
 def clip_duration_beats(text: str, patterns: Dict[str, Pattern], default_octave: int,
@@ -166,7 +168,7 @@ def flatten_clips_to_text(clips: List["Clip"], patterns: Dict[str, Pattern], def
     if not clips:
         return ""
     ordered = sorted(clips, key=lambda c: c.start_beat)
-    prefix = _FULL_STATE_PREFIX if any(_STATE_RESET_RE.search(c.text) for c in ordered) else _DEFAULT_STATE_PREFIX
+    prefix = _DEFAULT_STATE_PREFIX
     parts: List[str] = []
     cursor = 0.0
     for clip in ordered:
@@ -202,7 +204,7 @@ def read_song(text: str, name: str = "ST") -> Song:
     """Il brano descritto da un file di progetto .st (vedi la specifica)."""
     lines = text.splitlines()
     song = Song(name=name)
-    for inst_name, body in _extract_named_blocks(lines, RE_INSTRUMENT_HDR):
+    for inst_name, body in instrument_blocks(lines):
         song.instruments[inst_name] = _parse_instrument_body(inst_name, body)
     mixers = {n: _parse_mixer_body(body) for n, body in _extract_named_blocks(lines, RE_MIXER_HDR)}
 
@@ -234,6 +236,21 @@ def read_song(text: str, name: str = "ST") -> Song:
         if line == "":
             if mode:
                 flush()
+            continue
+        m = RE_ST_VERSION.match(line)
+        if m:
+            if mode:
+                flush()
+            song.st_version = (int(m.group(1)), int(m.group(2)))
+            if song.st_version > LANGUAGE_VERSION:
+                warnings.warn(tr("Il file e' scritto con ST {0}.{1}, questa libreria conosce la {2}.{3}: "
+                                 "qualcosa potrebbe non essere letto", *song.st_version, *LANGUAGE_VERSION))
+            continue
+        m = RE_PICKUP.match(line)
+        if m:
+            if mode:
+                flush()
+            song.pickup = parse_pickup(m.group(1))
             continue
         m = RE_TEMPO_LIST_HDR.match(line)
         if m:

@@ -452,7 +452,7 @@ def song_midi_tracks(song, only_audible: bool = True, midi_dir: Optional[str] = 
             continue
         num, den = int(m.group(1)), int(m.group(2))
         power = max(0, den.bit_length() - 1)
-        conductor.append((round(beat * TICKS_PER_BEAT), _CTRL, _meta(0x58, bytes([num, power, 24, 8]))))
+        conductor.append((max(0, round(beat * TICKS_PER_BEAT)), _CTRL, _meta(0x58, bytes([num, power, 24, 8]))))
     channels = _assign_channels(tracks)
     ports = midi_ports_needed(channels)
     midi_tracks = [conductor]

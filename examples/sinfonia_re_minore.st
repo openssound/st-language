@@ -28,6 +28,7 @@
 //     timpano, accordi staccati.
 // Il pannello Mixer ha un blocco per ogni sezione dell'orchestra.
 
+ST: 2.6
 Tempo: 132 BPM
 Metrica: 4/4
 Tonalita: Dm

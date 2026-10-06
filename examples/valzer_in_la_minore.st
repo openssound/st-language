@@ -18,6 +18,7 @@
 //   A    Am | E7 | Am | Dm | Am | Dm | E7 | (1) E7  (2) Am
 //   B    C | G7 | C | F | Dm | Am | Dm G7 | (1) G7  (2) E7
 
+ST: 2.6
 Tempo: 144 BPM
 Metrica: 3/4
 Tonalita: Am

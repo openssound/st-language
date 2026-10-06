@@ -49,6 +49,7 @@
 //     staccati, rulli e colpi di timpano) senza velocity: la dinamica la
 //     decide la traccia (`90@ %Arp_IA`), cosi' lo stesso pattern serve piu' volte.
 
+ST: 2.6
 Tempo: 60 BPM
 Metrica: 4/4
 Tonalita: Cm

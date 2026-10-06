@@ -22,6 +22,7 @@
 //     forcelle < sugli accordi e sulle note lunghe;
 //   - la corona ($fermata) sull'ultimo accordo.
 
+ST: 2.6
 Tempo: 56 BPM
 Metrica: 4/4
 Tonalita: Dm

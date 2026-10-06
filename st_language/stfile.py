@@ -13,23 +13,47 @@ from typing import List, Optional, Tuple
 from .instruments import InstrumentProfile
 
 
+# Versione del linguaggio con cui e' scritto il file: "ST: 2.6" (riga
+# facoltativa in cima; i lettori piu' vecchi la ignorano).
+RE_ST_VERSION = re.compile(r"^ST:\s*(\d+)\.(\d+)$")
+# La versione del linguaggio che questo lettore conosce (vedi la specifica).
+LANGUAGE_VERSION = (2, 6)
+
+# "Levare: 1" (o "Pickup:"): la battuta in levare, in quarti (anche "1.5" o
+# "1/2"); la battuta 1 e' la prima intera.
+RE_PICKUP = re.compile(r"^(?:Levare|Pickup):\s*(\d+(?:\.\d+)?(?:/\d+)?)$", re.IGNORECASE)
+
+
+def parse_pickup(raw: str) -> float:
+    """I quarti di 'Levare: raw' ("1", "1.5", "1/2")."""
+    from fractions import Fraction
+    return float(Fraction(raw))
+
+
+def format_pickup(quarters: float) -> str:
+    """'Levare:' come lo scrive il file: intero o decimale ("1", "1.5")."""
+    return f"{round(quarters, 6):g}"
+
+# Le parole chiave del file si scrivono in italiano o in inglese
+# (Metrica/Meter, Tonalita/Key, Traccia/Track, Strumento/Instrument...);
+# chi scrive il file usa sempre la forma italiana.
 RE_TEMPO = re.compile(r"^Tempo:\s*(\d+)\s*BPM$", re.IGNORECASE)
 
-RE_METRICA = re.compile(r"^Metrica:\s*(\d+/\d+)$", re.IGNORECASE)
+RE_METRICA = re.compile(r"^(?:Metrica|Meter|Time):\s*(\d+/\d+)$", re.IGNORECASE)
 
 # "Master: 80" persiste il volume master del progetto (100 = guadagno originale).
 RE_MASTER = re.compile(r"^Master:\s*(\d+)$", re.IGNORECASE)
 
 # "Tonalita: Am" persiste la tonalita' del brano (vedi core.chords.parse_key_signature).
-RE_KEY = re.compile(r"^Tonalita:\s*(.+)$", re.IGNORECASE)
+RE_KEY = re.compile(r"^(?:Tonalita|Tonalità|Key):\s*(.+)$", re.IGNORECASE)
 
 # "Ambiente: sala" persiste l'ambiente del riverbero del synth (vedi core.effects).
-RE_AMBIENTE = re.compile(r"^Ambiente:\s*(\w+)$", re.IGNORECASE)
+RE_AMBIENTE = re.compile(r"^(?:Ambiente|Room):\s*(\w+)$", re.IGNORECASE)
 
 # Forma estesa con cambi a partire da una certa battuta: "Tempo: 1: 120, 5: 140, 9: 100"
 RE_TEMPO_LIST_HDR = re.compile(r"^Tempo:\s*(\d+\s*:\s*\d+(?:\s*,\s*\d+\s*:\s*\d+)*)$", re.IGNORECASE)
 
-RE_METRICA_LIST_HDR = re.compile(r"^Metrica:\s*(\d+\s*:\s*\d+/\d+(?:\s*,\s*\d+\s*:\s*\d+/\d+)*)$", re.IGNORECASE)
+RE_METRICA_LIST_HDR = re.compile(r"^(?:Metrica|Meter|Time):\s*(\d+\s*:\s*\d+/\d+(?:\s*,\s*\d+\s*:\s*\d+/\d+)*)$", re.IGNORECASE)
 
 RE_BAR_VALUE = re.compile(r"(\d+)\s*:\s*(\d+(?:/\d+)?)")
 
@@ -37,7 +61,7 @@ RE_PATTERN_HDR = re.compile(r"^Pattern\s+%(\w+):$")
 
 # "Strumento Nome:" definisce uno strumento personalizzato (program=..., vedi
 # _parse_instrument_body).
-RE_INSTRUMENT_HDR = re.compile(r"^Strumento\s+(\w+):$")
+RE_INSTRUMENT_HDR = re.compile(r"^(?:Strumento|Instrument)\s+(\w+):$")
 
 # "Mixer Nome:" persiste volume/pan/mute/solo della traccia "Nome".
 RE_MIXER_HDR = re.compile(r"^Mixer\s+(.+?):$")
@@ -45,13 +69,13 @@ RE_MIXER_HDR = re.compile(r"^Mixer\s+(.+?):$")
 # "Effetti Nome:" persiste la catena di effetti della traccia "Nome" (vedi
 # core.effects): una riga per effetto, "tipo: parametro=valore ...", con
 # "spento" se l'effetto e' escluso e "preset=Nome" se parte da un preset.
-RE_EFFECTS_HDR = re.compile(r"^Effetti\s+(.+?):$")
+RE_EFFECTS_HDR = re.compile(r"^(?:Effetti|Effects)\s+(.+?):$")
 
 # "Catena master:" e' la catena di effetti sul mix finale (Project.master_effects);
 # parola diversa da "Effetti" per non confondersi con una traccia chiamata "master".
-RE_MASTER_CHAIN_HDR = re.compile(r"^Catena\s+(master):$", re.IGNORECASE)
+RE_MASTER_CHAIN_HDR = re.compile(r"^(?=Catena\s+master:$|Master\s+chain:$)(\w+)", re.IGNORECASE)
 
-RE_EFFECT_ITEM = re.compile(r"(\w+):((?:\s+(?:[\w.]+=(?:\"[^\"]*\"|[^\s]+)|spento))*)")
+RE_EFFECT_ITEM = re.compile(r"(\w+):((?:\s+(?:[\w.]+=(?:\"[^\"]*\"|[^\s]+)|spento|off))*)")
 
 # "Plugin Nome:" e' lo strumento plugin della traccia "Nome" (Track.synth,
 # vedi core.plugins): ref="vst3:..." o ref="lv2:...", i parametri come
@@ -80,9 +104,9 @@ RE_AUDIO_TRIM = re.compile(r'trim\s*=\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)')
 RE_AUDIO_GAIN = re.compile(r'gain\s*=\s*(-?\d+(?:\.\d+)?)')
 
 # Corpo di "Traccia Nome [Audio]:": come registrarla (vedi core.model.Track).
-RE_AUDIO_INPUT = re.compile(r"ingresso\s*=\s*(\w+)")
+RE_AUDIO_INPUT = re.compile(r"(?:ingresso|input)\s*=\s*(\w+)")
 
-RE_AUDIO_CHANNELS = re.compile(r"canali\s*=\s*(\d+(?:\+\d+)*)")
+RE_AUDIO_CHANNELS = re.compile(r"(?:canali|channels)\s*=\s*(\d+(?:\+\d+)*)")
 
 # Forma corta "Strumento:" / "Strumento N:": il nome di uno strumento
 # conosciuto (anche con cifre, come i GM "Lead8basslead" o "Pad8sweep"),
@@ -104,13 +128,13 @@ def short_track_header(line: str, instrument_names) -> Optional[Tuple[str, str]]
 # Formato esplicito con parentesi quadre, usato quando il nome della traccia
 # non coincide con la convenzione "<Strumento> <indice>:" (es. dopo una
 # rinomina) - vedi funzionalita' 2.
-RE_TRACK_HDR_EXPLICIT = re.compile(r"^Traccia\s+(.+?)\s*\[(\w+)\]\s*:$")
+RE_TRACK_HDR_EXPLICIT = re.compile(r"^(?:Traccia|Track)\s+(.+?)\s*\[(\w+)\]\s*:$")
 
 RE_KV_EQUALS = re.compile(r"(\w+)=([\w.-]+)")
 
 RE_KV_COLON = re.compile(r"(\w+):\s*([\w.-]+)")
 
-_TRACK_HDR_PATTERNS = (RE_TEMPO, RE_METRICA, RE_MASTER, RE_KEY, RE_PATTERN_HDR, RE_TRACK_HDR,
+_TRACK_HDR_PATTERNS = (RE_ST_VERSION, RE_PICKUP, RE_TEMPO, RE_METRICA, RE_MASTER, RE_KEY, RE_PATTERN_HDR, RE_TRACK_HDR,
                         RE_TRACK_HDR_EXPLICIT, RE_MIXER_HDR, RE_BOX_HDR,
                         RE_AUDIO_HDR, RE_EFFECTS_HDR, RE_MASTER_CHAIN_HDR)
 
@@ -130,7 +154,7 @@ def _parse_bar_value_list(raw: str, is_metrica: bool = False) -> List[tuple]:
 def _si(value: Optional[str], default: bool) -> bool:
     if value is None:
         return default
-    return value.strip().lower() in ("si", "s", "true", "1", "yes")
+    return value.strip().lower() in ("si", "sì", "s", "true", "1", "yes", "y")
 
 def _parse_kv_body(body: str) -> dict:
     """Estrae coppie chiave/valore da un corpo di blocco, accettando sia lo
@@ -178,8 +202,8 @@ def _parse_instrument_body(name: str, body: str) -> InstrumentProfile:
     return InstrumentProfile(
         name=name,
         gm_program=int(kv.get("program", 0)),
-        is_percussion=_si(kv.get("percussione"), False),
-        default_octave=int(kv.get("ottava", 4)),
+        is_percussion=_si(kv.get("percussione", kv.get("percussion")), False),
+        default_octave=int(kv.get("ottava", kv.get("octave", 4))),
         range_low=range_low,
         range_high=range_high,
         polyphonic=_si(kv.get("poly"), True),
@@ -242,6 +266,17 @@ def _extract_named_blocks(lines: List[str], header_re) -> List[Tuple[str, str]]:
             flush()
     flush()
     return blocks
+
+
+def instrument_blocks(lines: List[str]) -> List[Tuple[str, str]]:
+    """I blocchi 'Strumento Nome:' (o 'Instrument Nome:') con la loro
+    definizione: (nome, corpo). Un blocco senza 'program=' non definisce
+    nessuno strumento (era la vecchia forma con 'type:') e si salta."""
+    return [(name, body) for name, body in _extract_named_blocks(lines, RE_INSTRUMENT_HDR)
+            if "program" in RE_KV_EQUALS_KEYS.findall(body)]
+
+
+RE_KV_EQUALS_KEYS = re.compile(r"(\w+)=")
 
 
 def _extract_box_blocks(lines: List[str], header_re=RE_BOX_HDR) -> List[Tuple[str, str, float, str]]:

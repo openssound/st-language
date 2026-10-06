@@ -19,6 +19,7 @@
 //   Giro    Em7 | Em7 | A9 | Em7
 //   Ritorn. C9 | B7#9 | Em7 | Em7
 
+ST: 2.6
 Tempo: 104 BPM
 Metrica: 4/4
 Tonalita: Em

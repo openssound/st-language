@@ -22,6 +22,7 @@
 //   1 A  2 A  3 A  4 B  5 A  6 B  7 B  8 B  9 A  10 B  11 A  12 finale
 //   A  Dmaj7 | Bm7 | Gmaj7 | Asus4          B  Gmaj7 | Em7 | Bm7 | A
 
+ST: 2.6
 Tempo: 60 BPM
 Metrica: 4/4
 Tonalita: D

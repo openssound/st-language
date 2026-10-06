@@ -364,6 +364,10 @@ LETTERS = "cdefgab"
 # Modo delle ottave: 'rel:' (relative, come in LilyPond) e 'abs:' (assolute,
 # il default); tonalita' delle note: 'key=G', 'key=Dm', 'key=off'.
 RE_PITCH_MODE = re.compile(r"^(rel|abs):$")
+# Riporta allo stato iniziale griglia, velocity, swing, spostamento,
+# trasposizione (quella di transpose=), modo delle altezze e tonalita'
+# (vedi la specifica, sezione 7.9). Le automazioni restano dove sono.
+RESET_TOKEN = "reset:"
 RE_KEY_MODE = re.compile(r"^key=(?:([A-G][#b♭]?m?)|off)$")
 _LETTER_FIFTHS = {"f": -1, "c": 0, "g": 1, "d": 2, "a": 3, "e": 4, "b": 5}
 
@@ -775,6 +779,21 @@ class PitchRewriter:
                 return ""
             self.dst.set_relative(m.group(1) == "rel")
             return tok
+        if tok == RESET_TOKEN:
+            self.src.set_relative(False)
+            self.src.alters = {}
+            # nel testo riscritto il modo e la tonalita' di destinazione
+            # (se si converte) vanno ridichiarati dopo il reset
+            out = [tok]
+            self.dst.set_relative(bool(self.to_relative))
+            if self.to_relative:
+                out.append("rel:")
+            if self.to_key:
+                self.dst.alters = key_signature_alters(self.to_key)
+                out.append(f"key={self.to_key}")
+            else:
+                self.dst.alters = {}
+            return " ".join(out)
         m = RE_KEY_MODE.match(tok)
         if m:
             self.src.alters = key_signature_alters(m.group(1)) if m.group(1) else {}
@@ -805,7 +824,7 @@ class PitchRewriter:
             if m:
                 mult_s, name_path, plus = m.groups()
                 name_path, offset = _midi_ref_offset(name_path, plus)
-                return f"{mult_s}&{name_path}{_offset_suffix(offset + self.semitones)}"
+                return mult_s + _midi_ref_text(name_path, offset + self.semitones)
         base, value = split_note_value(tok)
         mm = re.match(r"^(\d*)\[(.*)\]$", base)
         if mm:
@@ -879,20 +898,22 @@ def _offset_suffix(semitones: int) -> str:
 
 def _midi_ref_offset(name_path: str, plus: Optional[str]) -> Tuple[str, int]:
     """(nome del file, trasposizione) di un riferimento '&nome[+N]', con la
-    regola di _resolve_midi_ref per un '-N' in fondo: e' una trasposizione
-    solo se nella libreria non c'e' un file col nome per intero."""
+    regola di _resolve_midi_ref: un '-N' in fondo e' una trasposizione,
+    salvo il caso di compatibilita' con la 2.5 (midi_ref_is_legacy)."""
     if plus:
         return name_path, int(plus)
-    tail = re.match(r"^(.*[^-])-(\d+)$", name_path)
-    if not tail or _midi_ref_resolver is None:
+    tail = _MIDI_REF_TAIL.match(name_path)
+    if not tail or midi_ref_is_legacy(name_path):
         return name_path, 0
-    try:
-        _midi_ref_resolver(name_path, None)
-        return name_path, 0
-    except FileNotFoundError:
-        return tail.group(1), -int(tail.group(2))
-    except Exception:
-        return name_path, 0
+    return tail.group(1), -int(tail.group(2))
+
+
+def _midi_ref_text(name_path: str, semitones: int) -> str:
+    """'&nome' con la trasposizione: un nome che finisce con '-cifre' vuole
+    sempre il '+N' (anche '+0'), se no il '-cifre' sarebbe una trasposizione."""
+    if _MIDI_REF_TAIL.match(name_path) and semitones >= 0:
+        return f"&{name_path}+{semitones}"
+    return "&" + name_path + _offset_suffix(semitones)
 
 
 def transpose_tokens(tokens: List[str], semitones: int, default_octave: int) -> List[str]:
@@ -945,9 +966,10 @@ def set_midi_ref_resolver(fn) -> None:
 def _resolve_midi_ref(name_path: str, semitones: int, midi_dir: Optional[str], tok: str,
                       has_plus: bool) -> Tuple[List[str], int]:
     """(token del file MIDI, semitoni di trasposizione) per un riferimento
-    '&percorso': prima si cerca il file col nome per intero; se non c'e' e
-    il nome finisce con '-N' (e non c'era un '+N'), si cerca il file senza
-    quel suffisso e N negativo e' la trasposizione."""
+    '&percorso'. Dalla 2.6 un '-N' in fondo (senza '+N') e' sempre una
+    trasposizione: si cerca il file senza quel suffisso. Per compatibilita'
+    con la 2.5, se quel file non c'e' ma c'e' quello col nome per intero, si
+    usa questo (notation_warnings lo segnala: va scritto '&nome-N+0')."""
     if _midi_ref_resolver is None:
         raise NotationError(tr("I riferimenti a file MIDI (&Nome) non sono disponibili qui"), tok)
 
@@ -961,18 +983,41 @@ def _resolve_midi_ref(name_path: str, semitones: int, midi_dir: Optional[str], t
         except Exception as e:          # es. riferimento ambiguo
             raise NotationError(str(e), tok)
 
+    def not_found(path: str) -> NotationError:
+        return NotationError(tr("File MIDI '&{name_path}' non trovato nella libreria MIDI", name_path=path), tok)
+
+    tail = None if has_plus else _MIDI_REF_TAIL.match(name_path)
+    if tail:
+        try:
+            return load(tail.group(1)), -int(tail.group(2))
+        except FileNotFoundError:
+            pass
     try:
         return load(name_path), semitones
     except FileNotFoundError:
-        tail = None if has_plus else re.match(r"^(.*[^-])(-\d+)$", name_path)
-        if tail:
-            try:
-                return load(tail.group(1)), int(tail.group(2))
-            except FileNotFoundError:
-                pass
-        raise NotationError(
-            tr("File MIDI '&{name_path}' non trovato nella libreria MIDI", name_path=name_path), tok
-        )
+        raise not_found(tail.group(1) if tail else name_path)
+
+
+# '&nome-N': il nome e la trasposizione verso il basso
+_MIDI_REF_TAIL = re.compile(r"^(.*[^-])-(\d+)$")
+
+
+def midi_ref_is_legacy(name_path: str, midi_dir: Optional[str] = None) -> bool:
+    """Vero per un '&nome-N' (senza '+') che vale solo per compatibilita'
+    con la 2.5: 'nome' non c'e' nella libreria, 'nome-N' si'."""
+    tail = _MIDI_REF_TAIL.match(name_path)
+    if not tail or _midi_ref_resolver is None:
+        return False
+
+    def exists(path: str) -> bool:
+        try:
+            _midi_ref_resolver(path, midi_dir)
+            return True
+        except FileNotFoundError:
+            return False
+        except Exception:
+            return True
+    return not exists(tail.group(1)) and exists(name_path)
 
 
 def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
@@ -1521,6 +1566,16 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 pitch.set_relative(m.group(1) == "rel")
                 continue
 
+            if tok == RESET_TOKEN:
+                if pending_ramp:
+                    raise NotationError(tr("reset: dentro una rampa di velocity o di tempo: chiudi prima la rampa"),
+                                        tok)
+                grid_beats, velocity, swing, shift = Fraction(1), 80, None, None
+                pitch.set_relative(False)
+                pitch.alters, pitch.key_name, pitch.local = {}, "", 0
+                last_state_kind = "reset"
+                continue
+
             m = RE_KEY_MODE.match(tok)
             if m:
                 pitch.alters = key_signature_alters(m.group(1)) if m.group(1) else {}
@@ -1968,6 +2023,8 @@ def context_prefix_before(text: str, char_start: int) -> str:
             last_grid = tok
         elif RE_VELOCITY.match(tok):
             last_vel = tok
+        elif tok == RESET_TOKEN:
+            last_grid = last_vel = None
     parts = [t for t in (last_grid, last_vel) if t]
     return (" ".join(parts) + " ") if parts else ""
 
@@ -2005,15 +2062,21 @@ def describe_duration(beats: Fraction) -> Tuple[int, str]:
     return 2, tr("{value} quarti", value=value)
 
 
-def bar_starts(time_sig: str = "4/4", metrica_changes=()):
+def _pickup_fraction(pickup) -> Fraction:
+    return Fraction(pickup or 0).limit_denominator(1 << 16)
+
+
+def bar_starts(time_sig: str = "4/4", metrica_changes=(), pickup=0):
     """Generatore infinito dell'inizio (in quarti, Fraction) di ogni
-    battuta: 0, poi via via sommando la durata della battuta secondo la
-    metrica in vigore. Stessa regola di project_io.compute_bar_beat_offsets
-    (con dei cambi di metrica che non partono dalla battuta 1, prima vale
-    il 4/4)."""
+    battuta, dalla 1: 0, poi via via sommando la durata della battuta
+    secondo la metrica in vigore. Stessa regola di
+    timing.compute_bar_beat_offsets (con dei cambi di metrica che non
+    partono dalla battuta 1, prima vale il 4/4). Con una battuta in levare
+    di 'pickup' quarti (intestazione Levare:), la battuta 1 e' la prima
+    intera e comincia li'; il levare e' la battuta 0."""
     metrica_map = dict(metrica_changes)
     sig = metrica_map.get(1, "4/4" if metrica_changes else (time_sig or "4/4"))
-    start = Fraction(0)
+    start = _pickup_fraction(pickup)
     bar = 1
     while True:
         yield start
@@ -2033,8 +2096,8 @@ class Meter:
     'bar=N'. Si costruisce con la metrica del brano e gli eventuali suoi
     cambi (vedi bar_starts); senza, vale il 4/4."""
 
-    def __init__(self, time_sig: str = "4/4", metrica_changes=()):
-        self._gen = bar_starts(time_sig, metrica_changes)
+    def __init__(self, time_sig: str = "4/4", metrica_changes=(), pickup=0):
+        self._gen = bar_starts(time_sig, metrica_changes, pickup)
         self._starts: List[Fraction] = []
 
     def start_of(self, bar: int) -> Fraction:
@@ -2058,28 +2121,34 @@ def default_meter() -> Meter:
 class BarIssue:
     char_start: int     # posizione della '|' nel testo
     char_end: int
-    bar: int            # battuta che non torna
+    bar: int            # battuta che non torna (0 per gli avvisi che non riguardano una battuta)
     message: str
+    # "bar" (controllo di battuta), "anchor" (ancora bar=N), "lyric" (testo
+    # cantato), "midi" (riferimento &nome-N per compatibilita')
+    kind: str = "bar"
 
 
 class _BarGrid:
     """Le stanghette del brano, calcolate man mano che servono."""
 
-    def __init__(self, time_sig: str, metrica_changes):
-        self._gen = bar_starts(time_sig, metrica_changes)
-        self._starts = [next(self._gen), next(self._gen)]
+    def __init__(self, time_sig: str, metrica_changes, pickup=0):
+        self._gen = bar_starts(time_sig, metrica_changes, pickup)
+        # con il levare, la battuta 0 comincia all'inizio del brano
+        self._first_bar = 0 if pickup else 1
+        self._starts = ([Fraction(0)] if pickup else []) + [next(self._gen), next(self._gen)]
 
     def nearest(self, position: Fraction) -> Tuple[int, Fraction]:
         """(k, inizio della battuta k) per la stanghetta piu' vicina a
-        'position', mai la 1 (l'inizio del brano non chiude nessuna
-        battuta); a pari distanza vince quella prima."""
+        'position', mai quella all'inizio del brano (non chiude nessuna
+        battuta); a pari distanza vince quella prima. La battuta che la
+        stanghetta chiude e' la k - 1."""
         while self._starts[-1] <= position:
             self._starts.append(next(self._gen))
-        k = len(self._starts) - 1          # prima stanghetta oltre position (indice 0 = battuta 1)
-        before, after = self._starts[k - 1], self._starts[k]
-        if k - 1 >= 1 and position - before <= after - position:
-            return k, before                # battuta k (1-based) inizia in 'before'
-        return k + 1, after
+        i = len(self._starts) - 1          # prima stanghetta oltre position
+        before, after = self._starts[i - 1], self._starts[i]
+        if i - 1 >= 1 and position - before <= after - position:
+            return self._first_bar + i - 1, before
+        return self._first_bar + i, after
 
 
 def bar_check_message(bar: int, delta: Fraction) -> str:
@@ -2102,7 +2171,7 @@ def anchor_message(bar: int, over: Fraction) -> str:
 
 def check_bar_lines(text: str, patterns: Dict[str, Pattern], time_sig: str = "4/4",
                     metrica_changes=(), start_beat: float = 0.0, default_octave: int = 4,
-                    midi_dir: Optional[str] = None) -> List[BarIssue]:
+                    midi_dir: Optional[str] = None, pickup=0) -> List[BarIssue]:
     """I controlli di battuta '|' del testo che non cadono su una
     stanghetta, secondo la metrica del progetto (e i suoi cambi).
     'start_beat' e' dove il testo comincia nel brano (l'inizio del box).
@@ -2117,24 +2186,25 @@ def check_bar_lines(text: str, patterns: Dict[str, Pattern], time_sig: str = "4/
     controllata a ogni ripetizione e segnalata sul riferimento; dentro un
     blocco di voci { ; } ogni voce si controlla per conto suo."""
     return [w for w in notation_warnings(text, patterns, time_sig, metrica_changes, start_beat,
-                                         default_octave, midi_dir) if w.bar]
+                                         default_octave, midi_dir, pickup) if w.kind in ("bar", "anchor")]
 
 
 def notation_warnings(text: str, patterns: Dict[str, Pattern], time_sig: str = "4/4",
                       metrica_changes=(), start_beat: float = 0.0, default_octave: int = 4,
-                      midi_dir: Optional[str] = None) -> List[BarIssue]:
+                      midi_dir: Optional[str] = None, pickup=0) -> List[BarIssue]:
     """Gli avvisi che non impediscono di suonare il testo, in ordine di
-    posizione: controlli di battuta '|' che non tornano (vedi
-    check_bar_lines, bar > 0) e testi cantati con piu' sillabe che note
-    (bar == 0)."""
+    posizione (vedi BarIssue.kind): controlli di battuta '|' che non tornano
+    (vedi check_bar_lines), ancore bar=N gia' superate, testi cantati con
+    piu' sillabe che note, riferimenti '&nome-N' letti come nella 2.5.
+    'pickup': quarti della battuta in levare (intestazione Levare:)."""
     extras: dict = {}
     offset = Fraction(start_beat).limit_denominator(1 << 16)
     try:
         raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave, extras,
-                                                          Meter(time_sig, metrica_changes), offset)
+                                                          Meter(time_sig, metrica_changes, pickup), offset)
     except NotationError:
         return []
-    grid = _BarGrid(time_sig, metrica_changes)
+    grid = _BarGrid(time_sig, metrica_changes, pickup)
     issues: List[BarIssue] = []
     reported = set()
 
@@ -2166,10 +2236,17 @@ def notation_warnings(text: str, patterns: Dict[str, Pattern], time_sig: str = "
                     voice_shift = check(block_start + p, voice_shift, origin)
     for index, message in extras.get("lyric_issues", {}).items():
         _, cs, ce = raw[origins[index]]
-        issues.append(BarIssue(cs, ce, 0, message))
+        issues.append(BarIssue(cs, ce, 0, message, "lyric"))
     for index, (bar, over) in extras.get("anchor_issues", {}).items():
         _, cs, ce = raw[origins[index]]
-        issues.append(BarIssue(cs, ce, bar, anchor_message(bar, over)))
+        issues.append(BarIssue(cs, ce, bar, anchor_message(bar, over), "anchor"))
+    for tok, cs, ce in raw:
+        m = RE_MIDI_REF.match(tok)
+        if m and not m.group(3) and midi_ref_is_legacy(m.group(2), midi_dir):
+            issues.append(BarIssue(cs, ce, 0, tr(
+                "'&{name}': dalla versione 2.6 il '-{n}' finale e' una trasposizione; "
+                "per il file '{name}' scrivi '&{name}+0'",
+                name=m.group(2), n=_MIDI_REF_TAIL.match(m.group(2)).group(2)), "midi"))
     issues.sort(key=lambda i: i.char_start)
     return issues
 

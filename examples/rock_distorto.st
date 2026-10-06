@@ -20,6 +20,7 @@
 //   - la corona ($fermata) sull'ultimo accordo;
 //   - strumenti definiti nel file (chitarra distorta, basso a plettro).
 
+ST: 2.6
 Tempo: 124 BPM
 Metrica: 4/4
 Tonalita: Em

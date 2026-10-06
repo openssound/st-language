@@ -25,6 +25,7 @@
 //   - strumenti definiti nel file (basso sintetico, piano elettrico,
 //     vibrafono, archi).
 
+ST: 2.6
 Tempo: 90 BPM
 Metrica: 4/4
 Tonalita: Am

@@ -25,7 +25,7 @@ from st_language import Pattern, notation_warnings, parse_track_text, tokenize, 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# (id, testo, opzioni) - opzioni: patterns {nome: corpo}, octave, time_sig, metrica_changes
+# (id, testo, opzioni) - opzioni: patterns {nome: corpo}, octave, time_sig, metrica_changes, pickup
 CASES = [
     # --- altezze e durate
     ("notes-basic", "c d e f g a b", {}),
@@ -195,6 +195,19 @@ CASES = [
     ("transpose-pattern-inherits", "transpose=3 %T %T+4", {"patterns": {"T": "4: c e g"}}),
     ("transpose-pattern-nested", "%U+1", {"patterns": {"T": "4: c e g", "U": "%T+2 c"}}),
     ("transpose-set-inside-pattern", "%A %B %A+2", {"patterns": {"A": "transpose=5 c d", "B": "c"}}),
+    # --- reset: (2.6)
+    ("reset-restores-state", "8: 100@ rel: key=G transpose=2 swing=60 shift=20 c f reset: c f", {}),
+    ("reset-keeps-automations", "vol=40 pan=0.5 c reset: d", {}),
+    ("reset-keeps-call-transposition", "%P+2", {"patterns": {"P": "transpose=5 c reset: c"}}),
+    ("reset-in-voices", "8: 90@ { c reset: c ; d } e", {}),
+    ("error-reset-in-ramp", "60@ >> c reset: d 90@", {}),
+    ("error-ramp-after-reset", "reset: >> c", {}),
+    # --- battuta in levare (2.6)
+    ("pickup-bar-checks", "4: g | c e g | c 2r |", {"time_sig": "3/4", "pickup": 1}),
+    ("pickup-anchor", "4: g bar=2 c", {"time_sig": "3/4", "pickup": 1}),
+    ("pickup-meter-changes", "8: g a | 4: c d e | c d | bar=4 e",
+     {"metrica_changes": [[1, "3/4"], [2, "2/4"]], "pickup": 1}),
+    ("warning-pickup-bar", "4: g a | c e g |", {"time_sig": "3/4", "pickup": 1}),
     # --- avvisi (il testo e' valido)
     ("warning-bar-missing", "4: c d e | f g a b |", {}),
     ("warning-bar-extra", "8: c d e f g a b c d | e", {}),
@@ -238,7 +251,8 @@ def run_case(text: str, options: dict) -> dict:
     patterns = {name: Pattern(name, tokenize(body)) for name, body in options.get("patterns", {}).items()}
     octave = options.get("octave", 4)
     from st_language import Meter
-    meter = Meter(options.get("time_sig", "4/4"), [tuple(c) for c in options.get("metrica_changes", [])])
+    pickup = options.get("pickup", 0)
+    meter = Meter(options.get("time_sig", "4/4"), [tuple(c) for c in options.get("metrica_changes", [])], pickup)
     ok, _message = validate_track_text(text, patterns, default_octave=octave, meter=meter)
     if not ok:
         return {"error": True}
@@ -246,7 +260,7 @@ def run_case(text: str, options: dict) -> dict:
     warnings = [{"start": w.char_start, "end": w.char_end, "bar": w.bar}
                 for w in notation_warnings(text, patterns, options.get("time_sig", "4/4"),
                                            [tuple(c) for c in options.get("metrica_changes", [])],
-                                           default_octave=octave)]
+                                           default_octave=octave, pickup=pickup)]
     result = {"events": events}
     if warnings:
         result["warnings"] = warnings
@@ -261,7 +275,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "2.5", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.6", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 

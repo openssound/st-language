@@ -20,6 +20,7 @@
 //   A  Fmaj7 | D7 | Gm7 | C7 | Am7 D7 | Gm7 C7 | Fmaj7 Dm7 | Gm7 C7
 //   B  Em7 A7 | Dmaj7 | Dm7 G7 | Cmaj7 | Cm7 F7 | Bbmaj7 | Gm7 C7 | C7
 
+ST: 2.6
 Tempo: 132 BPM
 Metrica: 4/4
 Tonalita: F

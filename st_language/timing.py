@@ -22,7 +22,8 @@ if TYPE_CHECKING:          # solo per le annotazioni (nessun import circolare)
 RE_METRICA_VALUE = re.compile(r"^\s*(\d+)\s*/\s*(\d+)\s*$")
 
 
-def compute_bar_beat_offsets(tempo_changes, metrica_changes, base_time_sig: str = "4/4") -> Dict[int, float]:
+def compute_bar_beat_offsets(tempo_changes, metrica_changes, base_time_sig: str = "4/4",
+                             pickup: float = 0.0) -> Dict[int, float]:
     """Calcola, per ogni numero di battuta dichiarato in tempo_changes o
     metrica_changes, il beat (quarti) assoluto in cui quella battuta inizia,
     simulando l'accumulo delle durate di battuta (dipendenti dalla metrica
@@ -30,7 +31,9 @@ def compute_bar_beat_offsets(tempo_changes, metrica_changes, base_time_sig: str 
     beat 0.0. base_time_sig e' la metrica in vigore fino al primo cambio
     dichiarato (project.time_sig), usata solo se metrica_changes e' vuota:
     con una metrica singola ('Metrica: 3/4') le battute verrebbero
-    altrimenti contate in 4/4."""
+    altrimenti contate in 4/4. Con una battuta in levare di 'pickup'
+    quarti le battute dalla 2 in poi si spostano di tanto; quello che vale
+    alla battuta 1 vale gia' dall'inizio del brano (anche nel levare)."""
     declared_bars = sorted({b for b, _ in tempo_changes} | {b for b, _ in metrica_changes} | {1})
     if not declared_bars:
         return {1: 0.0}
@@ -52,8 +55,12 @@ def compute_bar_beat_offsets(tempo_changes, metrica_changes, base_time_sig: str 
         bar_length_beats = int(num) * 4.0 / int(den)
         beat_acc += bar_length_beats
         bar += 1
-        offsets[bar] = beat_acc
+        offsets[bar] = beat_acc + (pickup or 0.0)
     return offsets
+
+
+def _pickup(project) -> float:
+    return float(getattr(project, "pickup", 0.0) or 0.0)
 
 
 def build_tempo_beat_map(project: "Song", tracks=None, midi_dir: Optional[str] = None,
@@ -70,7 +77,7 @@ def build_tempo_beat_map(project: "Song", tracks=None, midi_dir: Optional[str] =
 
     points = {}
     bar_offsets = compute_bar_beat_offsets(project.tempo_changes, project.metrica_changes,
-                                           project.time_sig)
+                                           project.time_sig, _pickup(project))
     for bar, bpm in project.tempo_changes:
         points[bar_offsets.get(bar, 0.0)] = bpm
     if not project.tempo_changes:
@@ -89,15 +96,27 @@ def build_tempo_beat_map(project: "Song", tracks=None, midi_dir: Optional[str] =
 def build_metrica_beat_map(project: "Song") -> List[Tuple[float, str]]:
     """Elenco ordinato (beat, "N/D") di ogni punto in cui la metrica cambia,
     a partire dai cambi per battuta dichiarati nell'intestazione del
-    progetto (nessun marcatore inline esiste per la metrica)."""
+    progetto (nessun marcatore inline esiste per la metrica).
+
+    Con una battuta in levare il primo punto e' prima dell'inizio del
+    brano (beat negativo: levare meno una battuta intera), cosi' le battute
+    contate da li' cominciano proprio dopo il levare (il metronomo accenta
+    il primo tempo della battuta 1); chi scrive la metrica nel MIDI lo
+    porta a 0."""
+    pickup = _pickup(project)
     bar_offsets = compute_bar_beat_offsets(project.tempo_changes, project.metrica_changes,
-                                           project.time_sig)
+                                           project.time_sig, pickup)
     points = {}
     for bar, sig in project.metrica_changes:
         points[bar_offsets.get(bar, 0.0)] = sig
     if not project.metrica_changes:
         points[0.0] = project.time_sig
-    return sorted(points.items())
+    result = sorted(points.items())
+    if pickup and result and result[0][0] == 0.0:
+        m = RE_METRICA_VALUE.match(result[0][1] or "")
+        length = int(m.group(1)) * 4.0 / int(m.group(2)) if m and int(m.group(2)) else 4.0
+        result[0] = (pickup - length, result[0][1])
+    return result
 
 
 def value_at_beat(beat_map: List[Tuple[float, object]], beat: float):

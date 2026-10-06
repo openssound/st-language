@@ -19,6 +19,7 @@
 //   Ritornello  Abmaj7 | Bb7 | Gm7 Cm7 | Fm7 Bb7 | Abmaj7 | Bb/D Ebmaj7 | Cm7 Fm7 | Bb7sus4 Bb7
 //   Ponte       Cm7 | Fm7 | Dm7b5 G7 | Cm7 | Abmaj7 | Bb7sus4 | Gm7 Cm7 | Fm7 Bb7
 
+ST: 2.6
 Tempo: 66 BPM
 Metrica: 4/4
 Tonalita: Eb

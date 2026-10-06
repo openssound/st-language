@@ -8,6 +8,7 @@
 // poi la coda con il rallentando e la corona sull'ultimo accordo.
 // Lo swing (swing=66) da' il "terzinato" del blues alle crome scritte dritte.
 
+ST: 2.6
 Tempo: 96 BPM
 Metrica: 4/4
 Tonalita: A

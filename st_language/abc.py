@@ -210,7 +210,7 @@ def project_to_abc(project: "Song", only_audible: bool = True,
         tempo_map = [(_frac(b, grid), bpm) for b, bpm in
                      build_tempo_beat_map(project, tracks=tracks, events_by_track=events_by_track)]
         end = max([i.end for items, _ in parsed.values() for i in items] + [Fraction(0)])
-        measures = _measures(build_metrica_beat_map(project), end)
+        measures = _measures(build_metrica_beat_map(project), end, getattr(project, "pickup", 0))
         times = [m[0] for m in measures] + [t for t, _ in tempo_map]
         for items, pedals in parsed.values():
             times += [i.start for i in items] + [i.end for i in items] + [t for t, _ in pedals]

@@ -1,5 +1,5 @@
 {
- "spec_version": "2.5",
+ "spec_version": "2.6",
  "cases": [
   {
    "id": "notes-basic",
@@ -6608,6 +6608,412 @@
       "velocity": 80,
       "letter": "a",
       "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "reset-restores-state",
+   "input": "8: 100@ rel: key=G transpose=2 swing=60 shift=20 c f reset: c f",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "d",
+      "octave": 4,
+      "swing": [
+       1.0,
+       0.6
+      ],
+      "shift": 20
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "g#",
+      "octave": 4,
+      "swing": [
+       1.0,
+       0.6
+      ],
+      "shift": 20
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "reset-keeps-automations",
+   "input": "vol=40 pan=0.5 c reset: d",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "vol",
+      "value": 40
+     },
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "control",
+      "velocity": 80,
+      "name": "pan",
+      "value": 0.5
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "reset-keeps-call-transposition",
+   "input": "%P+2",
+   "patterns": {
+    "P": "transpose=5 c reset: c"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "reset-in-voices",
+   "input": "8: 90@ { c reset: c ; d } e",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 90,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 90,
+      "letter": "d",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 90,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "error-reset-in-ramp",
+   "input": "60@ >> c reset: d 90@",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-ramp-after-reset",
+   "input": "reset: >> c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "pickup-bar-checks",
+   "input": "4: g | c e g | c 2r |",
+   "time_sig": "3/4",
+   "pickup": 1,
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 2.0,
+      "kind": "rest",
+      "velocity": 80
+     }
+    ]
+   }
+  },
+  {
+   "id": "pickup-anchor",
+   "input": "4: g bar=2 c",
+   "time_sig": "3/4",
+   "pickup": 1,
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 3.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "pickup-meter-changes",
+   "input": "8: g a | 4: c d e | c d | bar=4 e",
+   "metrica_changes": [
+    [
+     1,
+     "3/4"
+    ],
+    [
+     2,
+     "2/4"
+    ]
+   ],
+   "pickup": 1,
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 2.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "warning-pickup-bar",
+   "input": "4: g a | c e g |",
+   "time_sig": "3/4",
+   "pickup": 1,
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     }
+    ],
+    "warnings": [
+     {
+      "start": 7,
+      "end": 8,
+      "bar": 0
      }
     ]
    }

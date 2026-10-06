@@ -30,7 +30,7 @@ from .notation import (  # noqa: F401
 )
 from .song import Clip, Part, Song, load_song, read_song, song_from_notation, text_to_song  # noqa: F401
 
-__version__ = "2.5.0"
+__version__ = "2.6.0"
 
 __all__ = [
     "BarIssue", "Clip", "Event", "Meter", "NotationError", "Part", "Pattern", "Song", "check", "check_bar_lines",
@@ -51,10 +51,10 @@ def validate(text: str, patterns: Optional[Dict[str, Pattern]] = None) -> Tuple[
 
 
 def check(text: str, patterns: Optional[Dict[str, Pattern]] = None, time_sig: str = "4/4",
-          metrica_changes=()) -> List[BarIssue]:
+          metrica_changes=(), pickup=0) -> List[BarIssue]:
     """Gli avvisi che non impediscono di suonare: controlli di battuta e
-    testo cantato con troppe sillabe."""
-    return notation_warnings(text, patterns or {}, time_sig, metrica_changes)
+    testo cantato con troppe sillabe. 'pickup': quarti del levare."""
+    return notation_warnings(text, patterns or {}, time_sig, metrica_changes, pickup=pickup)
 
 
 def to_midi(song: Song, path: str, only_audible: bool = True) -> str:

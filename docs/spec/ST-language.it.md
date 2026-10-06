@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.5** · Implementazione di riferimento: la libreria Python
+**Versione 2.6** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -111,7 +111,7 @@ A-Z o a-z, `word` sono una o piu' lettere, cifre o `_`):
 
 ```ebnf
 token        = grid | velocity | tempo | ramp | control | swing | shift | anchor
-             | transpose
+             | transpose | reset
              | pitch-mode | key-mode | sustain
              | bar-check | repeat | text | lyric | pattern-ref | midi-ref
              | group | voices | sounding ;
@@ -129,6 +129,7 @@ swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
 shift        = "shift=" [ "-" ] number ;                        (* shift=-15 *)
 anchor       = "bar=" number ;                                  (* bar=29 *)
 transpose    = "transpose=" [ "-" ] number ;                    (* transpose=-3 *)
+reset        = "reset:" ;
 pitch-mode   = "rel:" | "abs:" ;
 key-mode     = "key=" ( root [ "m" ] | "off" ) ;                (* key=G  key=Dm *)
 sustain      = "SON" | "SOFF" ;
@@ -225,6 +226,17 @@ moltiplicatore e' il numero iniziale (1 se manca) e l'unita' e' quella di
 griglia, o il **valore di nota** se il token ne ha uno (sezione 6.6). Poi
 il cursore avanza della durata. Comandi di stato, controlli di battuta e
 testi cantati non occupano tempo.
+
+**Eredita'.** Con quale stato comincia ogni parte del testo, e dove
+finiscono i cambi fatti dentro:
+
+| Contesto | Comincia con | I cambi fatti dentro |
+| --- | --- | --- |
+| gruppo di ripetizione `N(...)` | lo stato corrente | continuano dopo (il gruppo e' scritto per esteso) |
+| pattern `%Nome`, riferimento MIDI `&Nome` | lo stato corrente, tranne: modo `abs:`, nessuna tonalita', nota precedente azzerata (sezione 8.2); trasposizione = quella corrente piu' il `+N`/`-N` del riferimento | modo, tonalita', nota precedente e `transpose=` finiscono col riferimento; griglia, velocity, automazioni, swing e spostamento continuano dopo |
+| blocco di voci `{ ; }` | ogni voce: lo stato corrente | restano nella voce; dopo il blocco lo stato e' quello di prima |
+| box (file di brano, sezione 12.4) | lo stato iniziale, con `reset:`; i valori delle automazioni continuano dal box prima | finiscono col box |
+| `reset:` | — | griglia, velocity, swing, spostamento, trasposizione (`transpose=`), modo, tonalita' e nota precedente tornano ai valori iniziali (sezione 7.9) |
 
 ---
 
@@ -576,6 +588,23 @@ trasposto di N semitoni **in aggiunta** alla trasposizione in vigore
 (sezione 8.2); il numero segue il nome senza spazi. Lo stesso vale per i
 riferimenti MIDI della sezione 8.3 (`&Nome+7`).
 
+### 7.9 Reset
+
+`reset:` rimette lo **stato iniziale** della sezione 4: unita' di griglia
+1 quarto, velocity 80, swing spento, spostamento 0, trasposizione di
+`transpose=` 0, modo `abs:`, nessuna tonalita', nota precedente
+azzerata. Non occupa tempo e non produce eventi. **Non** cambia:
+
+- i valori delle automazioni (sezione 7.5): agiscono su tutto il canale,
+  e riportarli indietro produrrebbe degli eventi;
+- la trasposizione che viene dal riferimento del pattern che lo contiene
+  (`%Nome+N`): dentro quel pattern la trasposizione torna a N.
+
+`reset:` con una rampa di velocity o di tempo aperta e' un errore, e una
+rampa non puo' seguirlo direttamente (sezione 7.3). E' cio' con cui
+comincia un box (sezione 12.4), ed e' il modo per rendere un testo
+indipendente da quello che c'e' prima.
+
 ---
 
 ## 8. Struttura
@@ -615,11 +644,20 @@ errore.
 
 Un riferimento MIDI si trasporta come un pattern: `&Nome+N` legge il file
 N semitoni sopra, in aggiunta alla trasposizione in vigore (sezione 7.8), e
-`&Nome-N` sotto. Poiche' il nome di un file puo' contenere `-`, un `-N` in
-fondo vale come trasposizione solo se la libreria non ha un file con il nome
-per intero; `+N` e' sempre una trasposizione. I token del file si leggono
-nello stato iniziale delle altezze, come quelli di un pattern, e la
-trasposizione finisce col riferimento.
+`&Nome-N` sotto. Senza un `+`, un `-` seguito da cifre in fondo al
+riferimento e' **sempre** una trasposizione: `&take-2` e' il file `take`
+due semitoni sotto. Un `+N` rende letterale tutto il nome che lo precede,
+quindi un file il cui nome finisce con `-cifre` si scrive con il `+`:
+`&take-2+0` e' il file `take-2`, `&take-2+3` lo stesso file tre semitoni
+sopra. I token del file si leggono nello stato iniziale delle altezze, come
+quelli di un pattern, e la trasposizione finisce col riferimento.
+
+*Compatibilita' con la 2.5* (dove `-N` era una trasposizione solo se la
+libreria non aveva un file col nome per intero): quando il file senza il
+`-N` non esiste e quello col nome per intero si', un parser DEVE leggere il
+nome per intero e dare un avviso (sezione 10.2). Il significato di un
+riferimento non dipende mai dalla libreria quando il file accorciato
+esiste.
 
 ### 8.4 Blocchi di voci
 
@@ -715,8 +753,9 @@ comandi.
 
 `bar=N` (N intero da 1 a 99999) porta il cursore all'**inizio della
 battuta N** del brano, con le stesse posizioni delle battute dei controlli
-di battuta (sezione 12.3: la battuta 1 comincia al quarto 0, ogni battuta
-dura `4 × num / den` quarti della metrica in vigore).
+di battuta (sezione 12.3: la battuta 1 comincia al quarto 0, o dopo la
+battuta in levare se il brano ne ha una; ogni battuta dura
+`4 × num / den` quarti della metrica in vigore).
 
 - Se il cursore e' **prima** di quel punto, il vuoto si riempie di
   silenzio: un evento di tipo `rest` dal cursore all'inizio della battuta
@@ -854,6 +893,7 @@ conforme DEVE segnalare almeno questi errori:
   di battuta che non e' un intero da 1 a 99999, o che richiede un
   silenzio con una legatura aperta; una trasposizione fuori da −60..60
   (`transpose=` o `%Nome+N`) o che porta una nota fuori da MIDI 0-127;
+  `reset:` con una rampa di velocity o di tempo aperta;
 - un pattern non definito, un riferimento troppo profondo o ciclico, un
   riferimento MIDI che non si risolve;
 - un blocco vuoto `[]` o un blocco di voci vuoto.
@@ -862,9 +902,11 @@ conforme DEVE segnalare almeno questi errori:
 
 Gli avvisi non rendono il testo non valido.
 
-**Controlli di battuta.** Le stanghette vengono dalla metrica del brano:
-la battuta 1 comincia al quarto 0 e ogni battuta dura `4 × num / den`
-quarti della metrica in vigore (sezione 12.3). Una traccia che comincia
+**Controlli di battuta.** Le stanghette vengono dalla metrica del brano
+(sezione 12.3): la battuta 1 comincia al quarto 0 e ogni battuta dura
+`4 × num / den` quarti della metrica in vigore; con un levare di P quarti
+la prima stanghetta e' a P e chiude la battuta 0 (il levare), e li'
+comincia la battuta 1. Una traccia che comincia
 piu' avanti nel brano (un box, sezione 12.4) si controlla nella sua
 posizione assoluta. I controlli si esaminano in ordine di tempo con uno
 **sfasamento** corrente (all'inizio 0):
@@ -890,6 +932,10 @@ numero di battuta N, una volta per token anche se ripetuto.
 
 **Testo cantato.** Piu' sillabe che eventi in attesa (sezione 8.5): si
 segnala sul token del testo.
+
+**Riferimenti MIDI letti come nella 2.5.** Un `&nome-N` il cui file
+accorciato non esiste e quello col nome per intero si' (sezione 8.3): si
+segnala sul riferimento, suggerendo `&nome-N+0`.
 
 ---
 
@@ -942,16 +988,31 @@ libero).
 
 | Riga | Significato |
 | --- | --- |
+| `ST: 2.6` | versione del linguaggio in cui e' scritto il file |
 | `Tempo: 120 BPM` | tempo |
 | `Tempo: 1: 120, 5: 140` | tempo per battuta (battuta: bpm, …) |
 | `Metrica: 3/4` | metrica |
 | `Metrica: 1: 4/4, 5: 3/4` | metrica per battuta |
+| `Levare: 1` | battuta in levare, in quarti (`1`, `1.5`, `1/2`; sezione 12.3) |
 | `Tonalita: Am` | tonalita' (A-G, alterazione e `m` facoltative) |
 
 Con un elenco per battuta, il tempo/la metrica del brano sono quelli
 della battuta 1, o il primo valore se la battuta 1 non c'e'. `Tempo`,
-`Metrica` e `Tonalita` non distinguono maiuscole e minuscole; le altre
-intestazioni si scrivono come indicato.
+`Metrica`, `Levare` e `Tonalita` non distinguono maiuscole e minuscole;
+le altre intestazioni si scrivono come indicato.
+
+**Versione.** `ST: M.m` e' facoltativa e va prima degli altri blocchi. Un
+lettore che trova una versione piu' recente di quella che conosce
+DOVREBBE avvisare che parti del file potrebbero non essere lette; chi
+scrive il file DOVREBBE metterla. I lettori delle versioni prima della 2.6
+la ignorano (e' una riga fuori da ogni blocco).
+
+**Parole chiave.** Le parole chiave del file si possono scrivere in
+italiano o in inglese: `Metrica`/`Meter`, `Tonalita`/`Key`,
+`Levare`/`Pickup`, `Traccia`/`Track`, `Strumento`/`Instrument`; nel corpo
+di uno strumento `percussione`/`percussion` e `ottava`/`octave`; i valori
+si'/no come `si`/`yes`/`no`. Chi scrive il file DOVREBBE usare le forme
+italiane, che ogni versione legge.
 
 ### 12.2 Blocchi
 
@@ -961,7 +1022,7 @@ intestazioni si scrivono come indicato.
 | `Traccia Nome [Strumento]:` | testo della traccia |
 | `Piano:`, `Piano 2:` (il nome di uno strumento conosciuto, indice facoltativo) | testo della traccia `Piano` / `Piano 2` |
 | `Box Traccia "Nome" \|quarto:` | un box della traccia `Traccia` che comincia a `quarto` |
-| `Strumento Nome:` | definizione di strumento (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`) |
+| `Strumento Nome:` | definizione di strumento (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`); un blocco senza `program=` non definisce nulla |
 | `Mixer Traccia:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) di una traccia |
 
 I corpi di tracce e box conservano gli **a capo** (i commenti finiscono a
@@ -981,6 +1042,14 @@ battuta 1, oppure il valore di `Metrica:` se non c'e' un elenco; cambia a
 ogni battuta elencata; ogni battuta dura `4 × num / den` quarti. I cambi
 di tempo per battuta valgono da quelle posizioni.
 
+Con `Levare: P` (0 < P, meno di una battuta intera) il brano comincia con
+una **battuta in levare** incompleta di P quarti, numerata 0: la battuta
+1 e' la prima intera e comincia al quarto P, e tutte le successive si
+spostano di P. Quello che e' dichiarato per la battuta 1 (tempo, metrica)
+vale dall'inizio del brano, levare compreso. Una partitura stampa il
+levare come prima misura incompleta; un metronomo lo conta come gli
+ultimi tempi di una battuta.
+
 ### 12.4 Box
 
 Se una traccia ha dei box, il suo testo si costruisce da questi, in
@@ -989,13 +1058,15 @@ ordine di inizio:
 - il vuoto prima di ogni box (dalla fine del box precedente, o da 0) si
   riempie di pause su una griglia di sedicesimi: `16: Nr` con N =
   round(vuoto / 0,25);
-- ogni box porta `4: 80@ ` seguito dal suo testo (cosi' un box parte
-  sempre dallo stato di default); se il testo di un box della traccia
-  contiene `rel:`, `abs:`, `key=`, `swing` o `shift=`, il prefisso e'
-  `4: 80@ abs: key=off swing=50 shift=0 `; un box il cui testo contiene `//` e'
+- ogni box porta `reset: ` seguito dal suo testo, cosi' parte sempre
+  dallo stato iniziale (sezione 7.9); un box il cui testo contiene `//` e'
   seguito da un a capo;
-- le parti si uniscono con spazi; la fine di un box e' il suo inizio piu'
-  la fine del suo ultimo evento.
+- le parti si uniscono con spazi. Un box comincia dove finisce il testo
+  costruito fin li' (il suo quarto d'inizio, salvo box sovrapposti) e la
+  sua fine e' quella posizione piu' la fine del suo ultimo evento, con il
+  testo interpretato in quel punto del brano (cosi' un `bar=N` al suo
+  interno arriva alla battuta N del brano). Un box il cui testo non e'
+  valido dura 0: la traccia non e' valida, il brano si legge lo stesso.
 
 Il corpo di una traccia che ha dei box si ignora, quindi chi scrive il
 file lo lascia vuoto: basta l'intestazione, con il nome e lo strumento.
@@ -1078,13 +1149,24 @@ prova (vedi [`conformance/README.md`](conformance/README.md)): per ogni
 input, `"error": true` oppure gli eventi attesi (campi della sezione 11,
 numeri arrotondati a 9 decimali, `voice` omesso quando vale 1, atomi dei
 blocchi senza il moltiplicatore) e gli avvisi attesi (intervallo di
-caratteri del token e numero di battuta; 0 per il testo cantato). Un
+caratteri del token e numero di battuta; 0 per il testo cantato e per la
+battuta in levare; un caso puo' dare il levare in quarti come `pickup`). Un
 parser e' conforme a questa versione se da' lo stesso risultato per ogni
 caso.
 
 ---
 
 ## Appendice A: modifiche
+
+**2.6** — consolidamento: `reset:` (sezione 7.9), usato come prefisso dei
+box (sezione 12.4); la tabella dell'eredita' dello stato (sezione 4);
+`&nome-N` e' sempre una trasposizione, `&nome-N+0` indica un file che
+finisce con `-N`, con una regola di compatibilita' e un avviso (sezioni
+8.3, 10.2); l'intestazione di versione `ST:`, la battuta in levare
+`Levare:` (sezioni 12.1, 12.3) e le parole chiave inglesi nel file di
+brano; un blocco strumento vuole `program=`. Ogni testo di traccia valido
+2.5 e' valido anche in 2.6, con gli stessi eventi, tranne un `&nome-N`
+quando nella libreria esistono sia `nome` sia `nome-N`.
 
 **2.5** — ancore di battuta `bar=N` (sezione 8.9) e l'avviso per una
 traccia che e' gia' oltre la battuta; trasposizione `transpose=N` e

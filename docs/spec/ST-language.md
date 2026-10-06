@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.5** · Reference implementation: the `st_language` Python
+**Version 2.6** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -107,7 +107,7 @@ A-Z or a-z, `word` is one or more letters, digits or `_`):
 
 ```ebnf
 token        = grid | velocity | tempo | ramp | control | swing | shift | anchor
-             | transpose
+             | transpose | reset
              | pitch-mode | key-mode | sustain
              | bar-check | repeat | text | lyric | pattern-ref | midi-ref
              | group | voices | sounding ;
@@ -125,6 +125,7 @@ swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
 shift        = "shift=" [ "-" ] number ;                        (* shift=-15 *)
 anchor       = "bar=" number ;                                  (* bar=29 *)
 transpose    = "transpose=" [ "-" ] number ;                    (* transpose=-3 *)
+reset        = "reset:" ;
 pitch-mode   = "rel:" | "abs:" ;
 key-mode     = "key=" ( root [ "m" ] | "off" ) ;                (* key=G  key=Dm *)
 sustain      = "SON" | "SOFF" ;
@@ -221,6 +222,17 @@ multiplier is the leading number (1 if absent) and the unit is the grid
 unit, or the **note value** if the token has one (section 6.6). The
 cursor then advances by the duration. State commands, bar checks and
 lyrics take no time.
+
+**Inheritance.** Where each part of the text starts its state, and where
+the changes made inside it end:
+
+| Context | Starts with | Changes made inside it |
+| --- | --- | --- |
+| repeat group `N(...)` | the current state | carry on after it (the group is written out) |
+| pattern `%Name`, MIDI reference `&Name` | the current state, except: pitch mode `abs:`, no key, previous note reset (section 8.2); transposition = the current one plus the `+N`/`-N` of the reference | pitch mode, key, previous note and `transpose=` end with the reference; grid, velocity, automations, swing and shift carry on after it |
+| voice block `{ ; }` | each voice: the current state | stay in the voice; after the block the state is the one before it |
+| box (song file, section 12.4) | the initial state, through `reset:`; automation values carry on from the previous box | end with the box |
+| `reset:` | — | grid, velocity, swing, shift, transposition (`transpose=`), pitch mode, key and previous note back to their initial values (section 7.9) |
 
 ---
 
@@ -560,6 +572,24 @@ transposed by N semitones **in addition to** the transposition in force
 (section 8.2); the number follows the name with no spaces. The same holds
 for the MIDI references of section 8.3 (`&Name+7`).
 
+### 7.9 Reset
+
+`reset:` puts back the **initial state** of section 4: grid unit 1 beat,
+velocity 80, swing off, shift 0, transposition set by `transpose=` 0,
+pitch mode `abs:`, no key, previous note reset. It takes no time and
+produces no event. It does **not** change:
+
+- the automation values (section 7.5): they act on the whole channel, and
+  setting them back would produce events;
+- the transposition that comes from the reference of the pattern that
+  contains it (`%Name+N`): inside that pattern the transposition goes
+  back to N.
+
+`reset:` while a velocity or tempo ramp is open is an error, and a ramp
+cannot follow it directly (section 7.3). It is what a box starts with
+(section 12.4), and it is the way to make a text independent of what
+comes before it.
+
 ---
 
 ## 8. Structure
@@ -597,11 +627,20 @@ parser without a library MUST report such a reference as an error.
 
 A MIDI reference can be transposed like a pattern: `&Name+N` reads the
 file N semitones higher, in addition to the transposition in force
-(section 7.8), and `&Name-N` lower. Since a file name may contain `-`, a
-`-N` at the end is read as a transposition only if the library has no file
-with the full name; `+N` is always a transposition. The tokens of the
-file are read in the initial pitch state, like those of a pattern, and the
-transposition ends with the reference.
+(section 7.8), and `&Name-N` lower. Without a `+`, a `-` followed by
+digits at the end of the reference is **always** a transposition: `&take-2`
+is the file `take` two semitones lower. A `+N` makes the whole name before
+it literal, so a file whose name ends in `-digits` is written with a `+`:
+`&take-2+0` is the file `take-2`, `&take-2+3` the same file three
+semitones higher. The tokens of the file are read in the initial pitch
+state, like those of a pattern, and the transposition ends with the
+reference.
+
+*Compatibility with 2.5* (where `-N` was a transposition only if the
+library had no file with the full name): when the file without the `-N`
+does not exist and the file with the full name does, a parser MUST read
+the full name and report a warning (section 10.2). The meaning of a
+reference never depends on the library when the shortened file exists.
 
 ### 8.4 Voice blocks
 
@@ -693,8 +732,8 @@ own commands.
 
 `bar=N` (N an integer from 1 to 99999) moves the cursor to the **start of
 bar N** of the song, using the same bar positions as the bar checks
-(section 12.3: bar 1 starts at beat 0, each bar lasts `4 × num / den`
-beats of the meter in force).
+(section 12.3: bar 1 starts at beat 0, or after the pickup bar if the song
+has one; each bar lasts `4 × num / den` beats of the meter in force).
 
 - If the cursor is **before** that point, the gap is filled with silence:
   one event of kind `rest` from the cursor to the start of bar N, with
@@ -825,7 +864,8 @@ conforming parser MUST report at least these errors:
   value outside 50-80; a shift outside −500..500 ms; a bar anchor that is
   not an integer from 1 to 99999, or that needs silence while a tie is
   open; a transposition outside −60..60 (`transpose=` or `%Name+N`) or
-  that takes a note out of MIDI 0-127;
+  that takes a note out of MIDI 0-127; `reset:` while a velocity or tempo
+  ramp is open;
 - an undefined pattern, a too-deep or cyclic reference, an unresolvable
   MIDI reference;
 - an empty block `[]` or an empty voice block.
@@ -834,9 +874,10 @@ conforming parser MUST report at least these errors:
 
 Warnings do not make the text invalid.
 
-**Bar checks.** Bar lines come from the song's meter: bar 1 starts at
-beat 0 and each bar lasts `4 × num / den` beats of the meter in force
-(section 12.3). A track that starts later in the song (a box, section
+**Bar checks.** Bar lines come from the song's meter (section 12.3):
+bar 1 starts at beat 0 and each bar lasts `4 × num / den` beats of the
+meter in force; with a pickup of P beats, the first bar line is at P and
+closes bar 0 (the pickup), and bar 1 starts there. A track that starts later in the song (a box, section
 12.4) is checked at its absolute position. The checks are processed in
 time order with a running **shift** (initially 0):
 
@@ -860,6 +901,10 @@ N, once per token even if repeated.
 
 **Lyrics.** More syllables than pending events (section 8.5): reported
 at the lyric token.
+
+**MIDI references read as in 2.5.** A `&name-N` whose shortened file does
+not exist and whose full name does (section 8.3): reported at the
+reference, suggesting `&name-N+0`.
 
 ---
 
@@ -910,15 +955,29 @@ ignored (free text).
 
 | Line | Meaning |
 | --- | --- |
+| `ST: 2.6` | version of the language the file is written in |
 | `Tempo: 120 BPM` | tempo |
 | `Tempo: 1: 120, 5: 140` | tempo per bar (bar: bpm, …) |
 | `Metrica: 3/4` | meter |
 | `Metrica: 1: 4/4, 5: 3/4` | meter per bar |
+| `Levare: 1` | pickup bar, in beats (`1`, `1.5`, `1/2`; section 12.3) |
 | `Tonalita: Am` | key (A-G, optional accidental, optional `m`) |
 
 With a per-bar list, the song tempo/meter is the bar-1 value, or the
-first value if bar 1 is not listed. `Tempo`, `Metrica` and `Tonalita`
-are case-insensitive; the other headers are written as shown.
+first value if bar 1 is not listed. `Tempo`, `Metrica`, `Levare` and
+`Tonalita` are case-insensitive; the other headers are written as shown.
+
+**Version.** `ST: M.m` is optional and goes before the other blocks. A
+reader that meets a version newer than the one it knows SHOULD warn that
+parts of the file may not be read; writers SHOULD write it. Readers of
+versions before 2.6 ignore it (it is a line outside any block).
+
+**Keywords.** The keywords of the file can be written in Italian or in
+English: `Metrica`/`Meter`, `Tonalita`/`Key`, `Levare`/`Pickup`,
+`Traccia`/`Track`, `Strumento`/`Instrument`; in an instrument body
+`percussione`/`percussion` and `ottava`/`octave`; yes/no values as
+`si`/`yes`/`no`. Writers SHOULD use the Italian forms, which every
+version reads.
 
 ### 12.2 Blocks
 
@@ -928,7 +987,7 @@ are case-insensitive; the other headers are written as shown.
 | `Traccia Name [Instrument]:` | track text |
 | `Piano:`, `Piano 2:` (a known instrument name, optional index) | text of the track `Piano` / `Piano 2` |
 | `Box Track "Name" \|beat:` | a box of the track `Track` starting at `beat` |
-| `Strumento Name:` | instrument definition (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`) |
+| `Strumento Name:` | instrument definition (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`); a block without `program=` defines nothing |
 | `Mixer Track:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) of a track |
 
 Track and box bodies keep their **line breaks** (comments end at line
@@ -946,6 +1005,13 @@ list does not start at bar 1, or the `Metrica:` value if there is no
 list; it changes at each listed bar; each bar lasts `4 × num / den`
 beats. Per-bar tempo changes take effect at those positions.
 
+With `Levare: P` (0 < P, less than a whole bar) the song starts with an
+incomplete **pickup bar** of P beats, numbered 0: bar 1 is the first full
+bar and starts at beat P, and every following bar moves by P. What is
+declared for bar 1 (tempo, meter) holds from the start of the song, the
+pickup included. A score prints the pickup as an incomplete first measure;
+a metronome counts it as the last beats of a bar.
+
 ### 12.4 Boxes
 
 When a track has boxes, its text is built from them, in order of start
@@ -954,13 +1020,15 @@ beat:
 - the gap before each box (from the end of the previous box, or 0) is
   filled with rests on a sixteenth grid: `16: Nr` with N = round(gap /
   0.25);
-- each box contributes `4: 80@ ` followed by its text (so a box always
-  starts from the default state); when the text of any box of the track
-  contains `rel:`, `abs:`, `key=`, `swing` or `shift=`, the prefix is
-  `4: 80@ abs: key=off swing=50 shift=0 `; a box whose text contains `//` is
+- each box contributes `reset: ` followed by its text, so it always starts
+  from the initial state (section 7.9); a box whose text contains `//` is
   followed by a line break;
-- the parts are joined with spaces; a box's end is its start plus the
-  end of its last event.
+- the parts are joined with spaces. A box starts where the text built so
+  far ends (its start beat, unless boxes overlap) and its end is that
+  position plus the end of its last event, with its text interpreted at
+  that position of the song (so a `bar=N` in it reaches bar N of the
+  song). A box whose text is invalid lasts 0: the track is invalid, the
+  song can still be read.
 
 The body of a track that has boxes is ignored, so writers leave it empty:
 the header alone gives the track's name and instrument.
@@ -1036,12 +1104,22 @@ drum aliases named after section 9.5; `bend` and `tune` together become
 either `"error": true` or the expected events (section 11 fields,
 numbers rounded to 9 decimals, `voice` omitted when 1, block atoms
 without their multiplier) and the expected warnings (character range of
-the token and bar number; 0 for lyrics). A parser conforms to this
+the token and bar number; 0 for lyrics and for the pickup bar; a case
+may give the pickup in beats as `pickup`). A parser conforms to this
 version if it gives the same result for every case.
 
 ---
 
 ## Appendix A: changes
+
+**2.6** — consolidation: `reset:` (section 7.9), used as the box prefix
+(section 12.4); the table of state inheritance (section 4); `&name-N` is
+always a transposition, `&name-N+0` names a file ending in `-N`, with a
+compatibility rule and warning (sections 8.3, 10.2); the `ST:` version
+header, the pickup bar `Levare:` (sections 12.1, 12.3) and English
+keywords in the song file; an instrument block needs `program=`. Every
+valid 2.5 track text is valid 2.6 text with the same events, except a
+`&name-N` when both `name` and `name-N` exist in the library.
 
 **2.5** — bar anchors `bar=N` (section 8.9) and the warning for a track
 that is past the bar; transposition `transpose=N` and `%Name+N`

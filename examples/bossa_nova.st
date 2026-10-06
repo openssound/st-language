@@ -18,6 +18,7 @@
 //   A    Am7 | Dm7 | G7 | Cmaj7 | Fmaj7 | Bm7b5 E7 | Am7 | Am7 (A7 nella ripetizione)
 //   B    Dm7 | G7 | Cmaj7 | Fmaj7 | Bm7b5 | E7 | Am7 | E7
 
+ST: 2.6
 Tempo: 126 BPM
 Metrica: 4/4
 Tonalita: Am
