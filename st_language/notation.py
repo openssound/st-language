@@ -794,6 +794,18 @@ class PitchRewriter:
         if tok.startswith(LYRIC_QUOTE) or tok.startswith("$") or tok in (BAR_CHECK, REPEAT_START, REPEAT_END,
                                                                             DOUBLE_BAR):
             return tok
+        if self.semitones:
+            # Pattern e file MIDI richiamati: si trasportano col suffisso +N/-N
+            # (le note del pattern restano com'erano, altri lo usano).
+            m = RE_PATTERN_REF.match(tok)
+            if m:
+                mult_s, name, offset = m.groups()
+                return f"{mult_s}%{name}{_offset_suffix(int(offset or 0) + self.semitones)}"
+            m = RE_MIDI_REF.match(tok)
+            if m:
+                mult_s, name_path, plus = m.groups()
+                name_path, offset = _midi_ref_offset(name_path, plus)
+                return f"{mult_s}&{name_path}{_offset_suffix(offset + self.semitones)}"
         base, value = split_note_value(tok)
         mm = re.match(r"^(\d*)\[(.*)\]$", base)
         if mm:
@@ -858,6 +870,29 @@ class PitchRewriter:
     def _spell(self, midi: int) -> Tuple[str, int]:
         """Come scrivere l'altezza midi nella tonalita' di destinazione."""
         return spell_midi(midi, self.dst.alters)
+
+
+def _offset_suffix(semitones: int) -> str:
+    """Il suffisso di trasposizione di un riferimento: '+3', '-2', '' per 0."""
+    return f"{semitones:+d}" if semitones else ""
+
+
+def _midi_ref_offset(name_path: str, plus: Optional[str]) -> Tuple[str, int]:
+    """(nome del file, trasposizione) di un riferimento '&nome[+N]', con la
+    regola di _resolve_midi_ref per un '-N' in fondo: e' una trasposizione
+    solo se nella libreria non c'e' un file col nome per intero."""
+    if plus:
+        return name_path, int(plus)
+    tail = re.match(r"^(.*[^-])-(\d+)$", name_path)
+    if not tail or _midi_ref_resolver is None:
+        return name_path, 0
+    try:
+        _midi_ref_resolver(name_path, None)
+        return name_path, 0
+    except FileNotFoundError:
+        return tail.group(1), -int(tail.group(2))
+    except Exception:
+        return name_path, 0
 
 
 def transpose_tokens(tokens: List[str], semitones: int, default_octave: int) -> List[str]:
@@ -1844,7 +1879,8 @@ def _expanded_ranges(text: str, patterns: Dict[str, Pattern], midi_dir: Optional
 
 
 def compute_token_spans(text: str, patterns: Dict[str, Pattern], midi_dir: Optional[str] = None,
-                          default_octave: int = 4, meter: Optional["Meter"] = None) -> List[tuple]:
+                          default_octave: int = 4, meter: Optional["Meter"] = None,
+                          origin_beat: float = 0) -> List[tuple]:
     """Calcola, per ogni token di 'primo livello' del testo GREZZO (prima
     dell'espansione di %pattern/&midi), la sua posizione carattere e il suo
     intervallo temporale in beat. Un riferimento %Nome o &Nome, o un gruppo
@@ -1861,9 +1897,11 @@ def compute_token_spans(text: str, patterns: Dict[str, Pattern], midi_dir: Optio
 
     Ritorna una lista di tuple (char_start, char_end, beat_start, beat_duration),
     ordinata per beat_start crescente. I comandi di stato (N:, NT:, N@, tempo=N,
-    rampe, SON/SOFF) non producono uno span (non hanno una durata propria)."""
+    rampe, SON/SOFF) non producono uno span (non hanno una durata propria).
+    'origin_beat': dove il testo comincia nel brano (per le ancore bar=N);
+    i beat degli span restano relativi all'inizio del testo."""
     raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave,
-                                                      meter=meter)
+                                                      meter=meter, origin_beat=Fraction(origin_beat))
     raw_positions = [(cs, ce) for _, cs, ce in raw]
 
     # Uno span per ogni tratto consecutivo dello stesso token grezzo: un
