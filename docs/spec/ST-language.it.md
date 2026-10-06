@@ -137,7 +137,7 @@ repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| 
 text         = '$"' { any character except '"' } '"' ;          (* $"rit." *)
 lyric        = '"' { qualunque carattere tranne '"' } '"' ;
 pattern-ref  = [ number ] "%" word [ ( "+" | "-" ) number ] ;      (* %Riff  3%Riff  %Riff+7 *)
-midi-ref     = [ number ] "&" ( word | "/" | "-" ) { word | "/" | "-" } ;
+midi-ref     = [ number ] "&" ( word | "/" | "-" ) { word | "/" | "-" } [ "+" number ] ;
 group        = [ number ] "(" { token } ")" ;                   (* 4(c d) *)
 voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } *)
 voice        = { token } ;
@@ -573,7 +573,8 @@ N fuori da −60..60, e' un errore.
 
 **Pattern.** `%Nome+N` e `%Nome-N` (e `K%Nome+N`) leggono il pattern
 trasposto di N semitoni **in aggiunta** alla trasposizione in vigore
-(sezione 8.2); il numero segue il nome senza spazi.
+(sezione 8.2); il numero segue il nome senza spazi. Lo stesso vale per i
+riferimenti MIDI della sezione 8.3 (`&Nome+7`).
 
 ---
 
@@ -611,6 +612,14 @@ vale rispetto a quel riferimento e finisce con esso.
 libreria. E' una funzione **facoltativa** dell'applicazione che ospita il
 parser: un parser senza libreria DEVE segnalare questi riferimenti come
 errore.
+
+Un riferimento MIDI si trasporta come un pattern: `&Nome+N` legge il file
+N semitoni sopra, in aggiunta alla trasposizione in vigore (sezione 7.8), e
+`&Nome-N` sotto. Poiche' il nome di un file puo' contenere `-`, un `-N` in
+fondo vale come trasposizione solo se la libreria non ha un file con il nome
+per intero; `+N` e' sempre una trasposizione. I token del file si leggono
+nello stato iniziale delle altezze, come quelli di un pattern, e la
+trasposizione finisce col riferimento.
 
 ### 8.4 Blocchi di voci
 
