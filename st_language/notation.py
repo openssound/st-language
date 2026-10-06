@@ -1273,8 +1273,12 @@ def swing_time(beat: float, swing: Optional[Tuple[float, float]]) -> float:
     return (k + warped) * pair
 
 
-def parse_tokens(tokens: List[str], default_octave: int = 4, meter: Optional["Meter"] = None) -> List[Event]:
-    return _parse_tokens_exact(tokens, default_octave, meter=meter)[0]
+def parse_tokens(tokens: List[str], default_octave: int = 4, meter: Optional["Meter"] = None,
+                 origin_beat: float = 0) -> List[Event]:
+    """'origin_beat' e' dove i token cominciano nel brano (serve solo alle
+    ancore bar=N); i tempi degli eventi restano relativi all'inizio."""
+    return _parse_tokens_exact(tokens, default_octave, meter=meter,
+                               origin_beat=Fraction(origin_beat))[0]
 
 
 def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
@@ -1794,13 +1798,15 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
 
 
 def parse_track_text(text: str, patterns: Dict[str, Pattern], default_octave: int = 4,
-                      midi_dir: Optional[str] = None, meter: Optional["Meter"] = None) -> List[Event]:
+                      midi_dir: Optional[str] = None, meter: Optional["Meter"] = None,
+                      origin_beat: float = 0) -> List[Event]:
     """Punto di ingresso completo: tokenizza, espande pattern (%) e riferimenti
     MIDI (&), quindi interpreta lo Stato Corrente. 'meter' (vedi Meter) serve
-    alle ancore di battuta 'bar=N'."""
+    alle ancore di battuta 'bar=N', e cosi' 'origin_beat': dove il testo
+    comincia nel brano (per esempio un box non all'inizio della traccia)."""
     raw_tokens = tokenize(text)
     expanded = expand_patterns(raw_tokens, patterns, midi_dir=midi_dir, default_octave=default_octave)
-    return parse_tokens(expanded, default_octave=default_octave, meter=meter)
+    return parse_tokens(expanded, default_octave=default_octave, meter=meter, origin_beat=origin_beat)
 
 
 def validate_track_text(text: str, patterns: Dict[str, Pattern], default_octave: int = 4,

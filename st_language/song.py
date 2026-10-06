@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from .instruments import DEFAULT_INSTRUMENTS, InstrumentProfile, instrument_for
-from .notation import Event, Meter, Pattern, COMMENT_MARK, parse_track_text, tokenize
+from .notation import Event, Meter, NotationError, Pattern, COMMENT_MARK, parse_track_text, tokenize
 from .stfile import (
     RE_AMBIENTE, RE_AUDIO_HDR, RE_BOX_HDR, RE_EFFECTS_HDR, RE_INSTRUMENT_HDR, RE_KEY, RE_MASTER,
     RE_MASTER_CHAIN_HDR, RE_METRICA, RE_METRICA_LIST_HDR, RE_MIXER_HDR, RE_PATTERN_HDR, RE_SYNTH_HDR,
@@ -131,23 +131,33 @@ _FILL_GRID_TOKEN = "16:"
 # stato lasciato dal riempimento del vuoto o dal box precedente.
 _DEFAULT_STATE_PREFIX = "4: 80@ "
 # Se i box usano anche questi comandi di stato, il prefisso li rimette a
-# posto: ottave assolute, nessuna tonalita', niente swing.
-_STATE_RESET_RE = re.compile(r"(?:^|\s)(?:rel:|abs:|key=|swing(?:16)?=|shift=)")
-_FULL_STATE_PREFIX = "4: 80@ abs: key=off swing=50 shift=0 "
+# posto: ottave assolute, nessuna tonalita', niente swing ne' trasposizione.
+_STATE_RESET_RE = re.compile(r"(?:^|\s)(?:rel:|abs:|key=|swing(?:16)?=|shift=|transpose=)")
+_FULL_STATE_PREFIX = "4: 80@ abs: key=off swing=50 shift=0 transpose=0 "
 
 
-def clip_duration_beats(text: str, patterns: Dict[str, Pattern], default_octave: int) -> float:
+def clip_duration_beats(text: str, patterns: Dict[str, Pattern], default_octave: int,
+                        start_beat: float = 0.0, meter: Optional[Meter] = None) -> float:
     """Durata in beat del testo di un box, per la larghezza del box nel
     canvas e per rilevare sovrapposizioni. Stesso pattern di
-    Song.duration_beats."""
-    events = parse_track_text(text, patterns, default_octave=default_octave)
+    Song.duration_beats. 'start_beat' e 'meter' dicono dove il box comincia
+    nel brano: servono alle ancore bar=N, che riempiono fino a una battuta
+    assoluta. Un box che non si riesce a leggere (per esempio un &MIDI che
+    manca su questo computer) dura 0: l'errore lo segnala chi suona o
+    controlla la traccia, ma il brano si apre lo stesso."""
+    try:
+        events = parse_track_text(text, patterns, default_octave=default_octave,
+                                  meter=meter, origin_beat=start_beat)
+    except (NotationError, ValueError):
+        return 0.0
     if not events:
         return 0.0
     return max(e.start + e.duration for e in events)
 
 
 def flatten_clips_to_text(clips: List["Clip"], patterns: Dict[str, Pattern], default_octave: int,
-                           fill_grid_beats: float = FILL_GRID_BEATS) -> str:
+                           fill_grid_beats: float = FILL_GRID_BEATS,
+                           meter: Optional[Meter] = None) -> str:
     """Appiattisce i box di una traccia (ordinati per start_beat) in un
     unico testo st-language lineare, riempiendo gli eventuali vuoti con
     pause esatte. E' il valore che va salvato in Track.text quando
@@ -165,12 +175,14 @@ def flatten_clips_to_text(clips: List["Clip"], patterns: Dict[str, Pattern], def
             n = round(gap / fill_grid_beats)
             if n > 0:
                 parts.append(f"{_FILL_GRID_TOKEN} {n}r")
+                cursor += n * fill_grid_beats
         body = clip.text.strip()
         if COMMENT_MARK in body:
             body += "\n"   # un commento in fondo al box non deve inghiottire il box dopo
         parts.append(prefix + body)
-        duration = clip_duration_beats(clip.text, patterns, default_octave)
-        cursor = clip.start_beat + duration
+        # Il box comincia dove lo porta il testo (cursor), che e' il suo
+        # start_beat salvo sovrapposizioni.
+        cursor += clip_duration_beats(clip.text, patterns, default_octave, start_beat=cursor, meter=meter)
     return " ".join(p for p in parts if p)
 
 
@@ -300,7 +312,8 @@ def read_song(text: str, name: str = "ST") -> Song:
             part.clips.append(Clip(box_name, body, start_beat))
     for part in song.tracks:
         if part.clips:
-            part.text = flatten_clips_to_text(part.clips, song.patterns, part.instrument.default_octave)
+            part.text = flatten_clips_to_text(part.clips, song.patterns, part.instrument.default_octave,
+                                              meter=song.meter())
     return song
 
 
