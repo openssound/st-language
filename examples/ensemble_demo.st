@@ -176,62 +176,88 @@ Pattern %DrumsChorus8:
 // ================================================================ tracce
 
 Voce:
-  // introduzione
-  4%Rest
+
+Box Voce "Strofa 1" |16:
   // strofa 1
   $"dolce" %VerseMelody "Il so- le scen- de- va sul- la stra- da di ca- sa o- gni pas- so e- ra un ri- tor- no fi- ne- stre ac- ce- se il fu- mo dei cam- pi ma ven- go da mol- to len- ta- no"
+
+Box Voce "Ritornello 1" |48:
   // ritornello 1
   %ChorusMelody "Stra- da di ca- sa por- ta- mi an- co- ra do- ve il cie- lo è a- ran- cio Stra- da di ca- sa se- ra do- po se- ra io sa- rò sem- pre a ca- sa"
+
+Box Voce "Strofa 2" |80:
   // strofa 2: la stessa musica, parole nuove
   %VerseMelody "La por- ta a- per- ta il pro- fu- mo del pa- ne u- na vo- ce dal cor- ti- le chia- ma co- me se il tem- po non fos- se pas- sa- to fi- nal- men- te so- no a ca- sa"
+
+Box Voce "Ritornello 2" |112:
   // ritornello 2
   %ChorusMelody "Stra- da di ca- sa por- ta- mi an- co- ra do- ve il cie- lo è a- ran- cio Stra- da di ca- sa se- ra do- po se- ra io sa- rò sem- pre a ca- sa"
-  // ponte: la voce tace
-  8%Rest
+
+Box Voce "Ritornello finale e coda" |176:
   // ritornello finale e coda
   %ChorusMelody "Stra- da di ca- sa por- ta- mi an- co- ra do- ve il cie- lo è a- ran- cio Stra- da di ca- sa se- ra do- po se- ra io sa- rò sem- pre a ca- sa"
   %OutroMelody "Stra- da di ca- sa"
 
 Piano:
+
+Box Piano "Inizio" |0:
   %IntroChords %VerseChords %ChorusChords
   %VerseChords %ChorusChords
+
+Box Piano "Ponte" |144:
   // ponte
   %BridgeChords
+
+Box Piano "Ritornello finale e coda" |176:
   // ritornello finale e coda, con l'indicazione di testo
   %ChorusChords
   $"rit." %OutroChords
 
 Guitar 1:
+
+Box Guitar 1 "Inizio" |0:
   vol=75 %GtrIntro
   %GtrVerse
+
+Box Guitar 1 "Ritornello 1" |48:
   // nel ritornello la chitarra sale di volume
   vol=95 %GtrChorus
   vol=75 %GtrVerse
   vol=95 %GtrChorus
+
+Box Guitar 1 "Ponte" |144:
   // ponte: gli arpeggi attraversano il campo stereo da sinistra a destra
   pan=-0.8 >>
   %GtrBridge
   pan=0.8
   pan=-0.4
   vol=100 %GtrChorus
+
+Box Guitar 1 "Coda" |208:
   // coda
   vol=80 %ArpC %ArpGB %ArpAm
   8: [g*2 d*3 g*3 b*3 d*4]'1$fermata |
 
 Bass:
-  2%Rest
+
+Box Bass "Inizio" |8:
   4: 85@ 2e*1 2b*1 | 2c*2 2g*1 |
   %BassVerse %BassChorus %BassVerse %BassChorus
   %BassBridge
   %BassChorus
+
+Box Bass "Coda" |208:
   // coda
-  c*2'1 | b*1'1 | a*1'1 | g*1'1$fermata |
+  4: 98@ c*2'1 | b*1'1 | a*1'1 | g*1'1$fermata |
 
 Archi:
+
+Box Archi "Strofa 2" |80:
   // entrano alla seconda strofa (introduzione 4 + strofa 8 + ritornello 8)
-  20%Rest
   %VerseChords
   %ChorusStrings
+
+Box Archi "Ponte" |144:
   // ponte: un crescendo che dura tutte e otto le battute
   vol=45 >>
   %BridgeChords
@@ -240,21 +266,28 @@ Archi:
   %OutroChords
 
 Trumpet:
+
+Box Trumpet "Ritornello 2" |112:
   // tace fino al secondo ritornello
-  28%Rest
   %TrChorus
   %TrBridge
   %TrChorus
   4%Rest
 
 Drums:
+
+Box Drums "Introduzione" |8:
   // introduzione: due battute di pausa, poi il groove e il rullo
-  2%Rest %DrumsVerse %DrumsFill
+  %DrumsVerse %DrumsFill
   %DrumsVerse8 %DrumsChorus8
   %DrumsVerse8 %DrumsChorus8
+
+Box Drums "Ponte" |144:
   // ponte: tamburi, e il rullo che porta al ritornello finale
   7%DrumsBridge %DrumsFill
   %DrumsChorus8
+
+Box Drums "Coda" |208:
   // coda: due battute di groove, poi il rallentando
   %DrumsChorusCrash %DrumsChorus
   100@ tempo=112 <<

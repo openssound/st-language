@@ -287,75 +287,101 @@ Pattern %DrumsChorus3:
 // ================================================================ tracce
 
 Trumpet:
-  swing=66
-  // introduzione e prime battute: la tromba aspetta
-  4%Rest
+
+Box Trumpet "Chorus 1" |16:
   // chorus 1: il tema
-  $"tema" %Head
-  // chorus 2: la tromba tace durante l'assolo di pianoforte
-  32%Rest
+  swing=66 $"tema" %Head
+
+Box Trumpet "Chorus 3" |272:
   // chorus 3: il tema ripreso, con piu' forza
-  100@ %Head
+  swing=66 100@ %Head
+
+Box Trumpet "Coda" |400:
   // coda
-  key=F 8: 90@
+  swing=66 100@ key=F 8: 90@
   r g*4 b*4 d*5 2f*5 e*5 c*5 |
   2a*4 c*5 f*5 3d*5 r |
   r g*4 b*4 d*5 2c*5 e*5 c*5 |
   8f*4$fermata |
 
 Piano:
-  swing=66
+
+Box Piano "Introduzione" |0:
   // introduzione: una breve frase a mano sola sul giro ii-V
-  key=F 8: 82@
+  swing=66 key=F 8: 82@
   r c*5 e*5 a*5 g*5 f#*5 a*5 d*5 |
   c*5 b*4 g*4 b*4 d*5 c*5 e*4 g*4 |
   r c*5 e*5 a*5 g*5 f#*5 a*5 d*5 |
   b*4 d*5 g*5 f*5 2e*5 c*5 e*5 |
+
+Box Piano "Chorus 1" |16:
   // chorus 1: accompagnamento Charleston sotto il tema
-  %CompChorus
+  swing=66 key=F 8: 82@ %CompChorus
+
+Box Piano "Chorus 2" |144:
   // chorus 2: l'assolo
-  $"assolo" %Solo
+  swing=66 key=F 8: 82@ $"assolo" %Solo
+
+Box Piano "Chorus 3" |272:
   // chorus 3: di nuovo il compagnamento
-  100@ %CompChorus
+  swing=66 key=F 8: 82@ 100@ %CompChorus
+
+Box Piano "Coda" |400:
   // coda
-  8: 76@ 3Gm7.drop2! r 2C7.drop2! 2r |
+  swing=66 key=F 8: 100@ 8: 76@ 3Gm7.drop2! r 2C7.drop2! 2r |
   3Am7.drop2! r 2D7.drop2! 2r |
   3Gm7.drop2! r 2C7.drop2! 2r |
   1: Fmaj7.drop2$fermata |
 
 Guitar 1:
-  swing=66
+
+Box Guitar 1 "Chorus 2" |144:
   // la chitarra entra con l'assolo di pianoforte
-  36%Rest
-  vol=100 %GtrChorus
+  swing=66 vol=100 %GtrChorus
+
+Box Guitar 1 "Chorus 3" |272:
   // chorus 3: di nuovo in sottofondo
-  vol=80 %GtrChorus
+  swing=66 vol=80 %GtrChorus
+
+Box Guitar 1 "Coda" |400:
   // coda
-  4: 62@ Gm7! Gm7! C7! C7! |
+  swing=66 4: 62@ Gm7! Gm7! C7! C7! |
   Am7! Am7! D7! D7! |
   Gm7! Gm7! C7! C7! |
   1: Fmaj7$fermata |
 
 Bass:
-  swing=66
+
+Box Bass "Introduzione" |8:
   // introduzione: il basso entra alla terza battuta
-  2%Rest %BAmD %BGmC
+  swing=66 %BAmD %BGmC
+
+Box Bass "Tre chorus" |16:
   // tre chorus
-  3%BassChorus
+  swing=66 3%BassChorus
+
+Box Bass "Coda" |400:
   // coda
-  %BGmC %BAmD %BGmC
+  swing=66 %BGmC %BAmD %BGmC
   1: 90@ f*1$fermata |
 
 Drums:
-  swing=66
+
+Box Drums "Introduzione" |8:
   // introduzione: due battute di pausa, poi il ride e il rullo di entrata
-  2%Rest %Ride %RideFill
+  swing=66 %Ride %RideFill
+
+Box Drums "Chorus 1 e 2" |16:
   // chorus 1 e 2: ride swing
-  %DrumsChorus1 %DrumsChorus2
+  swing=66 %DrumsChorus1 %DrumsChorus2
+
+Box Drums "Chorus 3" |272:
   // chorus 3: la cassa "piumata" e piu' energia
-  %DrumsChorus3
+  swing=66 %DrumsChorus3
+
+Box Drums "Coda" |400:
   // coda
-  %Ride %Ride %RideFill 8: [kick crash] 7r |
+  swing=66 %Ride %Ride %RideFill 8: [kick crash] 7r |
 
 // ================================================================ mixer
 

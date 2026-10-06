@@ -108,51 +108,83 @@ Pattern %Head:
 // ================================================================ tracce
 
 Drums:
-  swing=66
+
+Box Drums "Introduzione" |0:
   // introduzione: il click, poi il groove entra con il rullo
-  2%Click %Shuffle %FillA
+  swing=66 2%Click %Shuffle %FillA
+
+Box Drums "Coro 1" |16:
   // coro 1: il tema
-  %DrumsChorus
+  swing=66 %DrumsChorus
+
+Box Drums "Coro 2" |64:
   // coro 2: assolo di pianoforte, la batteria suona piano sul ride
-  %DrumsChorusSoft
+  swing=66 %DrumsChorusSoft
+
+Box Drums "Coro 3" |112:
   // coro 3: assolo di chitarra, tutta la forza
-  %DrumsChorus
+  swing=66 %DrumsChorus
+
+Box Drums "Coro 4" |160:
   // coro 4: il tema, e la coda con il rallentando
-  %DrumsChorus
+  swing=66 %DrumsChorus
+
+Box Drums "Coda" |208:
   // il rallentando va chiuso prima di un nuovo cambio di velocity: qui non ce ne sono
-  100@ tempo=96 <<
+  swing=66 100@ tempo=96 <<
   8: [kick hihat] hihat [snare hihat] hihat [kick hihat] hihat [snare hihat] [kick hihat] |
   [kick crash] 7r |
   tempo=62
 
 Bass:
-  2%Rest %BassA1 %BassE1
+
+Box Bass "Inizio" |8:
+  %BassA1 %BassE1
   4%BassChorus
+
+Box Bass "Coda" |208:
   // coda
   4: 92@ a*1 c#*2 e*2 f#*2 | 4: 2a*1 2r |
 
 Guitar 1:
+
+Box Guitar 1 "Inizio" |0:
   swing=66
   2%Rest %GA %GE
+
+Box Guitar 1 "Coro 1" |16:
   // coro 1: ritmica piena
-  %GChorus
+  swing=66 %GChorus
+
+Box Guitar 1 "Coro 2" |64:
   // coro 2: sotto l'assolo di pianoforte, il volume scende
-  vol=62 %GChorus
+  swing=66 vol=62 %GChorus
+
+Box Guitar 1 "Coro 3" |112:
   // coro 3: torna a pieno volume per l'assolo
-  vol=100 %GChorus
+  swing=66 vol=100 %GChorus
+
+Box Guitar 1 "Coro 4" |160:
   // coro 4
-  %GChorus
+  swing=66 %GChorus
+
+Box Guitar 1 "Coda" |208:
   // coda
-  %GA 8: [a*2 e*3 a*3]'1 |
+  swing=66 %GA 8: [a*2 e*3 a*3]'1 |
 
 Piano:
-  swing=66
+
+Box Piano "Introduzione" |0:
   // introduzione: I - IV - I - V
-  %CompA %CompD %CompA %CompE
+  swing=66 %CompA %CompD %CompA %CompE
+
+Box Piano "Coro 1" |16:
   // coro 1: accordi sul 2 e sul 4
-  %CompChorus
+  swing=66 %CompChorus
+
+Box Piano "Coro 2" |64:
   // coro 2: assolo (la mano destra, sul giro del blues)
-  8: 100@
+  swing=66 8: 100@
   e*5 2g*5 e*5 c*5 2a*4 r |
   d*5 f*5 2a*5 f*5 d*5 2c*5 |
   a*4 c*5 d*5 d#*5 2e*5 e*5 r |
@@ -165,32 +197,43 @@ Piano:
   a*5 c*6 2d*6 c*6 a*5 2f#*5 |
   e*5 g*5 a*5 c*6 4e*6 |
   2b*5 g#*5 e*5 d*5 b*4 2e*4 |
+
+Box Piano "Coro 3" |112:
   // coro 3: di nuovo il compagnamento
-  %CompChorus
+  swing=66 8: 100@ %CompChorus
+
+Box Piano "Coro 4" |160:
   // coro 4
-  %CompChorus
+  swing=66 8: 100@ %CompChorus
+
+Box Piano "Coda" |208:
   // coda: gli ultimi due accordi, il secondo con la corona
-  4: 80@ r A7! r A7! |
+  swing=66 8: 100@ 4: 80@ r A7! r A7! |
   1: 90@ A7$fermata |
 
 Trumpet:
+
+Box Trumpet "Inizio" |0:
   swing=66
   4%Rest
+
+Box Trumpet "Coro 1" |16:
   // coro 1: il tema
-  %Head
-  // cori 2 e 3: la tromba tace per lasciare spazio agli assoli
-  24%Rest
+  swing=66 %Head
+
+Box Trumpet "Coro 4" |160:
   // coro 4: il tema, con piu' forza
-  100@ %Head
+  swing=66 100@ %Head
+
+Box Trumpet "Coda" |208:
   // coda
-  4: 4r | 4: 4r |
+  swing=66 100@ 4: 4r | 4: 4r |
 
 Guitar 2:
-  swing=66
-  // introduzione e primi due cori: la seconda chitarra aspetta
-  28%Rest
+
+Box Guitar 2 "Coro 3" |112:
   // coro 3: assolo, con scivolate (nota>nota) e bending (bend=)
-  8: 100@
+  swing=66 8: 100@
   2a*4>c*5 c*5 e*5 2e*5 2r |
   d*5 f*5 a*5 f*5 2d*5 2c*5 |
   a*4 c*5 e*5 g*5 bend=0 >> 4a*5 bend=1 bend=0 |

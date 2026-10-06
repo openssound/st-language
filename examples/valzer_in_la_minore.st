@@ -173,25 +173,33 @@ Pattern %Perc:
 // ================================================================ tracce
 
 Violino:
+
+Box Violino "Inizio" |0:
   pan=0.2
-  // introduzione
-  4%Rest
+
+Box Violino "Prima parte" |12:
   // prima parte, con il ritornello e le due caselle
   $"con grazia"
   |: %MelA
   |1. %MelAend1 :|
   |2. %MelAend2 ||
+
+Box Violino "Seconda parte" |60:
   // seconda parte: ottave relative
   vol=100
   |: %MelB
   |1. %MelBend1 :|
   |2. %MelBend2 ||
+
+Box Violino "Ultima volta" |108:
   // ultima volta, con il mordente sulla prima nota e il trillo sul finale
   vol=110
   %MelA
   8: 88@ a*5$mordent c*6 e*6 3a*5$tr |
+
+Box Violino "Coda" |132:
   // coda: il riverbero aumenta mentre il valzer rallenta
-  rev=30 >>
+  8: 88@ rev=30 >>
   8: 80@ f*6 e*6 d*6 c*6 2a*5 |
   g#*5 b*5 d*6 b*5 2g#*5 |
   a*5 c*6 e*6 3a*5 |
@@ -199,23 +207,32 @@ Violino:
   4: 3a*5$fermata |
 
 Fisarmonica:
+
+Box Fisarmonica "Introduzione" |0:
   // introduzione: la fisarmonica sola
   4: 66@ Am'2. | E7'2. | Am'2. | E7'2. |
+
+Box Fisarmonica "Prima parte" |12:
   // prima parte: accordi tenuti
-  |: %PadA
+  4: 66@ |: %PadA
   |1. %PadAend1 :|
   |2. %PadAend2 ||
+
+Box Fisarmonica "Seconda parte" |60:
   // seconda parte: arpeggio e basso tenuto, in due voci
-  |: %ArpB
+  4: 66@ |: %ArpB
   |1. %ArpBend1 :|
   |2. %ArpBend2 ||
+
+Box Fisarmonica "Ultima volta e coda" |108:
   // ultima volta e coda
-  %PadA %PadAend2
+  4: 66@ %PadA %PadAend2
   4: 56@ Dm'2. | E7'2. | Am'2. | Am'2.$fermata |
 
 Guitar 1:
+
+Box Guitar 1 "Introduzione" |12:
   // introduzione
-  4%Rest
   pan=-0.4
   |: %GtA
   |1. %GtAend1 :|
@@ -230,6 +247,8 @@ Guitar 1:
   4: Am'2.$fermata |
 
 Bass:
+
+Box Bass "Inizio" |0:
   4: 80@ a*1 r e*2 | e*2 r b*1 | a*1 r e*2 | e*2 r b*1 |
   |: %BsA
   |1. %BsAend1 :|
@@ -242,8 +261,9 @@ Bass:
   4: a*1'2.$fermata |
 
 Traccia Percussioni [Drums]:
+
+Box Percussioni "Introduzione" |12:
   // introduzione: soltanto un colpo ogni battuta
-  4%Rest
   vol=80
   |: 7%Perc
   |1. %Perc :|
@@ -254,6 +274,8 @@ Traccia Percussioni [Drums]:
   |2. %Perc ||
   vol=100
   8%Perc
+
+Box Percussioni "Coda" |132:
   // coda: il rallentando
   100@ tempo=144 <<
   4: [kick tambourine] tambourine tambourine |

@@ -215,37 +215,56 @@ Pattern %DrumsBridge:
 // ================================================================ tracce
 
 Voce:
-  // introduzione
-  4%Rest
+
+Box Voce "Strofa 1" |16:
   // strofa 1
   $"sottovoce" %VerseM "La not- te scen- de sul- le stra- de e tu mi guar- di qui sem- pre non ser- ve dir- ci più il cuo- re sa la se- ra è no- stra o- ra"
+
+Box Voce "Ritornello 1" |48:
   // ritornello 1
   %ChorusM "Re- sta an- co- ra un po' con me la not- te è lun- ga e ti vo- glio an- cor non c'è fret- ta que- sta se- ra re- sta con me fi- no al mat- ti- no"
+
+Box Voce "Strofa 2" |80:
   // strofa 2: la stessa musica, parole nuove
   %VerseM "Il tuo pro- fu- mo ri- ma- ne qui co- me un pen- sie- ro lie- ve il tem- po si fer- ma nei tuoi oc- chi ri- tro- vo la pa- ce con te"
+
+Box Voce "Ritornello 2" |112:
   // ritornello 2
   %ChorusM "Re- sta an- co- ra un po' con me la not- te è lun- ga e ti vo- glio an- cor non c'è fret- ta que- sta se- ra re- sta con me fi- no al mat- ti- no"
+
+Box Voce "Ponte" |144:
   // ponte: la nota lunga e' una scivolata di intonazione
   $"con anima" %BridgeM "Quan- te vol- te ti cer- ca- vo in mez- zo al ven- to ec- co il mon- do ta- ce qui sì ti pre- go non par- ti re- sta re- sta"
+
+Box Voce "Ritornello finale" |176:
   // ritornello finale, piu' forte
   vol=100 %ChorusM "Re- sta an- co- ra un po' con me la not- te è lun- ga e ti vo- glio an- cor non c'è fret- ta que- sta se- ra re- sta con me fi- no al mat- ti- no"
+
+Box Voce "Coda" |208:
   // coda
   %OutroM "Re- sta an- co- ra un po' con me sì"
 
 Rhodes:
+
+Box Rhodes "Inizio" |0:
   tune=-8
   %RhIntro %RhVerse %RhChorus %RhVerse %RhChorus
+
+Box Rhodes "Ponte" |144:
   // ponte
   %RhBridge
   %RhChorus
   %RhOutro
 
 Archi:
+
+Box Archi "Ritornello 1" |48:
   // entrano al primo ritornello
-  12%Rest
   %ArChorus
   8%Rest
   %ArChorus
+
+Box Archi "Ponte" |144:
   // ponte: il volume cresce per tutte le otto battute
   vol=45 >>
   %ArBridge
@@ -254,37 +273,47 @@ Archi:
   %ArOutro
 
 Guitar 1:
+
+Box Guitar 1 "Strofa 2" |80:
   // la chitarra entra alla seconda strofa
-  20%Rest
   vol=80 %GtVerse
   %GtChorus
   8%Rest
   vol=100 %GtChorus
+
+Box Guitar 1 "Coda" |208:
   // coda
   %GaA %GaB %GaE
   key=Eb 1: [e*3 g*3 b*3 d*4]$fermata |
 
 Bass:
+
+Box Bass "Groove" |0:
   // il basso suona un poco dopo il tempo
   shift=12
   2%Rest
+
+Box Bass "Introduzione" |8:
   // introduzione (ultime due battute)
-  key=Eb 4: 88@ 2a*1 a*1 e*2 | 2b*1 b*1 d*2 |
+  shift=12 key=Eb 4: 88@ 2a*1 a*1 e*2 | 2b*1 b*1 d*2 |
   %BsVerse %BsChorus %BsVerse %BsChorus
   %BsBridge
   %BsChorus
   %BsOutro
 
 Drums:
-  swing=60
+
+Box Drums "Groove" |0:
   // il rullante e' un po' indietro, come nelle ballate soul
-  shift=14
+  swing=60 shift=14
   2%Rest 2%DrIntro
   %DrumsVerse %DrumsChorus %DrumsVerse %DrumsChorus
   %DrumsBridge
   %DrumsChorus
+
+Box Drums "Coda" |208:
   // coda: il rallentando comincia sulla prima battuta
-  100@ tempo=66 <<
+  swing=60 shift=14 100@ tempo=66 <<
   8: [kick hihat] hihat [rimshot hihat] hihat [kick hihat] hihat [rimshot hihat] hihat |
   8: [kick hihat] hihat [rimshot hihat] hihat [kick hihat] hihat [rimshot hihat] hihat |
   8: [kick hihat] hihat [snare hihat] hihat [snare hihat] snare [snare hihat] hihat |

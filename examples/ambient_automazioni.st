@@ -193,23 +193,31 @@ Pad:
   tempo=50
 
 Piano:
-  4%Rest
+
+Box Piano "Inizio" |16:
   %PnA %PnA %PnB %PnA %PnB
+
+Box Piano "Ponte" |96:
   // ponte
   %PnB %PnB
   %PnA %PnB %PnA
   %PnEnd
 
 Traccia Glockenspiel [Glock]:
+
+Box Glockenspiel "Inizio" |0:
   pan=-0.6
   4%Rest
   %BellA %BellA %BellB
+
+Box Glockenspiel "Seconda parte" |128:
   // il glockenspiel tace nel mezzo del brano
-  16%Rest
   %BellA %BellB %BellA
   %BellEnd
 
 Traccia Eco [Glock]:
+
+Box Eco "Eco" |0:
   // la stessa traccia, 300 ms dopo, piu' piano e dall'altra parte
   pan=0.7
   shift=300
@@ -221,22 +229,28 @@ Traccia Eco [Glock]:
   %BellEnd
 
 Flauto:
+
+Box Flauto "Prima parte" |32:
   // le prime due sezioni e le ultime due sono senza flauto
-  8%Rest
   $"dolce" %FlP1
   %FlP2
   8%Rest
+
+Box Flauto "Di nuovo" |128:
   // di nuovo, un'ottava sopra, quando il tempo e' piu' veloce
   %FlP3
   8%Rest
 
 Archi:
-  16%Rest
+
+Box Archi "Sezione 5" |64:
   // sezione 5: crescendo di volume
   vol=40 >>
   %ArA
   vol=90
   %ArB
+
+Box Archi "Ponte" |96:
   // ponte: l'accordatura scende di 40 cent, come un nastro che rallenta
   tune=0 >>
   %ArB %ArB
@@ -247,7 +261,8 @@ Archi:
   %ArEnd
 
 Bass:
-  8%Rest
+
+Box Bass "Inizio" |32:
   %BsA %BsB %BsA %BsB
   %BsB %BsB
   %BsA %BsB %BsA

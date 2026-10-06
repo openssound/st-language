@@ -144,119 +144,153 @@ Pattern %Solo:
 // ================================================================ tracce
 
 Clavinet:
-  swing16=58
-  // introduzione
-  4%Rest
+
+Box Clavinet "Strofa 1" |16:
   // strofa 1
-  2%ClVerse4
+  swing16=58 2%ClVerse4
+
+Box Clavinet "Ritornello 1" |48:
   // ritornello 1: il clavinet scende di volume sotto i fiati
-  vol=70 2%ClChorus4
+  swing16=58 vol=70 2%ClChorus4
+
+Box Clavinet "Strofa 2" |80:
   // strofa 2
-  vol=100 2%ClVerse4
-  // stop
-  2%Rest
+  swing16=58 vol=100 2%ClVerse4
+
+Box Clavinet "Assolo" |120:
   // assolo: il clavinet accompagna piano
-  vol=60 %ClVerse4 %ClChorus4
+  swing16=58 vol=60 %ClVerse4 %ClChorus4
+
+Box Clavinet "Ritornello 2" |152:
   // ritornello 2
-  vol=100 2%ClChorus4
+  swing16=58 vol=100 2%ClChorus4
+
+Box Clavinet "Coda" |184:
   // coda
-  %ClE1 %ClE2 %ClE1
+  swing16=58 %ClE1 %ClE2 %ClE1
   16: 105@ [e*4 g*4 b*4 e*5]$accent 15r |
 
 Guitar 1:
-  swing16=58
-  shift=5
+
+Box Guitar 1 "Introduzione" |8:
   // introduzione: la chitarra entra alla terza battuta
-  2%Rest %GtEm %GtEm
+  swing16=58 shift=5 %GtEm %GtEm
+
+Box Guitar 1 "Strofa 1" |16:
   // strofa 1: il wah si apre e si chiude
-  cc74=30 >>
+  swing16=58 shift=5 cc74=30 >>
   %GtVerse4
   cc74=110 >>
   %GtVerse4
   cc74=30
+
+Box Guitar 1 "Ritornello 1" |48:
   // ritornello 1
-  2%GtChorus4
+  swing16=58 shift=5 2%GtChorus4
+
+Box Guitar 1 "Strofa 2" |80:
   // strofa 2
-  cc74=30 >>
+  swing16=58 shift=5 cc74=30 >>
   %GtVerse4
   cc74=110 >>
   %GtVerse4
   cc74=70
-  // stop
-  2%Rest
+
+Box Guitar 1 "Assolo" |120:
   // assolo
-  %GtVerse4 %GtChorus4
+  swing16=58 shift=5 %GtVerse4 %GtChorus4
+
+Box Guitar 1 "Ritornello 2 e coda" |152:
   // ritornello 2 e coda
-  2%GtChorus4
+  swing16=58 shift=5 2%GtChorus4
   %GtEm %GtEm %GtEm
   16: 105@ Em7!$accent 15r |
 
 Bass:
-  swing16=58
+
+Box Bass "Groove" |0:
   // il basso suona un po' prima del tempo
-  shift=-8
+  swing16=58 shift=-8
   %BsVerse4
   2%BsVerse4
   2%BsChorus4
   2%BsVerse4
+
+Box Bass "Stop" |112:
   // stop
-  16: 110@ e*2 15r |
+  swing16=58 shift=-8 16: 110@ e*2 15r |
   16: 100@ e*2 7r e*2 r e*2 r e*2 g*2 a*2 b*2 |
+
+Box Bass "Assolo" |120:
   // assolo
-  %BsE1 %BsE2 %BsA9 %BsE1 %BsC9 %BsB7 %BsE1 %BsE2
+  swing16=58 shift=-8 16: 100@ %BsE1 %BsE2 %BsA9 %BsE1 %BsC9 %BsB7 %BsE1 %BsE2
   2%BsChorus4
+
+Box Bass "Coda" |184:
   // coda
-  %BsE1 %BsE2 %BsE1
+  swing16=58 shift=-8 16: 100@ %BsE1 %BsE2 %BsE1
   16: 110@ e*2 15r |
 
 Fiati:
-  swing16=58
-  // introduzione, strofa 1 (12 battute)
-  12%Rest
+
+Box Fiati "Ritornello 1" |48:
   // ritornello 1
-  2%HnChorus
-  // strofa 2
-  8%Rest
+  swing16=58 2%HnChorus
+
+Box Fiati "Stop" |112:
   // stop: tutti insieme
-  16: 110@ Em7!$accent 15r |
+  swing16=58 16: 110@ Em7!$accent 15r |
   16: 105@ Em7!$accent 7r Em7! r Em7! 5r |
-  // assolo
-  8%Rest
+
+Box Fiati "Ritornello 2" |152:
   // ritornello 2
-  2%HnChorus
+  swing16=58 16: 105@ 2%HnChorus
+
+Box Fiati "Coda" |184:
   // coda
-  16: 105@ Em7!$accent 2r Em7! 2r Em7! 9r |
+  swing16=58 16: 105@ 16: 105@ Em7!$accent 2r Em7! 2r Em7! 9r |
   16: 105@ Em7!$accent 2r Em7! 2r Em7! 9r |
   16r |
   16: 110@ Em7!$accent 15r |
 
 Trumpet:
-  swing16=58
+
+Box Trumpet "Fino all'assolo" |120:
   // fino all'assolo
-  30%Rest
-  $"assolo" %Solo
+  swing16=58 $"assolo" %Solo
+
+Box Trumpet "Ritornello 2" |152:
   // ritornello 2: note lunghe sopra i fiati
-  1: 92@ bb*5 | a*5 | g*5 | g*5 | bb*5 | a*5 | b*5 | e*6 |
-  // coda
-  4%Rest
+  swing16=58 1: 92@ bb*5 | a*5 | g*5 | g*5 | bb*5 | a*5 | b*5 | e*6 |
 
 Drums:
-  swing16=58
+
+Box Drums "Introduzione" |0:
   // introduzione
-  %DrFunk4
+  swing16=58 %DrFunk4
+
+Box Drums "Strofa 1" |16:
   // strofa 1, ritornello 1, strofa 2
-  %DrFunk4 %DrFunk4F
+  swing16=58 %DrFunk4 %DrFunk4F
   2%DrChorus4
   %DrFunk4 %DrFunk4F
+
+Box Drums "Stop" |112:
   // stop: i colpi in battere e il rullo
-  16: 110@ [kick crash] 3r 100@ snare 3r 100@ kick 3r 105@ snare 3r |
+  swing16=58 16: 110@ [kick crash] 3r 100@ snare 3r 100@ kick 3r 105@ snare 3r |
   16: 100@ kick r r r snare r r r kick r snare r tom1 tom2 floor [kick crash] |
+
+Box Drums "Assolo" |120:
   // assolo
-  %DrFunk4 %DrFunk4F
+  swing16=58 16: 100@ %DrFunk4 %DrFunk4F
+
+Box Drums "Ritornello 2" |152:
   // ritornello 2
-  2%DrChorus4
+  swing16=58 16: 100@ 2%DrChorus4
+
+Box Drums "Coda" |184:
   // coda
-  %DrFunk1 %DrFunk2 %DrFill
+  swing16=58 16: 100@ %DrFunk1 %DrFunk2 %DrFill
   16: 110@ [kick crash] 15r |
 
 // ================================================================ mixer

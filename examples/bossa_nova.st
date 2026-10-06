@@ -227,14 +227,15 @@ Pattern %Shaker:
 // ================================================================ tracce
 
 Flauto:
-  4%Rest
+
+Box Flauto "Tema" |16:
   // tema: A, A', B, A
   $"dolce" %HeadA %HeadEnd1
   %HeadA %HeadEnd2
   %HeadB
   %HeadA %HeadEnd1
-  // assolo di pianoforte: il flauto tace
-  16%Rest
+
+Box Flauto "Tema di nuovo (A) e coda" |208:
   // tema di nuovo (A) e coda
   vol=100 %HeadA %HeadEnd3
   key=Am 8: 80@
@@ -243,15 +244,23 @@ Flauto:
   2%Rest
 
 Nylon:
+
+Box Nylon "Inizio" |0:
   vol=80 %GtrIntro
+
+Box Nylon "Tema" |16:
   // tema: la chitarra con il ritmo 3-3-2
   %GtrA7 %GtrA8
   %GtrA7 %GtrA8
   %GtrB
   %GtrA7 %GtrA8End
+
+Box Nylon "Assolo" |144:
   // assolo: la chitarra accompagna
   vol=95 %GtrB
   %GtrA7 %GtrA8End
+
+Box Nylon "Tema e coda" |208:
   // tema e coda
   vol=80 %GtrA7 %GtrA8End
   key=Am 8: 66@
@@ -261,19 +270,23 @@ Nylon:
   1: Am7$fermata |
 
 Piano:
-  // introduzione: il pianoforte tace
-  4%Rest
+
+Box Piano "Tema" |16:
   // tema: accordi lunghi e morbidi
   $"dolce" %PnA7 %PnA8
   %PnA7 %PnA8
   %PnB
   %PnA7 %PnA8End
+
+Box Piano "Assolo" |144:
   // assolo: la mano destra, il pan si sposta da sinistra a destra
   pan=-0.5 >>
   $"assolo" %SoloB
   pan=0.5
   %SoloA
   pan=0
+
+Box Piano "Tema e coda" |208:
   // tema e coda
   %PnA7 %PnA8End
   key=Am 4: 55@ Dm7.drop2'1 |
@@ -282,32 +295,50 @@ Piano:
   Am7.drop2'1$fermata |
 
 Bass:
-  2%Rest %BassIntro
+
+Box Bass "Inizio" |8:
+  %BassIntro
+
+Box Bass "Tema" |16:
   // tema
   %BassA7 %BsA7
   %BassA7 %BsA7
   %BassB
   %BassA7 %BsAm
+
+Box Bass "Assolo" |144:
   // assolo
   %BassB
   %BassA7 %BsAm
+
+Box Bass "Tema e coda" |208:
   // tema e coda
   %BassA7 %BsAm
   %BsDm %BsBE %BsAm
   1: 80@ a*1$fermata |
 
 Drums:
+
+Box Drums "Introduzione" |8:
   // introduzione: due battute di pausa, poi il groove
-  2%Rest %BossaA %BossaB
+  %BossaA %BossaB
+
+Box Drums "Tema" |16:
   // tema: sul cerchio (hihat) e sul ride per il ponte
   %Drums8 %Drums8
   %Drums8Ride
   %Drums8
+
+Box Drums "Assolo" |144:
   // assolo
   %Drums8Ride
   %Drums8
+
+Box Drums "Tema" |208:
   // tema
   %Drums8
+
+Box Drums "Coda" |240:
   // coda: il rallentando comincia sulla prima battuta
   100@ tempo=126 <<
   8: [kick hihat] hihat hihat [rimshot hihat] [kick hihat] hihat [rimshot hihat] hihat |
@@ -317,17 +348,26 @@ Drums:
   tempo=70
 
 Traccia Shaker [Drums]:
-  4%Rest
+
+Box Shaker "Tema" |16:
   // tema: A e A'
   vol=70 16%Shaker
+
+Box Shaker "Ponte" |80:
   // ponte: il volume cresce per tutte e otto le battute
   vol=60 >>
   8%Shaker
   vol=95
+
+Box Shaker "Ultima A del tema" |112:
   // ultima A del tema
   vol=70 8%Shaker
+
+Box Shaker "Assolo di pianoforte" |144:
   // assolo di pianoforte
   vol=90 16%Shaker
+
+Box Shaker "Tema finale e coda" |208:
   // tema finale e coda
   vol=70 12%Shaker
 
