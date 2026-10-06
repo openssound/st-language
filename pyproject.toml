@@ -7,7 +7,7 @@
 #     pip install .                 # oppure dalla cartella del repository
 #     st-language check brano.st
 #
-# Come si pubblica una versione: docs/PUBBLICARE_SU_PYPI.md.
+# Come si pubblica una versione: .github/workflows/publish-pypi.yml (tag st-language-vX.Y.Z).
 
 [build-system]
 requires = ["setuptools>=77"]

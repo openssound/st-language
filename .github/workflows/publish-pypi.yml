@@ -3,7 +3,7 @@ name: Publish st-language
 # Pubblica la libreria ST-language (st_language/, pyproject.toml) su PyPI.
 # Si usa il "trusted publishing" di PyPI: niente password o token nel
 # repository, e' PyPI a fidarsi di questo workflow (vedi
-# docs/PUBBLICARE_SU_PYPI.md per la configurazione, da fare una volta).
+# le impostazioni del progetto su pypi.org, da fare una volta).
 #
 #   - tag  st-language-vX.Y.Z   -> prova e pubblica su PyPI, poi allega lo sdist
 #                                  e la wheel alla release di GitHub
