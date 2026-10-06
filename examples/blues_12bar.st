@@ -1,35 +1,227 @@
+// Blues in La: introduzione, quattro cori da 12 battute e coda.
+//
+// Un brano intero costruito con i pattern: ogni "coro" (le 12 battute del
+// blues) e' un pattern fatto di pattern di una battuta, e le tracce lo
+// richiamano. Ogni coro cambia carattere:
+//   1. il tema, alla tromba;      2. l'assolo di pianoforte;
+//   3. l'assolo di chitarra, con scivolate e bending;      4. il tema, di nuovo,
+// poi la coda con il rallentando e la corona sull'ultimo accordo.
+// Lo swing (swing=66) da' il "terzinato" del blues alle crome scritte dritte.
+
 Tempo: 96 BPM
 Metrica: 4/4
+Tonalita: A
 
-Pattern %ShuffleGtr:
-  8T: 100@ [e*3 a*3] r [e*3 a*3] r [e*3 a*3] r [e*3 a*3] r
+// ---------------------------------------------------------------- batteria
 
-Pattern %ShuffleGtrIV:
-  8T: 100@ [a*3 d*4] r [a*3 d*4] r [a*3 d*4] r [a*3 d*4] r
+Pattern %Click:
+  4: 70@ rimshot r rimshot hihat_pedal |
 
-Pattern %ShuffleGtrV:
-  8T: 100@ [b*3 e*4] r [b*3 e*4] r [b*3 e*4] r [b*3 e*4] r
+Pattern %Shuffle:
+  8: 100@ [kick hihat] 60@ hihat 100@ [snare hihat] 60@ hihat 100@ [kick hihat] 60@ hihat 100@ [snare hihat] 60@ [kick hihat] |
 
-Pattern %WalkBassI:
-  8T: 90@ e*2 r g#*2 r a*2 r b*2 r
+Pattern %ShuffleCrash:
+  8: 110@ [kick crash] 60@ hihat 100@ [snare hihat] 60@ hihat 100@ [kick hihat] 60@ hihat 100@ [snare hihat] 60@ [kick hihat] |
 
-Pattern %WalkBassIV:
-  8T: 90@ a*2 r c*3 r d*3 r e*3 r
+Pattern %ShuffleSoft:
+  8: 75@ [kick ride] 45@ ride 70@ [rimshot ride] 45@ ride 75@ [kick ride] 45@ ride 70@ [rimshot ride] 45@ ride |
 
-Pattern %WalkBassV:
-  8T: 90@ b*2 r d#*3 r e*3 r f#*3 r
+Pattern %FillA:
+  8: 100@ [kick hihat] 60@ hihat 100@ [snare hihat] 60@ hihat 95@ snare snare 105@ tom1 floor |
 
-Pattern %ShuffleDrums:
-  8T: 90@ [kick hihat] hihat [snare hihat] hihat 70@ [kick hihat] hihat [snare hihat] hihat
+Pattern %FillB:
+  8: 100@ [kick hihat] 100@ snare 105@ snare 100@ tom1 tom2 floor 110@ [kick floor] 90@ snare |
 
-Guitar 1:
-  %ShuffleGtr %ShuffleGtr %ShuffleGtr %ShuffleGtr %ShuffleGtrIV %ShuffleGtrIV %ShuffleGtr %ShuffleGtr %ShuffleGtrV %ShuffleGtrIV %ShuffleGtr %ShuffleGtr
+Pattern %DrumsChorus:
+  %ShuffleCrash %Shuffle %Shuffle %Shuffle %Shuffle %Shuffle %Shuffle %FillA %Shuffle %Shuffle %Shuffle %FillB
 
-Bass:
-  %WalkBassI %WalkBassI %WalkBassI %WalkBassI %WalkBassIV %WalkBassIV %WalkBassI %WalkBassI %WalkBassV %WalkBassIV %WalkBassI %WalkBassI
+Pattern %DrumsChorusSoft:
+  %ShuffleSoft %ShuffleSoft %ShuffleSoft %ShuffleSoft %ShuffleSoft %ShuffleSoft %ShuffleSoft %FillA %ShuffleSoft %ShuffleSoft %ShuffleSoft %FillB
 
-Piano:
-  16: 80@ E7 r r r r r r r E7 r r r r r r r 16: A7 r r r r r r r E7 r r r r r r r 16: B7 r r r r A7 r r r r r r E7 r r r r
+// ---------------------------------------------------------------- basso (camminato)
+
+Pattern %BassA1:
+  4: 92@ a*1 c#*2 e*2 f#*2 |
+
+Pattern %BassA2:
+  4: 88@ a*1 e*2 g*2 e*2 |
+
+Pattern %BassD1:
+  4: 92@ d*2 f#*2 a*2 b*2 |
+
+Pattern %BassD2:
+  4: 88@ d*2 a*2 c*3 a*2 |
+
+Pattern %BassE1:
+  4: 92@ e*2 g#*2 b*2 c#*3 |
+
+Pattern %BassTurn:
+  4: 95@ e*2 d*2 c#*2 b*1 |
+
+Pattern %BassChorus:
+  %BassA1 %BassD1 %BassA2 %BassA1 %BassD2 %BassD1 %BassA2 %BassA1 %BassE1 %BassD2 %BassA1 %BassTurn
+
+// ---------------------------------------------------------------- chitarra ritmica (shuffle 1-5, 1-6, 1-b7)
+
+Pattern %GA:
+  8: 88@ [a*2 e*3] [a*2 e*3] [a*2 f#*3] [a*2 f#*3] [a*2 g*3] [a*2 g*3] [a*2 f#*3] [a*2 f#*3] |
+
+Pattern %GD:
+  8: 88@ [d*3 a*3] [d*3 a*3] [d*3 b*3] [d*3 b*3] [d*3 c*4] [d*3 c*4] [d*3 b*3] [d*3 b*3] |
+
+Pattern %GE:
+  8: 88@ [e*3 b*3] [e*3 b*3] [e*3 c#*4] [e*3 c#*4] [e*3 d*4] [e*3 d*4] [e*3 c#*4] [e*3 c#*4] |
+
+Pattern %GChorus:
+  %GA %GD %GA %GA %GD %GD %GA %GA %GE %GD %GA %GE
+
+// ---------------------------------------------------------------- pianoforte (accordi sul 2 e sul 4)
+
+Pattern %CompA:
+  4: 78@ r A7! r A7! |
+
+Pattern %CompD:
+  4: 78@ r D7! r D7! |
+
+Pattern %CompE:
+  4: 78@ r E7! r E7! |
+
+Pattern %CompChorus:
+  %CompA %CompD %CompA %CompA %CompD %CompD %CompA %CompA %CompE %CompD %CompA %CompE
+
+// ---------------------------------------------------------------- tromba: il tema (dialogo con la chitarra)
+
+Pattern %Rest:
+  4: 4r |
+
+Pattern %Head:
+  8: 96@ r e*4 g*4 a*4 4a*4 | g*4 a*4 2c*5 c*5 a*4 2g*4 |
+  8r |
+  8r |
+  r a*4 c*5 d*5 4d*5 | c*5 d*5 2f*5 f*5 d*5 2c*5 |
+  r a*4 c*5 e*5 4e*5 |
+  8r |
+  b*4 d*5 2e*5 d*5 b*4 2g#*4 | a*4 c*5 2d*5 c*5 a*4 2f#*4 |
+  e*4 g*4 a*4 c*5 4a*4 |
+  4r b*4 g#*4 e*4 d*4 |
+
+// ================================================================ tracce
 
 Drums:
-  %ShuffleDrums %ShuffleDrums %ShuffleDrums %ShuffleDrums %ShuffleDrums %ShuffleDrums %ShuffleDrums %ShuffleDrums %ShuffleDrums %ShuffleDrums %ShuffleDrums %ShuffleDrums
+  swing=66
+  // introduzione: il click, poi il groove entra con il rullo
+  2%Click %Shuffle %FillA
+  // coro 1: il tema
+  %DrumsChorus
+  // coro 2: assolo di pianoforte, la batteria suona piano sul ride
+  %DrumsChorusSoft
+  // coro 3: assolo di chitarra, tutta la forza
+  %DrumsChorus
+  // coro 4: il tema, e la coda con il rallentando
+  %DrumsChorus
+  // il rallentando va chiuso prima di un nuovo cambio di velocity: qui non ce ne sono
+  100@ tempo=96 <<
+  8: [kick hihat] hihat [snare hihat] hihat [kick hihat] hihat [snare hihat] [kick hihat] |
+  [kick crash] 7r |
+  tempo=62
+
+Bass:
+  2%Rest %BassA1 %BassE1
+  4%BassChorus
+  // coda
+  4: 92@ a*1 c#*2 e*2 f#*2 | 4: 2a*1 2r |
+
+Guitar 1:
+  swing=66
+  2%Rest %GA %GE
+  // coro 1: ritmica piena
+  %GChorus
+  // coro 2: sotto l'assolo di pianoforte, il volume scende
+  vol=62 %GChorus
+  // coro 3: torna a pieno volume per l'assolo
+  vol=100 %GChorus
+  // coro 4
+  %GChorus
+  // coda
+  %GA 8: [a*2 e*3 a*3]'1 |
+
+Piano:
+  swing=66
+  // introduzione: I - IV - I - V
+  %CompA %CompD %CompA %CompE
+  // coro 1: accordi sul 2 e sul 4
+  %CompChorus
+  // coro 2: assolo (la mano destra, sul giro del blues)
+  8: 100@
+  e*5 2g*5 e*5 c*5 2a*4 r |
+  d*5 f*5 2a*5 f*5 d*5 2c*5 |
+  a*4 c*5 d*5 d#*5 2e*5 e*5 r |
+  4e*5 g*5 e*5 2c*5 |
+  a*5 2f*5 d*5 2c*5 a*4 r |
+  d*5 f*5 a*5 c*6 2a*5 f*5 r |
+  e*5 e*5 g*5 a*5 2c*6 a*5 e*5 |
+  4a*5 2e*5 c*5 a*4 |
+  b*5 d*6 2e*6 d*6 b*5 2g#*5 |
+  a*5 c*6 2d*6 c*6 a*5 2f#*5 |
+  e*5 g*5 a*5 c*6 4e*6 |
+  2b*5 g#*5 e*5 d*5 b*4 2e*4 |
+  // coro 3: di nuovo il compagnamento
+  %CompChorus
+  // coro 4
+  %CompChorus
+  // coda: gli ultimi due accordi, il secondo con la corona
+  4: 80@ r A7! r A7! |
+  1: 90@ A7$fermata |
+
+Trumpet:
+  swing=66
+  4%Rest
+  // coro 1: il tema
+  %Head
+  // cori 2 e 3: la tromba tace per lasciare spazio agli assoli
+  24%Rest
+  // coro 4: il tema, con piu' forza
+  100@ %Head
+  // coda
+  4: 4r | 4: 4r |
+
+Guitar 2:
+  swing=66
+  // introduzione e primi due cori: la seconda chitarra aspetta
+  28%Rest
+  // coro 3: assolo, con scivolate (nota>nota) e bending (bend=)
+  8: 100@
+  2a*4>c*5 c*5 e*5 2e*5 2r |
+  d*5 f*5 a*5 f*5 2d*5 2c*5 |
+  a*4 c*5 e*5 g*5 bend=0 >> 4a*5 bend=1 bend=0 |
+  2e*5>g*5 e*5 c*5 2a*4 2r |
+  4d*5 f*5 a*5 2c*6 |
+  a*5 f*5 d*5 f*5 2a*5 2r |
+  e*5 a*5 c*6 a*5 2e*5 2c*5 |
+  4a*5 2g*5 2e*5 |
+  b*4 d*5 e*5 g#*5 bend=0 >> 4b*5 bend=1 bend=0 |
+  a*5 f#*5 d*5 f#*5 2a*5 2f#*5 |
+  e*5 g*5 a*5 c*6 2a*5 2e*5 |
+  2b*4 g#*4 e*4 4e*4 |
+  12%Rest
+  4: 4r | 4: 4r |
+
+// ================================================================ mixer
+
+Mixer Piano:
+  volume: 88 pan: -0.3 mute: no solo: no reverb: 18
+
+Mixer Guitar 1:
+  volume: 80 pan: -0.5 mute: no solo: no
+
+Mixer Guitar 2:
+  volume: 92 pan: 0.45 mute: no solo: no reverb: 30
+
+Mixer Bass:
+  volume: 100 pan: 0 mute: no solo: no
+
+Mixer Trumpet:
+  volume: 92 pan: 0.25 mute: no solo: no reverb: 25
+
+Mixer Drums:
+  volume: 90 pan: 0 mute: no solo: no reverb: 12
