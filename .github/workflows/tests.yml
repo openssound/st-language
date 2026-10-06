@@ -1,0 +1,80 @@
+name: Tests
+
+# Prova la libreria ST-language da sola: si costruisce il pacchetto, lo si
+# installa e si eseguono la suite di conformita' e i comandi da terminale con
+# la libreria INSTALLATA (docs/spec/conformance/run_installed.py), sulle
+# versioni di Python che dichiara (3.9-3.13) e su Windows e macOS: e' quello
+# che riceve chi fa pip install st-language.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  library:
+    name: libreria (python ${{ matrix.python }}, ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, python: "3.9"}
+          - {os: ubuntu-24.04, python: "3.10"}
+          - {os: ubuntu-24.04, python: "3.11"}
+          - {os: ubuntu-24.04, python: "3.12"}
+          - {os: ubuntu-24.04, python: "3.13"}
+          - {os: windows-2025, python: "3.12"}
+          - {os: macos-15, python: "3.12"}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - name: Checkout codice
+        uses: actions/checkout@v7
+
+      - name: Imposta Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Costruisci il pacchetto
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          twine check --strict dist/*
+
+      # Lo sdist e' la "sorgente" della libreria: ci devono essere la
+      # specifica, la suite di conformita' e gli esempi, non l'applicazione.
+      - name: Controlla il contenuto dello sdist
+        shell: bash
+        run: |
+          python - <<'PY'
+          import glob, tarfile
+          names = [n.split("/", 1)[1] for n in tarfile.open(glob.glob("dist/*.tar.gz")[0]).getnames() if "/" in n]
+          for needed in ("st_language/notation.py", "docs/spec/ST-language.md", "docs/spec/ST-language.it.md",
+                         "docs/spec/conformance/cases.json", "examples/blues_12bar.st", "LICENSE"):
+              assert needed in names, f"manca nello sdist: {needed}"
+          app = [n for n in names if n.startswith(("core/", "gui/", "tests/", "main.py"))]
+          assert not app, f"nello sdist c'e' l'applicazione: {app[:5]}"
+          print(len(names), "file nello sdist: ok")
+          PY
+
+      - name: Installa la wheel e prova la libreria installata
+        shell: bash
+        run: |
+          python -m pip install dist/*.whl
+          python docs/spec/conformance/run_installed.py
+
+      # I comandi da terminale lontano dal repository, cosi' non trovano il
+      # codice sorgente per sbaglio.
+      - name: Prova i comandi da terminale
+        shell: bash
+        run: |
+          cp examples/blues_12bar.st "$RUNNER_TEMP/brano.st"
+          cd "$RUNNER_TEMP"
+          st-language check brano.st
+          st2mid brano.st -o brano.mid
+          st2musicxml brano.st
+          echo "4: c d e f | 2g 2g |" | stcheck -
+          test -s brano.mid && test -s brano.musicxml
