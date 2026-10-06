@@ -1,0 +1,7 @@
+[console_scripts]
+st-language = st_language.cli:main
+st2abc = st_language.cli:abc_main
+st2mid = st_language.cli:midi_main
+st2mtxt = st_language.cli:mtxt_main
+st2musicxml = st_language.cli:musicxml_main
+stcheck = st_language.cli:check_main
