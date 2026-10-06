@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.4** · Implementazione di riferimento: la libreria Python
+**Versione 2.5** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -110,7 +110,8 @@ La grammatica di ogni tipo di token (EBNF; `digit` e' 0-9, `letter` e'
 A-Z o a-z, `word` sono una o piu' lettere, cifre o `_`):
 
 ```ebnf
-token        = grid | velocity | tempo | ramp | control | swing | shift
+token        = grid | velocity | tempo | ramp | control | swing | shift | anchor
+             | transpose
              | pitch-mode | key-mode | sustain
              | bar-check | repeat | text | lyric | pattern-ref | midi-ref
              | group | voices | sounding ;
@@ -126,6 +127,8 @@ control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" | "bend"
              | "tune" | "cc" number ;                         (* vol=80  cc74=30 *)
 swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
 shift        = "shift=" [ "-" ] number ;                        (* shift=-15 *)
+anchor       = "bar=" number ;                                  (* bar=29 *)
+transpose    = "transpose=" [ "-" ] number ;                    (* transpose=-3 *)
 pitch-mode   = "rel:" | "abs:" ;
 key-mode     = "key=" ( root [ "m" ] | "off" ) ;                (* key=G  key=Dm *)
 sustain      = "SON" | "SOFF" ;
@@ -133,7 +136,7 @@ bar-check    = "|" ;
 repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| |1. *)
 text         = '$"' { any character except '"' } '"' ;          (* $"rit." *)
 lyric        = '"' { qualunque carattere tranne '"' } '"' ;
-pattern-ref  = [ number ] "%" word ;                            (* %Riff  3%Riff *)
+pattern-ref  = [ number ] "%" word [ ( "+" | "-" ) number ] ;      (* %Riff  3%Riff  %Riff+7 *)
 midi-ref     = [ number ] "&" ( word | "/" | "-" ) { word | "/" | "-" } ;
 group        = [ number ] "(" { token } ")" ;                   (* 4(c d) *)
 voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } *)
@@ -206,6 +209,7 @@ tempo corrente, che parte da 0) e uno **stato corrente**:
 | valori delle automazioni | `vol` 100, `expr` 127, `pan` 0, `mod` 0, `rev` 0, `cho` 0, `bend` 0, `tune` 0, `ccN` 0 | comandi di automazione (sezione 7.5) |
 | swing | spento | comandi di swing (sezione 7.6) |
 | spostamento | 0 ms | `shift=` (sezione 7.7) |
+| trasposizione | 0 semitoni | `transpose=`, `%Nome+N` (sezione 7.8) |
 | modo delle altezze | `abs:` | `rel:` / `abs:` (sezione 5) |
 | tonalita' | nessuna (`key=off`) | `key=` (sezione 5) |
 | ottava di default | quella dello strumento (4 se manca) | — |
@@ -542,6 +546,35 @@ basso che spinge in avanti) e per allineare una parte a una
 registrazione; per i ritmi scritti si usano valori di nota, gruppi
 irregolari e swing.
 
+### 7.8 Trasposizione
+
+`transpose=N` (N intero da −60 a 60) fa suonare **note, accordi, slide e
+blocchi** che seguono N semitoni sopra (N > 0) o sotto (N < 0) rispetto a
+come sono scritti; `transpose=0` torna all'altezza scritta. Gli eventi
+portano l'altezza trasposta: `letter` e `octave` di una nota, la
+fondamentale (`symbol`), `bass` e `octave` di un accordo, i punti di uno
+slide e gli elementi di un blocco. Le percussioni, le pause e tutto cio'
+che non e' un'altezza non cambiano. Le ottave relative (`rel:`, sezione 5)
+si leggono sulle note scritte e la trasposizione si applica dopo; un
+blocco di voci eredita la trasposizione in vigore.
+
+**Scrittura.** Se c'e' una tonalita' (`key=K`), le note trasposte si
+scrivono nella tonalita' trasposta: `key=G` e `transpose=2` danno La
+maggiore, quindi un fa diesis scritto diventa sol diesis e un sol diventa
+la; una tonalita' con i bemolli da' bemolli. Senza tonalita', una nota
+trasposta prende un bemolle se la nota scritta lo aveva e un diesis negli
+altri casi. Fondamentale e basso di un accordo seguono la stessa regola.
+Un accordo la cui fondamentale scavalca il Do cambia ottava (`B` +1 e' `C`
+un'ottava sopra): una trasposizione di 12 alza quindi ogni accordo di
+un'ottava.
+
+Una nota o un accordo che la trasposizione porta fuori da MIDI 0-127, o un
+N fuori da −60..60, e' un errore.
+
+**Pattern.** `%Nome+N` e `%Nome-N` (e `K%Nome+N`) leggono il pattern
+trasposto di N semitoni **in aggiunta** alla trasposizione in vigore
+(sezione 8.2); il numero segue il nome senza spazi.
+
 ---
 
 ## 8. Struttura
@@ -566,6 +599,11 @@ nello stato iniziale delle altezze (`abs:`, nessuna tonalita') qualunque
 sia il modo della traccia, e dopo il riferimento modo, tonalita' e nota
 precedente della traccia sono quelli di prima: un pattern suona uguale
 in ogni traccia.
+
+Fa eccezione la **trasposizione** (sezione 7.8): un pattern si legge alla
+trasposizione in vigore nel punto del riferimento, piu' il numero scritto
+dopo il nome (`%Riff+7`, `3%Riff-12`). Un `transpose=` dentro il pattern
+vale rispetto a quel riferimento e finisce con esso.
 
 ### 8.3 Riferimenti MIDI
 
@@ -663,6 +701,30 @@ sola casella e' un errore.
 punto del cursore: un evento di tipo `text` con `name` = il testo e
 durata 0. Non cambia il suono: tempo e dinamica cambiano con i loro
 comandi.
+
+### 8.9 Ancore di battuta
+
+`bar=N` (N intero da 1 a 99999) porta il cursore all'**inizio della
+battuta N** del brano, con le stesse posizioni delle battute dei controlli
+di battuta (sezione 12.3: la battuta 1 comincia al quarto 0, ogni battuta
+dura `4 × num / den` quarti della metrica in vigore).
+
+- Se il cursore e' **prima** di quel punto, il vuoto si riempie di
+  silenzio: un evento di tipo `rest` dal cursore all'inizio della battuta
+  N, con la velocity in vigore, e il cursore si sposta sull'ancora. Una
+  legatura (`~`) non puo' arrivare a un'ancora che richiede un silenzio
+  (errore).
+- Se il cursore e' **esattamente** li', non succede nulla.
+- Se il cursore e' **gia' oltre**, il testo resta valido e il cursore resta
+  dov'e' (un'ancora non torna mai indietro); si segnala con un avviso
+  (sezione 10.2).
+
+L'ancora serve a dire dove entra una parte (`bar=29`) senza contare a mano
+le pause, e a scoprire una parte che si e' spostata rispetto alle battute
+su cui era pensata. Non ha una durata propria: non cambia alcuno stato ne'
+la griglia. Dentro un pattern o un gruppo ripetuto si valuta a ogni
+ripetizione, nella posizione assoluta del brano; in un blocco di voci ogni
+voce raggiunge la battuta partendo dall'inizio del blocco.
 
 ---
 
@@ -779,7 +841,10 @@ conforme DEVE segnalare almeno questi errori:
 - un segno sconosciuto, o un segno diverso da `$fermata` su una pausa; un
   ritornello scritto diversamente da come dice la sezione 8.7;
 - una legatura usata diversamente da come dicono le sezioni 6.9 e 6.10;
-  uno swing fuori da 50-80; uno spostamento fuori da −500..500 ms;
+  uno swing fuori da 50-80; uno spostamento fuori da −500..500 ms; un'ancora
+  di battuta che non e' un intero da 1 a 99999, o che richiede un
+  silenzio con una legatura aperta; una trasposizione fuori da −60..60
+  (`transpose=` o `%Nome+N`) o che porta una nota fuori da MIDI 0-127;
 - un pattern non definito, un riferimento troppo profondo o ciclico, un
   riferimento MIDI che non si risolve;
 - un blocco vuoto `[]` o un blocco di voci vuoto.
@@ -809,6 +874,10 @@ successivo. Una `|` ripetuta da un gruppo o da un pattern si segnala al
 massimo una volta (sul gruppo o sul riferimento). Ogni voce di un blocco
 di voci si controlla per conto suo, partendo dallo sfasamento al blocco;
 dopo il blocco lo sfasamento e' quello di prima.
+
+**Ancore di battuta.** Un `bar=N` raggiunto da un cursore che e' gia' oltre
+l'inizio della battuta N (sezione 8.9): si segnala sull'ancora, con il
+numero di battuta N, una volta per token anche se ripetuto.
 
 **Testo cantato.** Piu' sillabe che eventi in attesa (sezione 8.5): si
 segnala sul token del testo.
@@ -1007,6 +1076,11 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.5** — ancore di battuta `bar=N` (sezione 8.9) e l'avviso per una
+traccia che e' gia' oltre la battuta; trasposizione `transpose=N` e
+`%Nome+N` (sezione 7.8). Ogni testo valido 2.4 e' valido anche in 2.5, con
+gli stessi eventi.
 
 **2.4** — micro-tempo `shift=N` in millisecondi (sezione 7.7) con il
 campo `shift` degli eventi; l'automazione `tune=` in cent (sezione 7.5);

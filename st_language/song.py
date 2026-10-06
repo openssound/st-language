@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from .instruments import DEFAULT_INSTRUMENTS, InstrumentProfile, instrument_for
-from .notation import Event, Pattern, COMMENT_MARK, parse_track_text, tokenize
+from .notation import Event, Meter, Pattern, COMMENT_MARK, parse_track_text, tokenize
 from .stfile import (
     RE_AMBIENTE, RE_AUDIO_HDR, RE_BOX_HDR, RE_EFFECTS_HDR, RE_INSTRUMENT_HDR, RE_KEY, RE_MASTER,
     RE_MASTER_CHAIN_HDR, RE_METRICA, RE_METRICA_LIST_HDR, RE_MIXER_HDR, RE_PATTERN_HDR, RE_SYNTH_HDR,
@@ -57,9 +57,10 @@ class Part:
     def instrument_name(self) -> str:
         return self.instrument.name
 
-    def parsed_events(self, patterns: Dict[str, Pattern], midi_dir: Optional[str] = None) -> List[Event]:
+    def parsed_events(self, patterns: Dict[str, Pattern], midi_dir: Optional[str] = None,
+                      meter: Optional[Meter] = None) -> List[Event]:
         return parse_track_text(self.text, patterns, default_octave=self.instrument.default_octave,
-                                midi_dir=midi_dir)
+                                midi_dir=midi_dir, meter=meter)
 
 
 @dataclass
@@ -76,6 +77,10 @@ class Song:
 
     def instrument(self, name: str) -> InstrumentProfile:
         return instrument_for(name, known={**DEFAULT_INSTRUMENTS, **self.instruments})
+
+    def meter(self) -> Meter:
+        """Dove cominciano le battute del brano (per le ancore bar=N)."""
+        return Meter(self.time_sig, self.metrica_changes)
 
     def add_track(self, name: str, instrument="Piano", text: str = "") -> Part:
         profile = instrument if isinstance(instrument, InstrumentProfile) else self.instrument(instrument)
@@ -101,11 +106,12 @@ class Song:
 
     def duration_beats(self, only_audible: bool = True) -> float:
         tracks = self.audible_tracks() if only_audible else self.tracks
+        meter = self.meter()
         end = 0.0
         for t in tracks:
             if t.is_audio:
                 continue
-            for ev in t.parsed_events(self.patterns):
+            for ev in t.parsed_events(self.patterns, meter=meter):
                 end = max(end, ev.start + ev.duration)
         return end
 

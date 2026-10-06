@@ -25,15 +25,15 @@ from typing import Dict, List, Optional, Tuple
 
 from ._i18n import language, set_language, set_translator  # noqa: F401
 from .notation import (  # noqa: F401
-    BarIssue, Event, NotationError, Pattern, check_bar_lines, notation_warnings, parse_track_text,
+    BarIssue, Event, Meter, NotationError, Pattern, check_bar_lines, notation_warnings, parse_track_text,
     tokenize, transpose_tokens, validate_track_text,
 )
 from .song import Clip, Part, Song, load_song, read_song, song_from_notation, text_to_song  # noqa: F401
 
-__version__ = "2.4.0"
+__version__ = "2.5.0"
 
 __all__ = [
-    "BarIssue", "Clip", "Event", "NotationError", "Part", "Pattern", "Song", "check", "check_bar_lines",
+    "BarIssue", "Clip", "Event", "Meter", "NotationError", "Part", "Pattern", "Song", "check", "check_bar_lines",
     "language", "load_song", "notation_warnings", "parse", "parse_track_text", "read_song",
     "mtxt_to_midi", "set_language", "set_translator", "song_from_notation", "text_to_song", "to_abc",
     "to_midi", "to_musicxml", "to_mtxt", "tokenize", "transpose_tokens", "validate", "validate_track_text",

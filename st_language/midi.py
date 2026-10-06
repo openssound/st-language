@@ -438,7 +438,7 @@ def song_midi_tracks(song, only_audible: bool = True, midi_dir: Optional[str] = 
     (porta * 16 + canale, vedi _assign_channels). Usate da song_to_midi e
     dall'export MTXT (st_language.mtxt)."""
     tracks = [t for t in (song.audible_tracks() if only_audible else song.tracks) if not t.is_audio]
-    events_by_track = {t.name: t.parsed_events(song.patterns, midi_dir=midi_dir) for t in tracks}
+    events_by_track = {t.name: t.parsed_events(song.patterns, midi_dir=midi_dir, meter=song.meter()) for t in tracks}
     conductor: List[Tuple[int, int, bytes]] = [(0, _CTRL, _meta(0x03, midi_text_bytes(song.name)))]
     tempo_map = build_tempo_beat_map(song, tracks=tracks, events_by_track=events_by_track)
     tempo_ticks = []

@@ -264,7 +264,8 @@ def tokenize(text: str) -> List[str]:
 # ---------------------------------------------------------------------------
 
 # %Nome puo' essere preceduto da un moltiplicatore di ripetizione (es. 3%Riff)
-RE_PATTERN_REF = re.compile(r"^(\d*)%(\w+)$")
+# e seguito dalla trasposizione in semitoni (es. %Tema+7, 2%Tema-3).
+RE_PATTERN_REF = re.compile(r"^(\d*)%(\w+?)([+-]\d+)?$")
 # &Nome richiama un file MIDI dalla libreria (ricerca ricorsiva nelle sottocartelle,
 # funzionalita' 5), con lo stesso moltiplicatore di ripetizione di %Nome. Il nome
 # puo' anche essere un percorso qualificato con sottocartella (es. &Blues/bass_line).
@@ -391,12 +392,45 @@ class _PitchState:
         self.relative = False
         self.ref: Tuple[str, int] = ("c", default_octave)   # lettera e ottava dell'ultima nota
         self.alters: Dict[str, str] = {}
+        self.key_name = ""                                   # la tonalita' scritta (key=G), se c'e'
         self.stack: List[Tuple[str, int]] = []               # riferimento all'inizio dei ritornelli
+        # Trasposizione in semitoni: 'outer' viene dai pattern richiamati
+        # con %Nome+N (e da quelli che li contengono), 'local' da transpose=.
+        self.outer = 0
+        self.local = 0
+
+    @property
+    def semitones(self) -> int:
+        return self.outer + self.local
 
     def copy(self) -> "_PitchState":
         other = _PitchState(self.default_octave)
         other.relative, other.ref, other.alters = self.relative, self.ref, dict(self.alters)
+        other.key_name, other.outer, other.local = self.key_name, self.outer, self.local
         return other
+
+    def spell_transposed(self, name: str, octave: int, semitones: int, tok: str) -> Tuple[str, int]:
+        """(lettera con alterazione, ottava) di una nota scritta come
+        'name' all'ottava 'octave', trasposta di 'semitones'. Se c'e' una
+        tonalita' si scrive nella tonalita' trasposta, altrimenti coi
+        bemolli se la nota scritta ne aveva uno, con i diesis negli altri
+        casi."""
+        from .chords import pitch_to_midi
+        midi = pitch_to_midi(name, octave) + semitones
+        if not 0 <= midi <= 127:
+            raise NotationError(tr("La trasposizione porta la nota fuori dall'estensione MIDI"), tok)
+        alters = (key_signature_alters(_transpose_key_name(self.key_name, semitones))
+                  if self.key_name else {})
+        flats = (any(a == "b" for a in alters.values()) if self.key_name
+                 else len(name) > 1 and name[1] in "b♭")
+        spelled, octave = spell_midi(midi, alters, flats)
+        # spell_midi dice come si scrive nel testo (la lettera da sola prende
+        # l'alterazione della tonalita'); l'evento porta il nome esplicito
+        if spelled.endswith("n"):
+            spelled = spelled[:-1]
+        elif spelled in alters:
+            spelled += alters[spelled]
+        return spelled, octave
 
     def set_relative(self, relative: bool) -> None:
         self.relative = relative
@@ -425,6 +459,8 @@ class _PitchState:
             octave = self.default_octave
         _check_pitch_range(letter + accidental, octave, tok)
         self.ref = (letter, octave)
+        if self.semitones:
+            return self.spell_transposed(letter + accidental, octave, self.semitones, tok)
         return letter + accidental, octave
 
 
@@ -575,6 +611,19 @@ SWING_RANGE = (50, 80)
 RE_SHIFT = re.compile(r"^shift=(-?\d+)$")
 SHIFT_RANGE = (-500, 500)
 
+# Ancora di battuta: 'bar=N' porta il cursore all'inizio della battuta N
+# (con i silenzi che servono); se la traccia e' gia' oltre, resta dov'e' e
+# l'editor segnala l'avviso (vedi notation_warnings).
+RE_BAR_ANCHOR = re.compile(r"^bar=(\d+)$")
+
+# Trasposizione: 'transpose=N' sposta di N semitoni le note, gli accordi e
+# gli slide che seguono (0 per tornare all'altezza scritta); '%Nome+N' fa
+# suonare un pattern N semitoni sopra (o sotto, con '-') e poi torna
+# com'era.
+RE_TRANSPOSE = re.compile(r"^transpose=(-?\d+)$")
+TRANSPOSE_RANGE = (-60, 60)
+BAR_ANCHOR_MAX = 99999
+
 
 # ---------------------------------------------------------------------------
 # Eventi
@@ -647,6 +696,32 @@ class Pattern:
 
 _MAJOR_KEY_NAMES = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]
 _MINOR_KEY_NAMES = ["Cm", "C#m", "Dm", "Ebm", "Em", "Fm", "F#m", "Gm", "G#m", "Am", "Bbm", "Bm"]
+
+
+_FLAT_NAMES = ["c", "db", "d", "eb", "e", "f", "gb", "g", "ab", "a", "bb", "b"]
+
+
+def spell_midi(midi: int, alters: Dict[str, str], prefer_flat: bool = False) -> Tuple[str, int]:
+    """Come scrivere l'altezza midi in una tonalita' (le sue alterazioni,
+    lettera -> '#' o 'b'): una nota della scala senza alterazioni scritte,
+    le altre con un diesis o un bemolle (a scelta di prefer_flat)."""
+    from .chords import midi_to_pitch, note_name_to_pc
+    for letter in LETTERS:
+        accidental = alters.get(letter, "")
+        pc = note_name_to_pc(letter + accidental)
+        if pc == midi % 12:
+            octave = (midi - pc) // 12 - 1
+            if letter == "c" and accidental == "b":
+                octave += 1          # do bemolle: l'ottava della lettera e' quella sopra
+            elif letter == "b" and accidental == "#":
+                octave -= 1
+            return letter, octave
+    name, octave = midi_to_pitch(midi)
+    if prefer_flat and len(name) == 2:
+        name = _FLAT_NAMES[midi % 12]
+    if len(name) == 1 and name in alters:
+        name += "n"                  # la tonalita' la altererebbe: bequadro
+    return name, octave
 
 
 def _transpose_key_name(name: str, semitones: int) -> str:
@@ -779,22 +854,7 @@ class PitchRewriter:
 
     def _spell(self, midi: int) -> Tuple[str, int]:
         """Come scrivere l'altezza midi nella tonalita' di destinazione."""
-        from .chords import midi_to_pitch, note_name_to_pc
-        alters = self.dst.alters
-        for letter in LETTERS:
-            accidental = alters.get(letter, "")
-            pc = note_name_to_pc(letter + accidental)
-            if pc == midi % 12:
-                octave = (midi - pc) // 12 - 1
-                if letter == "c" and accidental == "b":
-                    octave += 1          # do bemolle: l'ottava della lettera e' quella sopra
-                elif letter == "b" and accidental == "#":
-                    octave -= 1
-                return letter, octave
-        name, octave = midi_to_pitch(midi)
-        if len(name) == 1 and name in alters:
-            name += "n"                  # la tonalita' la altererebbe: bequadro
-        return name, octave
+        return spell_midi(midi, self.dst.alters)
 
 
 def transpose_tokens(tokens: List[str], semitones: int, default_octave: int) -> List[str]:
@@ -853,14 +913,19 @@ def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
     for t in tokens:
         m = RE_PATTERN_REF.match(t)
         if m:
-            mult_s, name = m.groups()
+            mult_s, name, offset = m.groups()
             mult = int(mult_s) if mult_s else 1
             if name not in patterns:
                 raise NotationError(tr("Pattern '%{name}' non definito", name=name), t)
+            semitones = int(offset) if offset else 0
+            if not TRANSPOSE_RANGE[0] <= semitones <= TRANSPOSE_RANGE[1]:
+                raise NotationError(tr("Trasposizione fuori range ({0}..{1} semitoni)", *TRANSPOSE_RANGE), t)
             body = expand_patterns(patterns[name].tokens, patterns, midi_dir, default_octave, _depth + 1)
             # un pattern si legge per conto suo (ottave assolute, nessuna
-            # tonalita'), qualunque sia il modo della traccia che lo usa
-            out.extend([f"{_MARK}push"] + body * mult + [f"{_MARK}pop"])
+            # tonalita'), qualunque sia il modo della traccia che lo usa; la
+            # trasposizione in vigore, invece, lo accompagna (piu' la sua)
+            push = f"{_MARK}push:{semitones}" if semitones else f"{_MARK}push"
+            out.extend([push] + body * mult + [f"{_MARK}pop"])
             continue
 
         m = RE_MIDI_REF.match(t)
@@ -1054,6 +1119,28 @@ def _split_voicing_modifier(voicing: Optional[str], modifier: Optional[str]):
     return voicing, modifier
 
 
+def _transpose_chord(symbol: str, bass: Optional[str], octave: int, semitones: int,
+                     pitch: "_PitchState") -> Tuple[str, Optional[str], int]:
+    """L'accordo (simbolo, basso alternativo, ottava) trasposto: la
+    fondamentale e il basso cambiano nome (coi bemolli se la tonalita' li ha
+    o se la fondamentale scritta ne aveva uno), l'ottava segue quando la
+    fondamentale scavalca il Do."""
+    from .chords import parse_chord_symbol, note_name_to_pc
+    parsed = parse_chord_symbol(symbol)
+    flats = (any(a == "b" for a in key_signature_alters(_transpose_key_name(pitch.key_name, semitones)).values())
+             if pitch.key_name else (len(symbol) > 1 and symbol[1] in "b♭") or (bool(bass) and len(bass) > 1))
+    names = [n[0].upper() + n[1:] for n in (_FLAT_NAMES if flats else _SHARP_PC_NAMES)]
+    new_total = parsed.root_pc + semitones
+    new_symbol = names[new_total % 12] + parsed.quality
+    new_bass = None
+    if bass:
+        new_bass = names[(note_name_to_pc(bass) + semitones) % 12]
+    return new_symbol, new_bass, octave + new_total // 12
+
+
+_SHARP_PC_NAMES = ["c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b"]
+
+
 def _parse_atom(tok: str, default_octave: int, pitch: Optional[_PitchState] = None):
     """Ritorna un dict {kind, letter/symbol/name, octave, mult} per nota/accordo/percussione."""
     m = RE_NOTE.match(tok)
@@ -1081,9 +1168,13 @@ def _parse_atom(tok: str, default_octave: int, pitch: Optional[_PitchState] = No
                 tok,
             )
         articulation = {"!": "staccato", "x": "mute", "_": "legato"}.get(modifier)
+        octave = int(octv) if octv else default_octave
+        semitones = pitch.semitones if pitch is not None else 0
+        if semitones:
+            symbol, bass, octave = _transpose_chord(symbol, bass, octave, semitones, pitch)
         return {
             "kind": "chord", "symbol": symbol, "voicing": voicing, "bass": bass,
-            "octave": int(octv) if octv else default_octave,
+            "octave": octave,
             "mult": int(mult) if mult else 1,
             "articulation": articulation,
         }
@@ -1152,8 +1243,8 @@ def swing_time(beat: float, swing: Optional[Tuple[float, float]]) -> float:
     return (k + warped) * pair
 
 
-def parse_tokens(tokens: List[str], default_octave: int = 4) -> List[Event]:
-    return _parse_tokens_exact(tokens, default_octave)[0]
+def parse_tokens(tokens: List[str], default_octave: int = 4, meter: Optional["Meter"] = None) -> List[Event]:
+    return _parse_tokens_exact(tokens, default_octave, meter=meter)[0]
 
 
 def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
@@ -1165,7 +1256,9 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                          initial_controls: Optional[Dict[str, float]] = None,
                          initial_swing: Optional[Tuple[float, float]] = None,
                          initial_pitch: Optional["_PitchState"] = None,
-                         initial_shift: Optional[int] = None
+                         initial_shift: Optional[int] = None,
+                         meter: Optional["Meter"] = None,
+                         origin_beat: Fraction = Fraction(0)
                          ) -> Tuple[List[Event], Fraction, Fraction]:
     """Come parse_tokens, ma ritorna anche la posizione finale esatta (in
     beat, Fraction) e la griglia attiva alla fine. Griglia e posizione sono
@@ -1186,7 +1279,12 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
     dict vi si raccolgono, per indice di token, i controlli di battuta
     dentro le voci ("voice_bars": {i: (inizio, [[posizioni], ...])}) e gli
     avvisi sul testo cantato ("lyric_issues": {i: messaggio}), vedi
-    notation_warnings."""
+    notation_warnings.
+
+    'meter' (vedi Meter) dice dove cominciano le battute, per 'bar=N'; senza,
+    si usa il 4/4. 'origin_beat' e' dove il frammento comincia nel brano
+    (un blocco di voci o un box): la battuta N va cercata nel brano, non nel
+    frammento."""
     tokens, _origins = expand_repeats(tokens, lenient=lenient)
     grid_beats = initial_grid  # unita' di durata corrente, in beat (quarti). Default: 1/4 (nera)
     velocity = initial_velocity  # velocity corrente
@@ -1324,9 +1422,11 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 # check_bar_lines (avviso, non errore).
                 continue
 
-            if tok == f"{_MARK}push":
+            if tok == f"{_MARK}push" or tok.startswith(f"{_MARK}push:"):
                 saved_pitch.append(pitch)
-                pitch = _PitchState(default_octave)
+                fresh = _PitchState(default_octave)
+                fresh.outer = pitch.semitones + int(tok.partition(":")[2] or 0)
+                pitch = fresh
                 continue
             if tok == f"{_MARK}pop":
                 if saved_pitch:
@@ -1355,6 +1455,15 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             m = RE_KEY_MODE.match(tok)
             if m:
                 pitch.alters = key_signature_alters(m.group(1)) if m.group(1) else {}
+                pitch.key_name = m.group(1) or ""
+                continue
+
+            m = RE_TRANSPOSE.match(tok)
+            if m:
+                semitones = int(m.group(1))
+                if not TRANSPOSE_RANGE[0] <= semitones <= TRANSPOSE_RANGE[1]:
+                    raise NotationError(tr("Trasposizione fuori range ({0}..{1} semitoni)", *TRANSPOSE_RANGE), tok)
+                pitch.local = semitones
                 continue
 
             m = RE_TEXT.match(tok)
@@ -1396,7 +1505,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                         initial_velocity=velocity, voice=voice + k, extras=None,
                         pending_lyrics=lyric_targets if k == 0 else None,
                         initial_controls=controls, initial_swing=swing, initial_pitch=pitch,
-                        initial_shift=shift)
+                        initial_shift=shift, meter=meter, origin_beat=origin_beat + cursor)
                     for ev in sub_events:
                         ev.start += float(cursor)
                         if ev.kind == "control":
@@ -1500,6 +1609,23 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 if not SHIFT_RANGE[0] <= ms <= SHIFT_RANGE[1]:
                     raise NotationError(tr("Spostamento fuori range ({0}..{1} ms)", *SHIFT_RANGE), tok)
                 shift = ms or None
+                continue
+
+            m = RE_BAR_ANCHOR.match(tok)
+            if m:
+                bar = int(m.group(1))
+                if not 1 <= bar <= BAR_ANCHOR_MAX:
+                    raise NotationError(tr("Battuta fuori range (1-{0})", BAR_ANCHOR_MAX), tok)
+                target = (meter or default_meter()).start_of(bar) - origin_beat
+                if target > cursor:
+                    if pending_tie is not None:
+                        raise NotationError(tr("La legatura di valore (~) deve arrivare a una nota uguale, "
+                                               "non a un'ancora di battuta"), tok)
+                    _add(Event(start=float(cursor), duration=float(target - cursor), kind="rest",
+                               velocity=velocity))
+                    cursor = target
+                elif target < cursor and extras is not None:
+                    extras.setdefault("anchor_issues", {})[index] = (bar, cursor - target)
                 continue
 
             if tok in ("SON", "SOFF"):
@@ -1638,26 +1764,28 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
 
 
 def parse_track_text(text: str, patterns: Dict[str, Pattern], default_octave: int = 4,
-                      midi_dir: Optional[str] = None) -> List[Event]:
+                      midi_dir: Optional[str] = None, meter: Optional["Meter"] = None) -> List[Event]:
     """Punto di ingresso completo: tokenizza, espande pattern (%) e riferimenti
-    MIDI (&), quindi interpreta lo Stato Corrente."""
+    MIDI (&), quindi interpreta lo Stato Corrente. 'meter' (vedi Meter) serve
+    alle ancore di battuta 'bar=N'."""
     raw_tokens = tokenize(text)
     expanded = expand_patterns(raw_tokens, patterns, midi_dir=midi_dir, default_octave=default_octave)
-    return parse_tokens(expanded, default_octave=default_octave)
+    return parse_tokens(expanded, default_octave=default_octave, meter=meter)
 
 
 def validate_track_text(text: str, patterns: Dict[str, Pattern], default_octave: int = 4,
-                         midi_dir: Optional[str] = None):
+                         midi_dir: Optional[str] = None, meter: Optional["Meter"] = None):
     """Usata dall'editor per la validazione sintattica live. Ritorna (ok, messaggio_errore)."""
     try:
-        parse_track_text(text, patterns, default_octave=default_octave, midi_dir=midi_dir)
+        parse_track_text(text, patterns, default_octave=default_octave, midi_dir=midi_dir, meter=meter)
         return True, ""
     except (NotationError, ValueError) as e:
         return False, str(e)
 
 
 def _expanded_ranges(text: str, patterns: Dict[str, Pattern], midi_dir: Optional[str],
-                     default_octave: int, extras: Optional[dict] = None):
+                     default_octave: int, extras: Optional[dict] = None,
+                     meter: Optional["Meter"] = None, origin_beat: Fraction = Fraction(0)):
     """Espande separatamente ogni token di primo livello e interpreta il
     risultato in modalita' tollerante. Ritorna (token grezzi con posizione,
     token espansi, indice del token grezzo da cui viene ciascun espanso,
@@ -1675,12 +1803,12 @@ def _expanded_ranges(text: str, patterns: Dict[str, Pattern], midi_dir: Optional
     expanded, origins = expand_repeats(expanded, origins, lenient=True)
     ranges: List[Tuple[Fraction, Fraction]] = []
     _parse_tokens_exact(expanded, default_octave=default_octave, lenient=True, ranges=ranges,
-                        extras=extras)
+                        extras=extras, meter=meter, origin_beat=origin_beat)
     return raw, expanded, origins, ranges
 
 
 def compute_token_spans(text: str, patterns: Dict[str, Pattern], midi_dir: Optional[str] = None,
-                          default_octave: int = 4) -> List[tuple]:
+                          default_octave: int = 4, meter: Optional["Meter"] = None) -> List[tuple]:
     """Calcola, per ogni token di 'primo livello' del testo GREZZO (prima
     dell'espansione di %pattern/&midi), la sua posizione carattere e il suo
     intervallo temporale in beat. Un riferimento %Nome o &Nome, o un gruppo
@@ -1698,7 +1826,8 @@ def compute_token_spans(text: str, patterns: Dict[str, Pattern], midi_dir: Optio
     Ritorna una lista di tuple (char_start, char_end, beat_start, beat_duration),
     ordinata per beat_start crescente. I comandi di stato (N:, NT:, N@, tempo=N,
     rampe, SON/SOFF) non producono uno span (non hanno una durata propria)."""
-    raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave)
+    raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave,
+                                                      meter=meter)
     raw_positions = [(cs, ce) for _, cs, ce in raw]
 
     # Uno span per ogni tratto consecutivo dello stesso token grezzo: un
@@ -1825,6 +1954,32 @@ def bar_starts(time_sig: str = "4/4", metrica_changes=()):
         bar += 1
 
 
+class Meter:
+    """Dove cominciano le battute del brano (in quarti): serve alle ancore
+    'bar=N'. Si costruisce con la metrica del brano e gli eventuali suoi
+    cambi (vedi bar_starts); senza, vale il 4/4."""
+
+    def __init__(self, time_sig: str = "4/4", metrica_changes=()):
+        self._gen = bar_starts(time_sig, metrica_changes)
+        self._starts: List[Fraction] = []
+
+    def start_of(self, bar: int) -> Fraction:
+        """L'inizio della battuta 'bar' (la prima e' la 1, a 0)."""
+        while len(self._starts) < bar:
+            self._starts.append(next(self._gen))
+        return self._starts[bar - 1]
+
+
+_DEFAULT_METER: Optional[Meter] = None
+
+
+def default_meter() -> Meter:
+    global _DEFAULT_METER
+    if _DEFAULT_METER is None:
+        _DEFAULT_METER = Meter()
+    return _DEFAULT_METER
+
+
 @dataclass
 class BarIssue:
     char_start: int     # posizione della '|' nel testo
@@ -1864,6 +2019,13 @@ def bar_check_message(bar: int, delta: Fraction) -> str:
     return tr("battuta {bar}: mancano {amount}", bar=bar, amount=amount)
 
 
+def anchor_message(bar: int, over: Fraction) -> str:
+    """Avviso per 'bar=N' quando la traccia e' gia' oltre l'inizio della
+    battuta N di 'over' quarti."""
+    _, amount = describe_duration(over)
+    return tr("battuta {bar}: la traccia e' gia' {amount} oltre l'inizio", bar=bar, amount=amount)
+
+
 def check_bar_lines(text: str, patterns: Dict[str, Pattern], time_sig: str = "4/4",
                     metrica_changes=(), start_beat: float = 0.0, default_octave: int = 4,
                     midi_dir: Optional[str] = None) -> List[BarIssue]:
@@ -1892,11 +2054,12 @@ def notation_warnings(text: str, patterns: Dict[str, Pattern], time_sig: str = "
     check_bar_lines, bar > 0) e testi cantati con piu' sillabe che note
     (bar == 0)."""
     extras: dict = {}
+    offset = Fraction(start_beat).limit_denominator(1 << 16)
     try:
-        raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave, extras)
+        raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave, extras,
+                                                          Meter(time_sig, metrica_changes), offset)
     except NotationError:
         return []
-    offset = Fraction(start_beat).limit_denominator(1 << 16)
     grid = _BarGrid(time_sig, metrica_changes)
     issues: List[BarIssue] = []
     reported = set()
@@ -1930,6 +2093,9 @@ def notation_warnings(text: str, patterns: Dict[str, Pattern], time_sig: str = "
     for index, message in extras.get("lyric_issues", {}).items():
         _, cs, ce = raw[origins[index]]
         issues.append(BarIssue(cs, ce, 0, message))
+    for index, (bar, over) in extras.get("anchor_issues", {}).items():
+        _, cs, ce = raw[origins[index]]
+        issues.append(BarIssue(cs, ce, bar, anchor_message(bar, over)))
     issues.sort(key=lambda i: i.char_start)
     return issues
 
