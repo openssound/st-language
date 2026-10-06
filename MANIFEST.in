@@ -9,7 +9,7 @@ include docs/spec/conformance/README.md
 include docs/spec/conformance/cases.json
 include docs/spec/conformance/make_cases.py
 include docs/spec/conformance/run_installed.py
-include examples/*.st
+include examples/blues_12bar.st
 prune tests
 prune core
 prune gui
