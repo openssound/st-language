@@ -202,6 +202,9 @@ CASES = [
     ("reset-in-voices", "8: 90@ { c reset: c ; d } e", {}),
     ("error-reset-in-ramp", "60@ >> c reset: d 90@", {}),
     ("error-ramp-after-reset", "reset: >> c", {}),
+    # --- riferimenti MIDI fra virgolette (2.6): senza libreria sono errori
+    ("error-midi-ref-without-quotes", "c &Riff d", {}),
+    ("error-midi-ref-unclosed-quote", 'c &"Riff d', {}),
     # --- battuta in levare (2.6)
     ("pickup-bar-checks", "4: g | c e g | c 2r |", {"time_sig": "3/4", "pickup": 1}),
     ("pickup-anchor", "4: g bar=2 c", {"time_sig": "3/4", "pickup": 1}),

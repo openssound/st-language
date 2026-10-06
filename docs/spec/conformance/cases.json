@@ -6785,6 +6785,20 @@
    }
   },
   {
+   "id": "error-midi-ref-without-quotes",
+   "input": "c &Riff d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-midi-ref-unclosed-quote",
+   "input": "c &\"Riff d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
    "id": "pickup-bar-checks",
    "input": "4: g | c e g | c 2r |",
    "time_sig": "3/4",

@@ -22,7 +22,8 @@ from typing import Dict, List, Optional
 
 from .instruments import DEFAULT_INSTRUMENTS, InstrumentProfile, instrument_for
 from ._i18n import tr
-from .notation import Event, Meter, NotationError, Pattern, COMMENT_MARK, parse_track_text, tokenize
+from .notation import (Event, Meter, NotationError, Pattern, COMMENT_MARK, parse_track_text, tokenize,
+                       upgrade_midi_refs)
 from .stfile import (
     RE_AMBIENTE, RE_AUDIO_HDR, RE_BOX_HDR, RE_EFFECTS_HDR, RE_INSTRUMENT_HDR, RE_KEY, RE_MASTER,
     RE_MASTER_CHAIN_HDR, RE_METRICA, RE_METRICA_LIST_HDR, RE_MIXER_HDR, RE_PATTERN_HDR, RE_SYNTH_HDR,
@@ -192,7 +193,7 @@ def song_from_notation(text: str, instrument: str = "Piano", name: str = "ST",
                        tempo_bpm: int = 120, time_sig: str = "4/4") -> Song:
     """Un brano di una sola traccia da un testo in notazione."""
     song = Song(name=name, tempo_bpm=tempo_bpm, time_sig=time_sig)
-    song.add_track(instrument, instrument, text)
+    song.add_track(instrument, instrument, upgrade_midi_refs(text))
     return song
 
 
@@ -215,6 +216,8 @@ def read_song(text: str, name: str = "ST") -> Song:
     def flush():
         nonlocal mode, current_name, current_instrument, buffer
         body = ("\n" if mode in ("track", "pattern") else " ").join(buffer).strip()
+        if mode in ("track", "pattern"):
+            body = upgrade_midi_refs(body)      # &Nome delle versioni prima della 2.6
         if mode == "pattern" and current_name:
             song.add_pattern(current_name, body)
         elif mode == "track" and current_name:
@@ -326,7 +329,7 @@ def read_song(text: str, name: str = "ST") -> Song:
         except KeyError:
             continue
         if not part.is_audio:
-            part.clips.append(Clip(box_name, body, start_beat))
+            part.clips.append(Clip(box_name, upgrade_midi_refs(body), start_beat))
     for part in song.tracks:
         if part.clips:
             part.text = flatten_clips_to_text(part.clips, song.patterns, part.instrument.default_octave,

@@ -184,6 +184,16 @@ def tokenize_spans(text: str) -> List[Tuple[str, int, int]]:
         j = i
         while j < n and text[j].isdigit():
             j += 1
+        if j + 1 < n and text[j] == "&" and text[j + 1] == LYRIC_QUOTE:
+            # &"nome del file" (anche con spazi), poi l'eventuale +N / -N
+            k = text.find(LYRIC_QUOTE, j + 2)
+            if k == -1:
+                raise NotationError(tr("Nome del file MIDI '&\"' non chiuso"), text[i:j + 20])
+            m = re.match(r"[+-]\d+", text[k + 1:])
+            k = k + 1 + (len(m.group()) if m else 0)
+            tokens.append((text[i:k], i, k))
+            i = k
+            continue
         if j < n and text[j] == "[":
             if "]" not in text[j:]:
                 raise NotationError(tr("Blocco '[' non chiuso"), text[i:j + 20])
@@ -266,13 +276,15 @@ def tokenize(text: str) -> List[str]:
 # %Nome puo' essere preceduto da un moltiplicatore di ripetizione (es. 3%Riff)
 # e seguito dalla trasposizione in semitoni (es. %Tema+7, 2%Tema-3).
 RE_PATTERN_REF = re.compile(r"^(\d*)%(\w+?)([+-]\d+)?$")
-# &Nome richiama un file MIDI dalla libreria (ricerca ricorsiva nelle sottocartelle,
-# funzionalita' 5), con lo stesso moltiplicatore di ripetizione di %Nome. Il nome
-# puo' anche essere un percorso qualificato con sottocartella (es. &Blues/bass_line).
-# Un '+N' dopo il nome trasporta il file di N semitoni (&Basso+7); il '-N'
-# (&Basso-3) e' lo stesso, ma siccome il nome puo' contenere '-' vale solo se
-# non esiste un file che si chiami proprio cosi' (vedi _resolve_midi_ref).
-RE_MIDI_REF = re.compile(r"^(\d*)&([\w/-]+)(\+\d+)?$")
+# &"Nome" richiama un file MIDI dalla libreria (ricerca ricorsiva nelle
+# sottocartelle, funzionalita' 5), con lo stesso moltiplicatore di
+# ripetizione di %Nome. Il nome sta sempre fra virgolette (puo' contenere
+# sottocartelle, trattini e spazi: &"Blues/bass-line"); dopo, '+N' o '-N'
+# trasporta il file di N semitoni (&"Basso"+7, &"Basso"-3).
+RE_MIDI_REF = re.compile(r'^(\d*)&"([^"]+)"([+-]\d+)?$')
+# La forma senza virgolette delle versioni prima della 2.6 (&Nome, &Nome+7,
+# &Nome-3): non e' piu' valida; upgrade_midi_refs la converte.
+RE_MIDI_REF_BARE = re.compile(r"^(\d*)&([\w/-]+)(\+\d+)?$")
 # N(...) ripete N volte la sequenza di token racchiusa tra parentesi tonde
 # (a differenza di [...], che e' simultaneita', non sequenza ripetuta).
 RE_REPEAT_GROUP = re.compile(r"^(\d*)\((.*)\)$", re.DOTALL)
@@ -822,9 +834,8 @@ class PitchRewriter:
                 return f"{mult_s}%{name}{_offset_suffix(int(offset or 0) + self.semitones)}"
             m = RE_MIDI_REF.match(tok)
             if m:
-                mult_s, name_path, plus = m.groups()
-                name_path, offset = _midi_ref_offset(name_path, plus)
-                return mult_s + _midi_ref_text(name_path, offset + self.semitones)
+                mult_s, name_path, offset = m.groups()
+                return midi_ref_text(name_path, int(offset or 0) + self.semitones, mult_s)
         base, value = split_note_value(tok)
         mm = re.match(r"^(\d*)\[(.*)\]$", base)
         if mm:
@@ -896,26 +907,6 @@ def _offset_suffix(semitones: int) -> str:
     return f"{semitones:+d}" if semitones else ""
 
 
-def _midi_ref_offset(name_path: str, plus: Optional[str]) -> Tuple[str, int]:
-    """(nome del file, trasposizione) di un riferimento '&nome[+N]', con la
-    regola di _resolve_midi_ref: un '-N' in fondo e' una trasposizione,
-    salvo il caso di compatibilita' con la 2.5 (midi_ref_is_legacy)."""
-    if plus:
-        return name_path, int(plus)
-    tail = _MIDI_REF_TAIL.match(name_path)
-    if not tail or midi_ref_is_legacy(name_path):
-        return name_path, 0
-    return tail.group(1), -int(tail.group(2))
-
-
-def _midi_ref_text(name_path: str, semitones: int) -> str:
-    """'&nome' con la trasposizione: un nome che finisce con '-cifre' vuole
-    sempre il '+N' (anche '+0'), se no il '-cifre' sarebbe una trasposizione."""
-    if _MIDI_REF_TAIL.match(name_path) and semitones >= 0:
-        return f"&{name_path}+{semitones}"
-    return "&" + name_path + _offset_suffix(semitones)
-
-
 def transpose_tokens(tokens: List[str], semitones: int, default_octave: int) -> List[str]:
     """I token trasposti di 'semitones' (vedi PitchRewriter)."""
     if semitones == 0:
@@ -963,51 +954,35 @@ def set_midi_ref_resolver(fn) -> None:
     _midi_ref_resolver = fn
 
 
-def _resolve_midi_ref(name_path: str, semitones: int, midi_dir: Optional[str], tok: str,
-                      has_plus: bool) -> Tuple[List[str], int]:
-    """(token del file MIDI, semitoni di trasposizione) per un riferimento
-    '&percorso'. Dalla 2.6 un '-N' in fondo (senza '+N') e' sempre una
-    trasposizione: si cerca il file senza quel suffisso. Per compatibilita'
-    con la 2.5, se quel file non c'e' ma c'e' quello col nome per intero, si
-    usa questo (notation_warnings lo segnala: va scritto '&nome-N+0')."""
+def _resolve_midi_ref(name_path: str, midi_dir: Optional[str], tok: str) -> List[str]:
+    """I token del file MIDI '&"percorso"' della libreria."""
     if _midi_ref_resolver is None:
-        raise NotationError(tr("I riferimenti a file MIDI (&Nome) non sono disponibili qui"), tok)
-
-    def load(path: str) -> List[str]:
-        try:
-            return _midi_ref_resolver(path, midi_dir)
-        except NotationError:
-            raise
-        except FileNotFoundError:
-            raise
-        except Exception as e:          # es. riferimento ambiguo
-            raise NotationError(str(e), tok)
-
-    def not_found(path: str) -> NotationError:
-        return NotationError(tr("File MIDI '&{name_path}' non trovato nella libreria MIDI", name_path=path), tok)
-
-    tail = None if has_plus else _MIDI_REF_TAIL.match(name_path)
-    if tail:
-        try:
-            return load(tail.group(1)), -int(tail.group(2))
-        except FileNotFoundError:
-            pass
+        raise NotationError(tr("I riferimenti a file MIDI (&\"Nome\") non sono disponibili qui"), tok)
     try:
-        return load(name_path), semitones
+        return _midi_ref_resolver(name_path, midi_dir)
+    except NotationError:
+        raise
     except FileNotFoundError:
-        raise not_found(tail.group(1) if tail else name_path)
+        raise NotationError(
+            tr("File MIDI '&{name_path}' non trovato nella libreria MIDI", name_path=f'"{name_path}"'), tok)
+    except Exception as e:          # es. riferimento ambiguo
+        raise NotationError(str(e), tok)
 
 
-# '&nome-N': il nome e la trasposizione verso il basso
-_MIDI_REF_TAIL = re.compile(r"^(.*[^-])-(\d+)$")
+def midi_ref_text(name_path: str, semitones: int = 0, mult: str = "") -> str:
+    """Il riferimento come si scrive: N&"nome"+M (o -M, o senza)."""
+    return f'{mult}&"{name_path}"' + (f"{semitones:+d}" if semitones else "")
 
 
-def midi_ref_is_legacy(name_path: str, midi_dir: Optional[str] = None) -> bool:
-    """Vero per un '&nome-N' (senza '+') che vale solo per compatibilita'
-    con la 2.5: 'nome' non c'e' nella libreria, 'nome-N' si'."""
-    tail = _MIDI_REF_TAIL.match(name_path)
+def _legacy_midi_ref(name_path: str, plus: Optional[str], midi_dir: Optional[str]) -> Tuple[str, int]:
+    """(nome, trasposizione) di un riferimento senza virgolette, con la
+    regola della 2.5: un '-N' in fondo era una trasposizione solo se nella
+    libreria non c'era un file col nome per intero."""
+    if plus:
+        return name_path, int(plus)
+    tail = re.match(r"^(.*[^-])-(\d+)$", name_path)
     if not tail or _midi_ref_resolver is None:
-        return False
+        return name_path, 0
 
     def exists(path: str) -> bool:
         try:
@@ -1017,7 +992,33 @@ def midi_ref_is_legacy(name_path: str, midi_dir: Optional[str] = None) -> bool:
             return False
         except Exception:
             return True
-    return not exists(tail.group(1)) and exists(name_path)
+    if exists(name_path) or not exists(tail.group(1)):
+        return name_path, 0
+    return tail.group(1), -int(tail.group(2))
+
+
+# Un '&nome' senza virgolette all'inizio di un token (o dopo il
+# moltiplicatore, una parentesi o un ';'), fino alla fine del token.
+_BARE_REF_IN_TEXT = re.compile(r'(?<![^\s\d(\[{;])(\d*)&([\w/-]+?)(\+\d+)?(?=$|[\s)\]};|])')
+
+
+def upgrade_midi_refs(text: str, midi_dir: Optional[str] = None) -> str:
+    """Il testo con i riferimenti MIDI delle versioni prima della 2.6
+    (&Nome, &Nome+7, &Nome-3) riscritti nella forma con le virgolette
+    (&"Nome", &"Nome"+7, &"Nome"-3), lasciando intatto tutto il resto
+    (impaginazione e commenti). Per un '-N' finale vale la regola della 2.5
+    (vedi _legacy_midi_ref). Un testo che usa gia' le virgolette non cambia:
+    nella 2.6 la forma senza virgolette non e' valida, quindi convertirla
+    non cambia mai il significato di un testo corretto."""
+    if "&" not in text:
+        return text
+
+    def repl(m):
+        name, offset = _legacy_midi_ref(m.group(2), m.group(3), midi_dir)
+        return midi_ref_text(name, offset, m.group(1))
+    # fuori dai testi fra virgolette (testo cantato, $"...", &"..." gia' nuovi)
+    parts = re.split(r'("[^"]*")', text)
+    return "".join(part if k % 2 else _BARE_REF_IN_TEXT.sub(repl, part) for k, part in enumerate(parts))
 
 
 def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
@@ -1046,9 +1047,10 @@ def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
 
         m = RE_MIDI_REF.match(t)
         if m:
-            mult_s, name_path, plus = m.groups()
+            mult_s, name_path, offset = m.groups()
             mult = int(mult_s) if mult_s else 1
-            body, semitones = _resolve_midi_ref(name_path, int(plus) if plus else 0, midi_dir, t, bool(plus))
+            body = _resolve_midi_ref(name_path, midi_dir, t)
+            semitones = int(offset) if offset else 0
             if semitones:
                 if not TRANSPOSE_RANGE[0] <= semitones <= TRANSPOSE_RANGE[1]:
                     raise NotationError(tr("Trasposizione fuori range ({0}..{1} semitoni)", *TRANSPOSE_RANGE), t)
@@ -1056,6 +1058,11 @@ def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
             else:
                 out.extend(body * mult)
             continue
+
+        m = RE_MIDI_REF_BARE.match(t)
+        if m:
+            raise NotationError(tr("Il nome del file MIDI va fra virgolette: scrivi {0}",
+                                   midi_ref_text(m.group(2), int(m.group(3) or 0), m.group(1))), t)
 
         m = RE_VOICES.match(t)
         if m:
@@ -2124,7 +2131,7 @@ class BarIssue:
     bar: int            # battuta che non torna (0 per gli avvisi che non riguardano una battuta)
     message: str
     # "bar" (controllo di battuta), "anchor" (ancora bar=N), "lyric" (testo
-    # cantato), "midi" (riferimento &nome-N per compatibilita')
+    # cantato)
     kind: str = "bar"
 
 
@@ -2195,7 +2202,7 @@ def notation_warnings(text: str, patterns: Dict[str, Pattern], time_sig: str = "
     """Gli avvisi che non impediscono di suonare il testo, in ordine di
     posizione (vedi BarIssue.kind): controlli di battuta '|' che non tornano
     (vedi check_bar_lines), ancore bar=N gia' superate, testi cantati con
-    piu' sillabe che note, riferimenti '&nome-N' letti come nella 2.5.
+    piu' sillabe che note.
     'pickup': quarti della battuta in levare (intestazione Levare:)."""
     extras: dict = {}
     offset = Fraction(start_beat).limit_denominator(1 << 16)
@@ -2240,13 +2247,6 @@ def notation_warnings(text: str, patterns: Dict[str, Pattern], time_sig: str = "
     for index, (bar, over) in extras.get("anchor_issues", {}).items():
         _, cs, ce = raw[origins[index]]
         issues.append(BarIssue(cs, ce, bar, anchor_message(bar, over), "anchor"))
-    for tok, cs, ce in raw:
-        m = RE_MIDI_REF.match(tok)
-        if m and not m.group(3) and midi_ref_is_legacy(m.group(2), midi_dir):
-            issues.append(BarIssue(cs, ce, 0, tr(
-                "'&{name}': dalla versione 2.6 il '-{n}' finale e' una trasposizione; "
-                "per il file '{name}' scrivi '&{name}+0'",
-                name=m.group(2), n=_MIDI_REF_TAIL.match(m.group(2)).group(2)), "midi"))
     issues.sort(key=lambda i: i.char_start)
     return issues
 

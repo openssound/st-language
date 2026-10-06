@@ -86,12 +86,17 @@ position, the first matching rule applies:
    single `<` or `>` immediately after the `]` extends it with a hairpin
    (`[c e g]<`), then a `~` with a tie and a `(` or `)` with a slur mark
    (`[c e g]~`, `[c e g](`). No `]` is an error.
-4. Optional digits followed by `(` start a **group** token that ends at
+4. Optional digits followed by `&"` start a **MIDI reference** token:
+   the file name runs to the next `"` (it may contain spaces), and a
+   `+` or `-` followed by digits right after the closing quote extends
+   the token with a transposition (`&"Blues/bass line"-2`). No closing
+   quote is an error.
+5. Optional digits followed by `(` start a **group** token that ends at
    the matching `)`; parentheses nest, and parentheses inside lyric
    strings do not count. No matching `)` is an error.
-5. `{` starts a **voice block** token that ends at the matching `}`
+6. `{` starts a **voice block** token that ends at the matching `}`
    (same rules as groups). No matching `}` is an error.
-6. Otherwise a **plain** token runs until whitespace, `|` or `"`. So
+7. Otherwise a **plain** token runs until whitespace, `|` or `"`. So
    `d*4|` is two tokens (`d*4`, `|`) and `c"la"` is two tokens (`c`,
    `"la"`).
 
@@ -134,7 +139,9 @@ repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| 
 text         = '$"' { any character except '"' } '"' ;          (* $"rit." *)
 lyric        = '"' { any character except '"' } '"' ;
 pattern-ref  = [ number ] "%" word [ ( "+" | "-" ) number ] ;      (* %Riff  3%Riff  %Riff+7 *)
-midi-ref     = [ number ] "&" ( word | "/" | "-" ) { word | "/" | "-" } [ "+" number ] ;
+midi-ref     = [ number ] "&" '"' file-name '"' [ ( "+" | "-" ) number ] ;
+                                                  (* &"Riff"  2&"Blues/bass line"-12 *)
+file-name    = any character except '"' , { any character except '"' } ;
 group        = [ number ] "(" { token } ")" ;                   (* 4(c d) *)
 voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } *)
 voice        = { token } ;
@@ -229,7 +236,7 @@ the changes made inside it end:
 | Context | Starts with | Changes made inside it |
 | --- | --- | --- |
 | repeat group `N(...)` | the current state | carry on after it (the group is written out) |
-| pattern `%Name`, MIDI reference `&Name` | the current state, except: pitch mode `abs:`, no key, previous note reset (section 8.2); transposition = the current one plus the `+N`/`-N` of the reference | pitch mode, key, previous note and `transpose=` end with the reference; grid, velocity, automations, swing and shift carry on after it |
+| pattern `%Name`, MIDI reference `&"Name"` | the current state, except: pitch mode `abs:`, no key, previous note reset (section 8.2); transposition = the current one plus the `+N`/`-N` of the reference | pitch mode, key, previous note and `transpose=` end with the reference; grid, velocity, automations, swing and shift carry on after it |
 | voice block `{ ; }` | each voice: the current state | stay in the voice; after the block the state is the one before it |
 | box (song file, section 12.4) | the initial state, through `reset:`; automation values carry on from the previous box | end with the box |
 | `reset:` | — | grid, velocity, swing, shift, transposition (`transpose=`), pitch mode, key and previous note back to their initial values (section 7.9) |
@@ -570,7 +577,7 @@ N outside −60..60, is an error.
 **Patterns.** `%Name+N` and `%Name-N` (and `K%Name+N`) read the pattern
 transposed by N semitones **in addition to** the transposition in force
 (section 8.2); the number follows the name with no spaces. The same holds
-for the MIDI references of section 8.3 (`&Name+7`).
+for the MIDI references of section 8.3 (`&"Name"+7`).
 
 ### 7.9 Reset
 
@@ -621,26 +628,26 @@ pattern is relative to that reference and ends with it.
 
 ### 8.3 MIDI references
 
-`&Name` (and `N&Name`) inserts tokens converted from a MIDI file of a
-library. This is an **optional** feature of the host application: a
-parser without a library MUST report such a reference as an error.
+`&"Name"` (and `N&"Name"`) inserts tokens converted from a MIDI file of a
+library. The file name is always written **in quotes**: it may contain
+subfolders, dashes and spaces (`&"Blues/bass-line"`, `&"intro take 2"`),
+and nothing outside the quotes is part of it. This is an **optional**
+feature of the host application: a parser without a library MUST report
+such a reference as an error.
 
-A MIDI reference can be transposed like a pattern: `&Name+N` reads the
+A MIDI reference can be transposed like a pattern: `&"Name"+N` reads the
 file N semitones higher, in addition to the transposition in force
-(section 7.8), and `&Name-N` lower. Without a `+`, a `-` followed by
-digits at the end of the reference is **always** a transposition: `&take-2`
-is the file `take` two semitones lower. A `+N` makes the whole name before
-it literal, so a file whose name ends in `-digits` is written with a `+`:
-`&take-2+0` is the file `take-2`, `&take-2+3` the same file three
-semitones higher. The tokens of the file are read in the initial pitch
-state, like those of a pattern, and the transposition ends with the
-reference.
+(section 7.8), and `&"Name"-N` lower. The tokens of the file are read in
+the initial pitch state, like those of a pattern, and the transposition
+ends with the reference.
 
-*Compatibility with 2.5* (where `-N` was a transposition only if the
-library had no file with the full name): when the file without the `-N`
-does not exist and the file with the full name does, a parser MUST read
-the full name and report a warning (section 10.2). The meaning of a
-reference never depends on the library when the shortened file exists.
+A reference without quotes (`&Name`, the form of the versions before
+2.6) is an error. A reader of song files SHOULD convert it when it reads
+a file (section 12): `&Name` and `&Name+N` become `&"Name"` and
+`&"Name"+N`; for a final `-N` without `+` it applies the 2.5 rule (the
+whole name if the library has a file with it, otherwise the name without
+`-N` transposed down by N). Since the form without quotes is never valid
+text, the conversion never changes the meaning of a valid text.
 
 ### 8.4 Voice blocks
 
@@ -867,7 +874,8 @@ conforming parser MUST report at least these errors:
   that takes a note out of MIDI 0-127; `reset:` while a velocity or tempo
   ramp is open;
 - an undefined pattern, a too-deep or cyclic reference, an unresolvable
-  MIDI reference;
+  MIDI reference, a MIDI reference without quotes or with an unclosed
+  quote;
 - an empty block `[]` or an empty voice block.
 
 ### 10.2 Warnings
@@ -901,10 +909,6 @@ N, once per token even if repeated.
 
 **Lyrics.** More syllables than pending events (section 8.5): reported
 at the lyric token.
-
-**MIDI references read as in 2.5.** A `&name-N` whose shortened file does
-not exist and whose full name does (section 8.3): reported at the
-reference, suggesting `&name-N+0`.
 
 ---
 
@@ -1113,13 +1117,14 @@ version if it gives the same result for every case.
 ## Appendix A: changes
 
 **2.6** — consolidation: `reset:` (section 7.9), used as the box prefix
-(section 12.4); the table of state inheritance (section 4); `&name-N` is
-always a transposition, `&name-N+0` names a file ending in `-N`, with a
-compatibility rule and warning (sections 8.3, 10.2); the `ST:` version
+(section 12.4); the table of state inheritance (section 4); MIDI file
+names in quotes, `&"Name"+N` / `&"Name"-N` (sections 2.2, 3, 8.3), with
+the conversion of the old form when reading files; the `ST:` version
 header, the pickup bar `Levare:` (sections 12.1, 12.3) and English
 keywords in the song file; an instrument block needs `program=`. Every
-valid 2.5 track text is valid 2.6 text with the same events, except a
-`&name-N` when both `name` and `name-N` exist in the library.
+valid 2.5 track text without MIDI references is valid 2.6 text with the
+same events; one with MIDI references is, after the conversion of
+section 8.3.
 
 **2.5** — bar anchors `bar=N` (section 8.9) and the warning for a track
 that is past the bar; transposition `transpose=N` and `%Name+N`

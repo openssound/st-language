@@ -89,12 +89,17 @@ la prima regola che si applica:
    solo `<` o `>` subito dopo la `]` una forcella (`[c e g]<`), poi un `~`
    una legatura di valore e un `(` o `)` una legatura di portamento
    (`[c e g]~`, `[c e g](`). Senza `]` e' un errore.
-4. Delle cifre facoltative seguite da `(` aprono un **gruppo** che finisce
+4. Delle cifre facoltative seguite da `&"` aprono un **riferimento MIDI**:
+   il nome del file arriva fino alla `"` successiva (puo' contenere
+   spazi), e un `+` o un `-` seguito da cifre subito dopo la virgoletta
+   di chiusura allunga il token con una trasposizione
+   (`&"Blues/bass line"-2`). Senza la virgoletta di chiusura e' un errore.
+5. Delle cifre facoltative seguite da `(` aprono un **gruppo** che finisce
    alla `)` corrispondente; le parentesi si annidano, e quelle dentro un
    testo cantato non contano. Senza la `)` corrispondente e' un errore.
-5. `{` apre un **blocco di voci** che finisce alla `}` corrispondente
+6. `{` apre un **blocco di voci** che finisce alla `}` corrispondente
    (stesse regole dei gruppi). Senza la `}` corrispondente e' un errore.
-6. Altrimenti un token **semplice** arriva fino a uno spazio, a `|` o a
+7. Altrimenti un token **semplice** arriva fino a uno spazio, a `|` o a
    `"`. Cosi' `d*4|` sono due token (`d*4`, `|`) e `c"la"` sono due token
    (`c`, `"la"`).
 
@@ -138,7 +143,9 @@ repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| 
 text         = '$"' { any character except '"' } '"' ;          (* $"rit." *)
 lyric        = '"' { qualunque carattere tranne '"' } '"' ;
 pattern-ref  = [ number ] "%" word [ ( "+" | "-" ) number ] ;      (* %Riff  3%Riff  %Riff+7 *)
-midi-ref     = [ number ] "&" ( word | "/" | "-" ) { word | "/" | "-" } [ "+" number ] ;
+midi-ref     = [ number ] "&" '"' file-name '"' [ ( "+" | "-" ) number ] ;
+                                                  (* &"Riff"  2&"Blues/bass line"-12 *)
+file-name    = any character except '"' , { any character except '"' } ;
 group        = [ number ] "(" { token } ")" ;                   (* 4(c d) *)
 voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } *)
 voice        = { token } ;
@@ -233,7 +240,7 @@ finiscono i cambi fatti dentro:
 | Contesto | Comincia con | I cambi fatti dentro |
 | --- | --- | --- |
 | gruppo di ripetizione `N(...)` | lo stato corrente | continuano dopo (il gruppo e' scritto per esteso) |
-| pattern `%Nome`, riferimento MIDI `&Nome` | lo stato corrente, tranne: modo `abs:`, nessuna tonalita', nota precedente azzerata (sezione 8.2); trasposizione = quella corrente piu' il `+N`/`-N` del riferimento | modo, tonalita', nota precedente e `transpose=` finiscono col riferimento; griglia, velocity, automazioni, swing e spostamento continuano dopo |
+| pattern `%Nome`, riferimento MIDI `&"Nome"` | lo stato corrente, tranne: modo `abs:`, nessuna tonalita', nota precedente azzerata (sezione 8.2); trasposizione = quella corrente piu' il `+N`/`-N` del riferimento | modo, tonalita', nota precedente e `transpose=` finiscono col riferimento; griglia, velocity, automazioni, swing e spostamento continuano dopo |
 | blocco di voci `{ ; }` | ogni voce: lo stato corrente | restano nella voce; dopo il blocco lo stato e' quello di prima |
 | box (file di brano, sezione 12.4) | lo stato iniziale, con `reset:`; i valori delle automazioni continuano dal box prima | finiscono col box |
 | `reset:` | — | griglia, velocity, swing, spostamento, trasposizione (`transpose=`), modo, tonalita' e nota precedente tornano ai valori iniziali (sezione 7.9) |
@@ -586,7 +593,7 @@ N fuori da −60..60, e' un errore.
 **Pattern.** `%Nome+N` e `%Nome-N` (e `K%Nome+N`) leggono il pattern
 trasposto di N semitoni **in aggiunta** alla trasposizione in vigore
 (sezione 8.2); il numero segue il nome senza spazi. Lo stesso vale per i
-riferimenti MIDI della sezione 8.3 (`&Nome+7`).
+riferimenti MIDI della sezione 8.3 (`&"Nome"+7`).
 
 ### 7.9 Reset
 
@@ -637,27 +644,28 @@ vale rispetto a quel riferimento e finisce con esso.
 
 ### 8.3 Riferimenti MIDI
 
-`&Nome` (e `N&Nome`) inserisce i token convertiti da un file MIDI di una
-libreria. E' una funzione **facoltativa** dell'applicazione che ospita il
+`&"Nome"` (e `N&"Nome"`) inserisce i token convertiti da un file MIDI di
+una libreria. Il nome del file si scrive sempre **fra virgolette**: puo'
+contenere sottocartelle, trattini e spazi (`&"Blues/bass-line"`,
+`&"intro take 2"`), e niente di quello che sta fuori dalle virgolette ne
+fa parte. E' una funzione **facoltativa** dell'applicazione che ospita il
 parser: un parser senza libreria DEVE segnalare questi riferimenti come
 errore.
 
-Un riferimento MIDI si trasporta come un pattern: `&Nome+N` legge il file
-N semitoni sopra, in aggiunta alla trasposizione in vigore (sezione 7.8), e
-`&Nome-N` sotto. Senza un `+`, un `-` seguito da cifre in fondo al
-riferimento e' **sempre** una trasposizione: `&take-2` e' il file `take`
-due semitoni sotto. Un `+N` rende letterale tutto il nome che lo precede,
-quindi un file il cui nome finisce con `-cifre` si scrive con il `+`:
-`&take-2+0` e' il file `take-2`, `&take-2+3` lo stesso file tre semitoni
-sopra. I token del file si leggono nello stato iniziale delle altezze, come
-quelli di un pattern, e la trasposizione finisce col riferimento.
+Un riferimento MIDI si trasporta come un pattern: `&"Nome"+N` legge il
+file N semitoni sopra, in aggiunta alla trasposizione in vigore (sezione
+7.8), e `&"Nome"-N` sotto. I token del file si leggono nello stato
+iniziale delle altezze, come quelli di un pattern, e la trasposizione
+finisce col riferimento.
 
-*Compatibilita' con la 2.5* (dove `-N` era una trasposizione solo se la
-libreria non aveva un file col nome per intero): quando il file senza il
-`-N` non esiste e quello col nome per intero si', un parser DEVE leggere il
-nome per intero e dare un avviso (sezione 10.2). Il significato di un
-riferimento non dipende mai dalla libreria quando il file accorciato
-esiste.
+Un riferimento senza virgolette (`&Nome`, la forma delle versioni prima
+della 2.6) e' un errore. Un lettore dei file di brano DOVREBBE convertirlo
+quando legge un file (sezione 12): `&Nome` e `&Nome+N` diventano `&"Nome"`
+e `&"Nome"+N`; per un `-N` finale senza `+` vale la regola della 2.5 (il
+nome per intero se la libreria ha un file che si chiama cosi', altrimenti
+il nome senza `-N` trasposto di N semitoni sotto). Siccome la forma senza
+virgolette non e' mai un testo valido, la conversione non cambia mai il
+significato di un testo valido.
 
 ### 8.4 Blocchi di voci
 
@@ -895,7 +903,8 @@ conforme DEVE segnalare almeno questi errori:
   (`transpose=` o `%Nome+N`) o che porta una nota fuori da MIDI 0-127;
   `reset:` con una rampa di velocity o di tempo aperta;
 - un pattern non definito, un riferimento troppo profondo o ciclico, un
-  riferimento MIDI che non si risolve;
+  riferimento MIDI che non si risolve, senza virgolette o con la
+  virgoletta non chiusa;
 - un blocco vuoto `[]` o un blocco di voci vuoto.
 
 ### 10.2 Avvisi
@@ -932,10 +941,6 @@ numero di battuta N, una volta per token anche se ripetuto.
 
 **Testo cantato.** Piu' sillabe che eventi in attesa (sezione 8.5): si
 segnala sul token del testo.
-
-**Riferimenti MIDI letti come nella 2.5.** Un `&nome-N` il cui file
-accorciato non esiste e quello col nome per intero si' (sezione 8.3): si
-segnala sul riferimento, suggerendo `&nome-N+0`.
 
 ---
 
@@ -1160,13 +1165,13 @@ caso.
 
 **2.6** — consolidamento: `reset:` (sezione 7.9), usato come prefisso dei
 box (sezione 12.4); la tabella dell'eredita' dello stato (sezione 4);
-`&nome-N` e' sempre una trasposizione, `&nome-N+0` indica un file che
-finisce con `-N`, con una regola di compatibilita' e un avviso (sezioni
-8.3, 10.2); l'intestazione di versione `ST:`, la battuta in levare
-`Levare:` (sezioni 12.1, 12.3) e le parole chiave inglesi nel file di
-brano; un blocco strumento vuole `program=`. Ogni testo di traccia valido
-2.5 e' valido anche in 2.6, con gli stessi eventi, tranne un `&nome-N`
-quando nella libreria esistono sia `nome` sia `nome-N`.
+i nomi dei file MIDI fra virgolette, `&"Nome"+N` / `&"Nome"-N` (sezioni
+2.2, 3, 8.3), con la conversione della forma vecchia quando si leggono i
+file; l'intestazione di versione `ST:`, la battuta in levare `Levare:`
+(sezioni 12.1, 12.3) e le parole chiave inglesi nel file di brano; un
+blocco strumento vuole `program=`. Ogni testo di traccia valido 2.5 senza
+riferimenti MIDI e' valido anche in 2.6, con gli stessi eventi; uno con
+riferimenti MIDI lo e' dopo la conversione della sezione 8.3.
 
 **2.5** — ancore di battuta `bar=N` (sezione 8.9) e l'avviso per una
 traccia che e' gia' oltre la battuta; trasposizione `transpose=N` e
