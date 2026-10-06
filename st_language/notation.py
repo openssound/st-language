@@ -575,6 +575,12 @@ SWING_RANGE = (50, 80)
 RE_SHIFT = re.compile(r"^shift=(-?\d+)$")
 SHIFT_RANGE = (-500, 500)
 
+# Ancora di battuta: 'bar=N' porta il cursore all'inizio della battuta N
+# (con i silenzi che servono); se la traccia e' gia' oltre, resta dov'e' e
+# l'editor segnala l'avviso (vedi notation_warnings).
+RE_BAR_ANCHOR = re.compile(r"^bar=(\d+)$")
+BAR_ANCHOR_MAX = 99999
+
 
 # ---------------------------------------------------------------------------
 # Eventi
@@ -1152,8 +1158,8 @@ def swing_time(beat: float, swing: Optional[Tuple[float, float]]) -> float:
     return (k + warped) * pair
 
 
-def parse_tokens(tokens: List[str], default_octave: int = 4) -> List[Event]:
-    return _parse_tokens_exact(tokens, default_octave)[0]
+def parse_tokens(tokens: List[str], default_octave: int = 4, meter: Optional["Meter"] = None) -> List[Event]:
+    return _parse_tokens_exact(tokens, default_octave, meter=meter)[0]
 
 
 def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
@@ -1165,7 +1171,9 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                          initial_controls: Optional[Dict[str, float]] = None,
                          initial_swing: Optional[Tuple[float, float]] = None,
                          initial_pitch: Optional["_PitchState"] = None,
-                         initial_shift: Optional[int] = None
+                         initial_shift: Optional[int] = None,
+                         meter: Optional["Meter"] = None,
+                         origin_beat: Fraction = Fraction(0)
                          ) -> Tuple[List[Event], Fraction, Fraction]:
     """Come parse_tokens, ma ritorna anche la posizione finale esatta (in
     beat, Fraction) e la griglia attiva alla fine. Griglia e posizione sono
@@ -1186,7 +1194,12 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
     dict vi si raccolgono, per indice di token, i controlli di battuta
     dentro le voci ("voice_bars": {i: (inizio, [[posizioni], ...])}) e gli
     avvisi sul testo cantato ("lyric_issues": {i: messaggio}), vedi
-    notation_warnings."""
+    notation_warnings.
+
+    'meter' (vedi Meter) dice dove cominciano le battute, per 'bar=N'; senza,
+    si usa il 4/4. 'origin_beat' e' dove il frammento comincia nel brano
+    (un blocco di voci o un box): la battuta N va cercata nel brano, non nel
+    frammento."""
     tokens, _origins = expand_repeats(tokens, lenient=lenient)
     grid_beats = initial_grid  # unita' di durata corrente, in beat (quarti). Default: 1/4 (nera)
     velocity = initial_velocity  # velocity corrente
@@ -1396,7 +1409,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                         initial_velocity=velocity, voice=voice + k, extras=None,
                         pending_lyrics=lyric_targets if k == 0 else None,
                         initial_controls=controls, initial_swing=swing, initial_pitch=pitch,
-                        initial_shift=shift)
+                        initial_shift=shift, meter=meter, origin_beat=origin_beat + cursor)
                     for ev in sub_events:
                         ev.start += float(cursor)
                         if ev.kind == "control":
@@ -1500,6 +1513,23 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 if not SHIFT_RANGE[0] <= ms <= SHIFT_RANGE[1]:
                     raise NotationError(tr("Spostamento fuori range ({0}..{1} ms)", *SHIFT_RANGE), tok)
                 shift = ms or None
+                continue
+
+            m = RE_BAR_ANCHOR.match(tok)
+            if m:
+                bar = int(m.group(1))
+                if not 1 <= bar <= BAR_ANCHOR_MAX:
+                    raise NotationError(tr("Battuta fuori range (1-{0})", BAR_ANCHOR_MAX), tok)
+                target = (meter or default_meter()).start_of(bar) - origin_beat
+                if target > cursor:
+                    if pending_tie is not None:
+                        raise NotationError(tr("La legatura di valore (~) deve arrivare a una nota uguale, "
+                                               "non a un'ancora di battuta"), tok)
+                    _add(Event(start=float(cursor), duration=float(target - cursor), kind="rest",
+                               velocity=velocity))
+                    cursor = target
+                elif target < cursor and extras is not None:
+                    extras.setdefault("anchor_issues", {})[index] = (bar, cursor - target)
                 continue
 
             if tok in ("SON", "SOFF"):
@@ -1638,26 +1668,28 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
 
 
 def parse_track_text(text: str, patterns: Dict[str, Pattern], default_octave: int = 4,
-                      midi_dir: Optional[str] = None) -> List[Event]:
+                      midi_dir: Optional[str] = None, meter: Optional["Meter"] = None) -> List[Event]:
     """Punto di ingresso completo: tokenizza, espande pattern (%) e riferimenti
-    MIDI (&), quindi interpreta lo Stato Corrente."""
+    MIDI (&), quindi interpreta lo Stato Corrente. 'meter' (vedi Meter) serve
+    alle ancore di battuta 'bar=N'."""
     raw_tokens = tokenize(text)
     expanded = expand_patterns(raw_tokens, patterns, midi_dir=midi_dir, default_octave=default_octave)
-    return parse_tokens(expanded, default_octave=default_octave)
+    return parse_tokens(expanded, default_octave=default_octave, meter=meter)
 
 
 def validate_track_text(text: str, patterns: Dict[str, Pattern], default_octave: int = 4,
-                         midi_dir: Optional[str] = None):
+                         midi_dir: Optional[str] = None, meter: Optional["Meter"] = None):
     """Usata dall'editor per la validazione sintattica live. Ritorna (ok, messaggio_errore)."""
     try:
-        parse_track_text(text, patterns, default_octave=default_octave, midi_dir=midi_dir)
+        parse_track_text(text, patterns, default_octave=default_octave, midi_dir=midi_dir, meter=meter)
         return True, ""
     except (NotationError, ValueError) as e:
         return False, str(e)
 
 
 def _expanded_ranges(text: str, patterns: Dict[str, Pattern], midi_dir: Optional[str],
-                     default_octave: int, extras: Optional[dict] = None):
+                     default_octave: int, extras: Optional[dict] = None,
+                     meter: Optional["Meter"] = None, origin_beat: Fraction = Fraction(0)):
     """Espande separatamente ogni token di primo livello e interpreta il
     risultato in modalita' tollerante. Ritorna (token grezzi con posizione,
     token espansi, indice del token grezzo da cui viene ciascun espanso,
@@ -1675,12 +1707,12 @@ def _expanded_ranges(text: str, patterns: Dict[str, Pattern], midi_dir: Optional
     expanded, origins = expand_repeats(expanded, origins, lenient=True)
     ranges: List[Tuple[Fraction, Fraction]] = []
     _parse_tokens_exact(expanded, default_octave=default_octave, lenient=True, ranges=ranges,
-                        extras=extras)
+                        extras=extras, meter=meter, origin_beat=origin_beat)
     return raw, expanded, origins, ranges
 
 
 def compute_token_spans(text: str, patterns: Dict[str, Pattern], midi_dir: Optional[str] = None,
-                          default_octave: int = 4) -> List[tuple]:
+                          default_octave: int = 4, meter: Optional["Meter"] = None) -> List[tuple]:
     """Calcola, per ogni token di 'primo livello' del testo GREZZO (prima
     dell'espansione di %pattern/&midi), la sua posizione carattere e il suo
     intervallo temporale in beat. Un riferimento %Nome o &Nome, o un gruppo
@@ -1698,7 +1730,8 @@ def compute_token_spans(text: str, patterns: Dict[str, Pattern], midi_dir: Optio
     Ritorna una lista di tuple (char_start, char_end, beat_start, beat_duration),
     ordinata per beat_start crescente. I comandi di stato (N:, NT:, N@, tempo=N,
     rampe, SON/SOFF) non producono uno span (non hanno una durata propria)."""
-    raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave)
+    raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave,
+                                                      meter=meter)
     raw_positions = [(cs, ce) for _, cs, ce in raw]
 
     # Uno span per ogni tratto consecutivo dello stesso token grezzo: un
@@ -1825,6 +1858,32 @@ def bar_starts(time_sig: str = "4/4", metrica_changes=()):
         bar += 1
 
 
+class Meter:
+    """Dove cominciano le battute del brano (in quarti): serve alle ancore
+    'bar=N'. Si costruisce con la metrica del brano e gli eventuali suoi
+    cambi (vedi bar_starts); senza, vale il 4/4."""
+
+    def __init__(self, time_sig: str = "4/4", metrica_changes=()):
+        self._gen = bar_starts(time_sig, metrica_changes)
+        self._starts: List[Fraction] = []
+
+    def start_of(self, bar: int) -> Fraction:
+        """L'inizio della battuta 'bar' (la prima e' la 1, a 0)."""
+        while len(self._starts) < bar:
+            self._starts.append(next(self._gen))
+        return self._starts[bar - 1]
+
+
+_DEFAULT_METER: Optional[Meter] = None
+
+
+def default_meter() -> Meter:
+    global _DEFAULT_METER
+    if _DEFAULT_METER is None:
+        _DEFAULT_METER = Meter()
+    return _DEFAULT_METER
+
+
 @dataclass
 class BarIssue:
     char_start: int     # posizione della '|' nel testo
@@ -1864,6 +1923,13 @@ def bar_check_message(bar: int, delta: Fraction) -> str:
     return tr("battuta {bar}: mancano {amount}", bar=bar, amount=amount)
 
 
+def anchor_message(bar: int, over: Fraction) -> str:
+    """Avviso per 'bar=N' quando la traccia e' gia' oltre l'inizio della
+    battuta N di 'over' quarti."""
+    _, amount = describe_duration(over)
+    return tr("battuta {bar}: la traccia e' gia' {amount} oltre l'inizio", bar=bar, amount=amount)
+
+
 def check_bar_lines(text: str, patterns: Dict[str, Pattern], time_sig: str = "4/4",
                     metrica_changes=(), start_beat: float = 0.0, default_octave: int = 4,
                     midi_dir: Optional[str] = None) -> List[BarIssue]:
@@ -1892,11 +1958,12 @@ def notation_warnings(text: str, patterns: Dict[str, Pattern], time_sig: str = "
     check_bar_lines, bar > 0) e testi cantati con piu' sillabe che note
     (bar == 0)."""
     extras: dict = {}
+    offset = Fraction(start_beat).limit_denominator(1 << 16)
     try:
-        raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave, extras)
+        raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave, extras,
+                                                          Meter(time_sig, metrica_changes), offset)
     except NotationError:
         return []
-    offset = Fraction(start_beat).limit_denominator(1 << 16)
     grid = _BarGrid(time_sig, metrica_changes)
     issues: List[BarIssue] = []
     reported = set()
@@ -1930,6 +1997,9 @@ def notation_warnings(text: str, patterns: Dict[str, Pattern], time_sig: str = "
     for index, message in extras.get("lyric_issues", {}).items():
         _, cs, ce = raw[origins[index]]
         issues.append(BarIssue(cs, ce, 0, message))
+    for index, (bar, over) in extras.get("anchor_issues", {}).items():
+        _, cs, ce = raw[origins[index]]
+        issues.append(BarIssue(cs, ce, bar, anchor_message(bar, over)))
     issues.sort(key=lambda i: i.char_start)
     return issues
 

@@ -78,7 +78,7 @@ def build_tempo_beat_map(project: "Song", tracks=None, midi_dir: Optional[str] =
 
     for track in tracks:
         events = (events_by_track.get(track.name, []) if events_by_track is not None
-                  else track.parsed_events(project.patterns, midi_dir=midi_dir))
+                  else track.parsed_events(project.patterns, midi_dir=midi_dir, meter=project.meter()))
         for ev in events:
             if ev.kind == "tempo_marker" and ev.bpm:
                 points[ev.start] = ev.bpm

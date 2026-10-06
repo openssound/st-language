@@ -7,6 +7,8 @@
 //   3. l'assolo di chitarra, con scivolate e bending;      4. il tema, di nuovo,
 // poi la coda con il rallentando e la corona sull'ultimo accordo.
 // Lo swing (swing=66) da' il "terzinato" del blues alle crome scritte dritte.
+// Le ancore di battuta (bar=29, bar=41) dicono dove entrano la seconda
+// chitarra e il quarto coro, senza contare a mano le battute di pausa.
 
 Tempo: 96 BPM
 Metrica: 4/4
@@ -178,8 +180,10 @@ Trumpet:
   4%Rest
   // coro 1: il tema
   %Head
-  // cori 2 e 3: la tromba tace per lasciare spazio agli assoli
-  24%Rest
+  // cori 2 e 3: la tromba tace per lasciare spazio agli assoli; l'ancora
+  // bar=41 porta alla battuta in cui comincia il coro 4 (e avvisa se la
+  // traccia fosse arrivata piu' in la')
+  bar=41
   // coro 4: il tema, con piu' forza
   100@ %Head
   // coda
@@ -188,7 +192,7 @@ Trumpet:
 Guitar 2:
   swing=66
   // introduzione e primi due cori: la seconda chitarra aspetta
-  28%Rest
+  bar=29
   // coro 3: assolo, con scivolate (nota>nota) e bending (bend=)
   8: 100@
   2a*4>c*5 c*5 e*5 2e*5 2r |

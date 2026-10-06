@@ -111,5 +111,8 @@
  "{source}: errori di sintassi, niente esportazione (vedi st-language check)": "{source}: syntax errors, nothing exported (see st-language check)",
  "{value} quarti": "{value} quarter notes",
  "⚠  Avviso: {msg}": "⚠  Warning: {msg}",
- "⚠  Avviso: {msg} (e altri {n})": "⚠  Warning: {msg} (and {n} more)"
+ "⚠  Avviso: {msg} (e altri {n})": "⚠  Warning: {msg} (and {n} more)",
+ "Battuta fuori range (1-{0})": "Bar out of range (1-{0})",
+ "La legatura di valore (~) deve arrivare a una nota uguale, non a un'ancora di battuta": "The tie (~) must reach an equal note, not a bar anchor",
+ "battuta {bar}: la traccia e' gia' {amount} oltre l'inizio": "bar {bar}: the track is already {amount} past the start"
 }

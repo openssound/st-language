@@ -144,6 +144,10 @@ CASES = [
     ("error-slur-single-note", "c() d", {}),
     ("error-slur-on-rest", "r( c d)", {}),
     ("error-swing-range", "swing=90 c", {}),
+    ("error-anchor-zero", "bar=0 c", {}),
+    ("error-anchor-decimals", "bar=1.5 c", {}),
+    ("error-anchor-too-large", "bar=100000 c", {}),
+    ("error-anchor-after-tie", "c~ bar=2 c", {}),
     ("error-shift-range", "shift=600 c", {}),
     ("error-shift-decimals", "shift=1.5 c", {}),
     ("error-tune-range", "tune=-101 c", {}),
@@ -160,6 +164,16 @@ CASES = [
     ("error-key-too-many-accidentals", "key=G# c", {}),
     ("error-relative-out-of-range", "rel: c*9 a*+", {}),
     ("error-mark-on-rest", "r$accent", {}),
+    # --- ancore di battuta (2.5)
+    ("anchor-pads-with-silence", "4: c d e f bar=3 g", {}),
+    ("anchor-on-the-spot", "4: c d e f bar=2 g", {}),
+    ("anchor-at-the-start", "bar=3 4: c", {}),
+    ("anchor-time-signature", "4: bar=3 c", {"time_sig": "3/4"}),
+    ("anchor-meter-changes", "4: bar=4 c",
+     {"metrica_changes": [[1, "4/4"], [3, "3/4"]]}),
+    ("anchor-in-patterns", "%A bar=3 %A", {"patterns": {"A": "4: c d"}}),
+    ("anchor-in-voices", "4: c { d e ; bar=2 f }", {}),
+    ("anchor-keeps-velocity-and-grid", "8: 90@ c bar=2 d", {}),
     # --- avvisi (il testo e' valido)
     ("warning-bar-missing", "4: c d e | f g a b |", {}),
     ("warning-bar-extra", "8: c d e f g a b c d | e", {}),
@@ -169,6 +183,8 @@ CASES = [
      {"metrica_changes": [[1, "4/4"], [2, "3/4"], [3, "5/4"]]}),
     ("warning-voices", "4: { c d e | f ; 2c 2d | } |", {}),
     ("warning-extra-syllables", 'c d "a b c"', {}),
+    ("warning-anchor-past", "4: c d e f g a b c bar=2 d", {}),
+    ("warning-anchor-past-in-pattern", "%B %B", {"patterns": {"B": "4: c d e f bar=2 g"}}),
 ]
 
 
@@ -200,10 +216,12 @@ def event_json(ev) -> dict:
 def run_case(text: str, options: dict) -> dict:
     patterns = {name: Pattern(name, tokenize(body)) for name, body in options.get("patterns", {}).items()}
     octave = options.get("octave", 4)
-    ok, _message = validate_track_text(text, patterns, default_octave=octave)
+    from st_language import Meter
+    meter = Meter(options.get("time_sig", "4/4"), [tuple(c) for c in options.get("metrica_changes", [])])
+    ok, _message = validate_track_text(text, patterns, default_octave=octave, meter=meter)
     if not ok:
         return {"error": True}
-    events = [event_json(e) for e in parse_track_text(text, patterns, default_octave=octave)]
+    events = [event_json(e) for e in parse_track_text(text, patterns, default_octave=octave, meter=meter)]
     warnings = [{"start": w.char_start, "end": w.char_end, "bar": w.bar}
                 for w in notation_warnings(text, patterns, options.get("time_sig", "4/4"),
                                            [tuple(c) for c in options.get("metrica_changes", [])],
@@ -222,7 +240,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "2.4", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.5", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 

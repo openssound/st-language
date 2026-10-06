@@ -1,5 +1,5 @@
 {
- "spec_version": "2.4",
+ "spec_version": "2.5",
  "cases": [
   {
    "id": "notes-basic",
@@ -5334,6 +5334,34 @@
    }
   },
   {
+   "id": "error-anchor-zero",
+   "input": "bar=0 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-anchor-decimals",
+   "input": "bar=1.5 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-anchor-too-large",
+   "input": "bar=100000 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-anchor-after-tie",
+   "input": "c~ bar=2 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
    "id": "error-shift-range",
    "input": "shift=600 c",
    "expect": {
@@ -5443,6 +5471,312 @@
    "input": "r$accent",
    "expect": {
     "error": true
+   }
+  },
+  {
+   "id": "anchor-pads-with-silence",
+   "input": "4: c d e f bar=3 g",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 4.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "anchor-on-the-spot",
+   "input": "4: c d e f bar=2 g",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "anchor-at-the-start",
+   "input": "bar=3 4: c",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 8.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "anchor-time-signature",
+   "input": "4: bar=3 c",
+   "time_sig": "3/4",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 6.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "anchor-meter-changes",
+   "input": "4: bar=4 c",
+   "metrica_changes": [
+    [
+     1,
+     "4/4"
+    ],
+    [
+     3,
+     "3/4"
+    ]
+   ],
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 11.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "anchor-in-patterns",
+   "input": "%A bar=3 %A",
+   "patterns": {
+    "A": "4: c d"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 6.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "anchor-in-voices",
+   "input": "4: c { d e ; bar=2 f }",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 3.0,
+      "kind": "rest",
+      "velocity": 80,
+      "voice": 2
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4,
+      "voice": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "anchor-keeps-velocity-and-grid",
+   "input": "8: 90@ c bar=2 d",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 90,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 3.5,
+      "kind": "rest",
+      "velocity": 90
+     },
+     {
+      "start": 4.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 90,
+      "letter": "d",
+      "octave": 4
+     }
+    ]
    }
   },
   {
@@ -6037,6 +6371,191 @@
       "start": 4,
       "end": 11,
       "bar": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "warning-anchor-past",
+   "input": "4: c d e f g a b c bar=2 d",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     }
+    ],
+    "warnings": [
+     {
+      "start": 19,
+      "end": 24,
+      "bar": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "warning-anchor-past-in-pattern",
+   "input": "%B %B",
+   "patterns": {
+    "B": "4: c d e f bar=2 g"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     }
+    ],
+    "warnings": [
+     {
+      "start": 3,
+      "end": 5,
+      "bar": 2
      }
     ]
    }

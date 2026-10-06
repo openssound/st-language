@@ -825,7 +825,7 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
     if tracks is None:
         tracks = project.audible_tracks() if only_audible else project.tracks
     tracks = [t for t in tracks if not t.is_audio]
-    events_by_track = {t.name: t.parsed_events(project.patterns, midi_dir=midi_dir) for t in tracks}
+    events_by_track = {t.name: t.parsed_events(project.patterns, midi_dir=midi_dir, meter=project.meter()) for t in tracks}
     key = key_fifths(project.key)
     flats = bool(key and key[0] < 0)
 

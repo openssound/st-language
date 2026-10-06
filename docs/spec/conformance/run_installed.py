@@ -3,7 +3,7 @@ Prova la libreria st_language INSTALLATA (pip install st-language, una
 wheel, uno sdist): i casi della suite di conformita' e i comandi da
 terminale. Non usa il codice della cartella del repository.
 
-    pip install dist/st_language-2.4.0-py3-none-any.whl
+    pip install dist/st_language-2.5.0-py3-none-any.whl
     python docs/spec/conformance/run_installed.py
 
 Esce con 0 se tutto e' uguale all'atteso, con 1 altrimenti.

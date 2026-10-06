@@ -71,7 +71,7 @@ def events_json(song: Song) -> List[dict]:
         if part.is_audio:
             continue
         events = []
-        for ev in part.parsed_events(song.patterns):
+        for ev in part.parsed_events(song.patterns, meter=song.meter()):
             d = {k: v for k, v in asdict(ev).items() if v is not None and not (k == "voice" and v == 1)}
             events.append(d)
         out.append({"track": part.name, "instrument": part.instrument.name, "events": events})

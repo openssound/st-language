@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.4** · Reference implementation: the `st_language` Python
+**Version 2.5** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -106,7 +106,7 @@ The grammar of each kind of token (EBNF; `digit` is 0-9, `letter` is
 A-Z or a-z, `word` is one or more letters, digits or `_`):
 
 ```ebnf
-token        = grid | velocity | tempo | ramp | control | swing | shift
+token        = grid | velocity | tempo | ramp | control | swing | shift | anchor
              | pitch-mode | key-mode | sustain
              | bar-check | repeat | text | lyric | pattern-ref | midi-ref
              | group | voices | sounding ;
@@ -122,6 +122,7 @@ control-name = "vol" | "expr" | "pan" | "mod" | "rev" | "cho" | "bend"
              | "tune" | "cc" number ;                         (* vol=80  cc74=30 *)
 swing        = "swing" [ "16" ] "=" number ;                    (* swing=66 *)
 shift        = "shift=" [ "-" ] number ;                        (* shift=-15 *)
+anchor       = "bar=" number ;                                  (* bar=29 *)
 pitch-mode   = "rel:" | "abs:" ;
 key-mode     = "key=" ( root [ "m" ] | "off" ) ;                (* key=G  key=Dm *)
 sustain      = "SON" | "SOFF" ;
@@ -644,6 +645,29 @@ cursor: an event of kind `text` with `name` = the text and duration 0.
 It does not change the sound: tempo and dynamics are changed by their
 own commands.
 
+### 8.9 Bar anchors
+
+`bar=N` (N an integer from 1 to 99999) moves the cursor to the **start of
+bar N** of the song, using the same bar positions as the bar checks
+(section 12.3: bar 1 starts at beat 0, each bar lasts `4 × num / den`
+beats of the meter in force).
+
+- If the cursor is **before** that point, the gap is filled with silence:
+  one event of kind `rest` from the cursor to the start of bar N, with
+  the velocity in force, and the cursor moves to the anchor. A tie (`~`)
+  cannot reach an anchor that needs silence (error).
+- If the cursor is **exactly** there, nothing happens.
+- If the cursor is **already past** it, the text is still valid and the
+  cursor stays where it is (an anchor never goes back); it is reported
+  as a warning (section 10.2).
+
+The anchor is meant to say where a part enters (`bar=29`) instead of
+counting the rests by hand, and to catch a part that has drifted from the
+bars it was planned on. It has no duration of its own: it changes no
+state and no grid. Inside a pattern or a repeated group it is evaluated
+at every repetition, at the absolute position in the song; in a voice
+block each voice reaches the bar from the block's own start.
+
 ---
 
 ## 9. Chords and drums
@@ -754,7 +778,9 @@ conforming parser MUST report at least these errors:
 - an unknown mark, or a mark other than `$fermata` on a rest; a repeat
   not written as required by section 8.7;
 - a tie or slur not used as required by sections 6.9 and 6.10; a swing
-  value outside 50-80; a shift outside −500..500 ms;
+  value outside 50-80; a shift outside −500..500 ms; a bar anchor that is
+  not an integer from 1 to 99999, or that needs silence while a tie is
+  open;
 - an undefined pattern, a too-deep or cyclic reference, an unresolvable
   MIDI reference;
 - an empty block `[]` or an empty voice block.
@@ -782,6 +808,10 @@ repeated by a group or a pattern is reported at most once (at the group
 or reference). Each voice of a voice block is checked on its own,
 starting from the shift at the block; the shift after the block is the
 one before it.
+
+**Bar anchors.** A `bar=N` reached by a cursor that is already past the
+start of bar N (section 8.9): reported at the anchor, with the bar number
+N, once per token even if repeated.
 
 **Lyrics.** More syllables than pending events (section 8.5): reported
 at the lyric token.
@@ -967,6 +997,10 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.5** — bar anchors `bar=N` (section 8.9) and the warning for a track
+that is past the bar. Every valid 2.4 text is valid 2.5 text with the same
+events.
 
 **2.4** — micro-timing `shift=N` in milliseconds (section 7.7) with the
 event field `shift`; the automation `tune=` in cents (section 7.5); in
