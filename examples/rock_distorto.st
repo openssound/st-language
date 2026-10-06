@@ -258,22 +258,23 @@ Distorta:
 
 Box Distorta "Introduzione" |0:
   // due battute di silenzio, poi il riff
-  2%Rest 115@ %RiffEm %RiffEm
+  2%Rest vol=75 115@ %RiffEm %RiffEm
 
 Box Distorta "Strofa" |16:
   // il riff sotto la strofa, un po' piu' piano
-  105@ 2%RiffVerse4
+  vol=75 105@ 2%RiffVerse4
 
 Box Distorta "Ritornello" |48:
   // il tema a note lunghe, con piu' forza
-  124@ 2%ThemeChorus4
+  vol=90 124@ 2%ThemeChorus4
 
 Box Distorta "Assolo" |80:
   // l'assolo: semicrome veloci e scivolate
-  127@ %SoloAll
+  // piu' forte di tutto il resto: il controller del volume al massimo
+  vol=127 127@ %SoloAll
 
 Box Distorta "Coda" |112:
-  115@ %RiffEm %RiffC %RiffD
+  vol=90 115@ %RiffEm %RiffC %RiffD
   16: 127@ 16e*5$fermata |
 
 // ================================================================ mixer
