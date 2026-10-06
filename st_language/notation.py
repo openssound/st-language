@@ -269,7 +269,10 @@ RE_PATTERN_REF = re.compile(r"^(\d*)%(\w+?)([+-]\d+)?$")
 # &Nome richiama un file MIDI dalla libreria (ricerca ricorsiva nelle sottocartelle,
 # funzionalita' 5), con lo stesso moltiplicatore di ripetizione di %Nome. Il nome
 # puo' anche essere un percorso qualificato con sottocartella (es. &Blues/bass_line).
-RE_MIDI_REF = re.compile(r"^(\d*)&([\w/-]+)$")
+# Un '+N' dopo il nome trasporta il file di N semitoni (&Basso+7); il '-N'
+# (&Basso-3) e' lo stesso, ma siccome il nome puo' contenere '-' vale solo se
+# non esiste un file che si chiami proprio cosi' (vedi _resolve_midi_ref).
+RE_MIDI_REF = re.compile(r"^(\d*)&([\w/-]+)(\+\d+)?$")
 # N(...) ripete N volte la sequenza di token racchiusa tra parentesi tonde
 # (a differenza di [...], che e' simultaneita', non sequenza ripetuta).
 RE_REPEAT_GROUP = re.compile(r"^(\d*)\((.*)\)$", re.DOTALL)
@@ -904,6 +907,39 @@ def set_midi_ref_resolver(fn) -> None:
     _midi_ref_resolver = fn
 
 
+def _resolve_midi_ref(name_path: str, semitones: int, midi_dir: Optional[str], tok: str,
+                      has_plus: bool) -> Tuple[List[str], int]:
+    """(token del file MIDI, semitoni di trasposizione) per un riferimento
+    '&percorso': prima si cerca il file col nome per intero; se non c'e' e
+    il nome finisce con '-N' (e non c'era un '+N'), si cerca il file senza
+    quel suffisso e N negativo e' la trasposizione."""
+    if _midi_ref_resolver is None:
+        raise NotationError(tr("I riferimenti a file MIDI (&Nome) non sono disponibili qui"), tok)
+
+    def load(path: str) -> List[str]:
+        try:
+            return _midi_ref_resolver(path, midi_dir)
+        except NotationError:
+            raise
+        except FileNotFoundError:
+            raise
+        except Exception as e:          # es. riferimento ambiguo
+            raise NotationError(str(e), tok)
+
+    try:
+        return load(name_path), semitones
+    except FileNotFoundError:
+        tail = None if has_plus else re.match(r"^(.*[^-])(-\d+)$", name_path)
+        if tail:
+            try:
+                return load(tail.group(1)), int(tail.group(2))
+            except FileNotFoundError:
+                pass
+        raise NotationError(
+            tr("File MIDI '&{name_path}' non trovato nella libreria MIDI", name_path=name_path), tok
+        )
+
+
 def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
                      midi_dir: Optional[str] = None, default_octave: int = 4,
                      _depth: int = 0) -> List[str]:
@@ -930,21 +966,15 @@ def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
 
         m = RE_MIDI_REF.match(t)
         if m:
-            mult_s, name_path = m.groups()
+            mult_s, name_path, plus = m.groups()
             mult = int(mult_s) if mult_s else 1
-            if _midi_ref_resolver is None:
-                raise NotationError(tr("I riferimenti a file MIDI (&Nome) non sono disponibili qui"), t)
-            try:
-                body = _midi_ref_resolver(name_path, midi_dir)
-            except FileNotFoundError:
-                raise NotationError(
-                    tr("File MIDI '&{name_path}' non trovato nella libreria MIDI", name_path=name_path), t
-                )
-            except NotationError:
-                raise
-            except Exception as e:      # es. riferimento ambiguo
-                raise NotationError(str(e), t)
-            out.extend(body * mult)
+            body, semitones = _resolve_midi_ref(name_path, int(plus) if plus else 0, midi_dir, t, bool(plus))
+            if semitones:
+                if not TRANSPOSE_RANGE[0] <= semitones <= TRANSPOSE_RANGE[1]:
+                    raise NotationError(tr("Trasposizione fuori range ({0}..{1} semitoni)", *TRANSPOSE_RANGE), t)
+                out.extend([f"{_MARK}push:{semitones}"] + body * mult + [f"{_MARK}pop"])
+            else:
+                out.extend(body * mult)
             continue
 
         m = RE_VOICES.match(t)

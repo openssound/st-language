@@ -133,7 +133,7 @@ repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| 
 text         = '$"' { any character except '"' } '"' ;          (* $"rit." *)
 lyric        = '"' { any character except '"' } '"' ;
 pattern-ref  = [ number ] "%" word [ ( "+" | "-" ) number ] ;      (* %Riff  3%Riff  %Riff+7 *)
-midi-ref     = [ number ] "&" ( word | "/" | "-" ) { word | "/" | "-" } ;
+midi-ref     = [ number ] "&" ( word | "/" | "-" ) { word | "/" | "-" } [ "+" number ] ;
 group        = [ number ] "(" { token } ")" ;                   (* 4(c d) *)
 voices       = "{" voice { ";" voice } "}" ;                    (* { c d ; 2e } *)
 voice        = { token } ;
@@ -557,7 +557,8 @@ N outside −60..60, is an error.
 
 **Patterns.** `%Name+N` and `%Name-N` (and `K%Name+N`) read the pattern
 transposed by N semitones **in addition to** the transposition in force
-(section 8.2); the number follows the name with no spaces.
+(section 8.2); the number follows the name with no spaces. The same holds
+for the MIDI references of section 8.3 (`&Name+7`).
 
 ---
 
@@ -593,6 +594,14 @@ pattern is relative to that reference and ends with it.
 `&Name` (and `N&Name`) inserts tokens converted from a MIDI file of a
 library. This is an **optional** feature of the host application: a
 parser without a library MUST report such a reference as an error.
+
+A MIDI reference can be transposed like a pattern: `&Name+N` reads the
+file N semitones higher, in addition to the transposition in force
+(section 7.8), and `&Name-N` lower. Since a file name may contain `-`, a
+`-N` at the end is read as a transposition only if the library has no file
+with the full name; `+N` is always a transposition. The tokens of the
+file are read in the initial pitch state, like those of a pattern, and the
+transposition ends with the reference.
 
 ### 8.4 Voice blocks
 
