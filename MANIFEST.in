@@ -2,6 +2,8 @@
 # specifica con la suite di conformita' e gli esempi; non l'applicazione
 # SoundText ne' i suoi test, che non fanno parte del pacchetto.
 include LICENSE
+include THIRD_PARTY_NOTICES.md
+include licenses/mtxt.txt
 include st_language/README.md
 include docs/spec/ST-language.md
 include docs/spec/ST-language.it.md
@@ -16,5 +18,4 @@ prune gui
 prune songs
 prune midi
 prune assets
-prune licenses
 prune locales

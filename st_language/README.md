@@ -76,7 +76,8 @@ for other implementations.
 
 ## License
 
-GPL-3.0-or-later, © 2026 Sergio Scolaro.
+GPL-3.0-or-later, © 2026 Sergio Scolaro. The MTXT-derived voice-name table is MIT
+(see `THIRD_PARTY_NOTICES.md`).
 
 ---
 
