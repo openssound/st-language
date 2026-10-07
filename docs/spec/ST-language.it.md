@@ -1337,7 +1337,9 @@ segni `$arp`, `$staccatissimo`, `$sfz`, `$fp`, `$trem`, `$harmonic`
 e Fine (sezione 8.11); le strofe del testo `"2: ..."` (sezione 8.5); nel
 file del brano titolo e autori, la tonalita' per battuta e gli strumenti
 traspositori (sezioni 9.4, 12.1, 12.2). Ogni testo 2.6 valido e' un testo
-2.7 valido con gli stessi eventi.
+2.7 valido con gli stessi eventi, tranne un testo cantato che comincia con
+una cifra 1-9, i due punti e uno spazio, che ora e' il numero di una
+strofa (sezione 8.5).
 
 **2.6** — consolidamento: `reset:` (sezione 7.9), usato come prefisso dei
 box (sezione 12.4); la tabella dell'eredita' dello stato (sezione 4);

@@ -1285,7 +1285,8 @@ version if it gives the same result for every case.
 (section 8.11); lyric verses `"2: ..."` (section 8.5); in the song file
 the title, composer and lyricist, the key per bar and transposing
 instruments (sections 9.4, 12.1, 12.2). Every valid 2.6 text is valid
-2.7 text with the same events.
+2.7 text with the same events, except a lyric that starts with a digit
+1-9, a colon and a space, which is now a verse number (section 8.5).
 
 **2.6** — consolidation: `reset:` (section 7.9), used as the box prefix
 (section 12.4); the table of state inheritance (section 4); MIDI file
