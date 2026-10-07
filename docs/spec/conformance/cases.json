@@ -1,5 +1,5 @@
 {
- "spec_version": "2.6",
+ "spec_version": "2.7",
  "cases": [
   {
    "id": "notes-basic",
@@ -7027,6 +7027,1439 @@
      {
       "start": 7,
       "end": 8,
+      "bar": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "chords-27",
+   "input": "C7#5 Caug7 C7b5 Cm11 Cm13 C69 Cmaj7#11 C7#11 C9sus4 C7b13 Cadd11 Cmadd9 C7sus2 Csus C13b9",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C7#5",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Caug7",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C7b5",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Cm11",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Cm13",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C69",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Cmaj7#11",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C7#11",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C9sus4",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C7b13",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Cadd11",
+      "octave": 4
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Cmadd9",
+      "octave": 4
+     },
+     {
+      "start": 12.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C7sus2",
+      "octave": 4
+     },
+     {
+      "start": 13.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Csus",
+      "octave": 4
+     },
+     {
+      "start": 14.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C13b9",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "percussion-27",
+   "input": "side_stick vibraslap agogo_hi agogo_low whistle_short whistle_long guiro_short guiro_long cuica_mute cuica_open triangle_mute triangle",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "side_stick"
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "vibraslap"
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "agogo_hi"
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "agogo_low"
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "whistle_short"
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "whistle_long"
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "guiro_short"
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "guiro_long"
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "cuica_mute"
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "cuica_open"
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "triangle_mute"
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "triangle"
+     }
+    ]
+   }
+  },
+  {
+   "id": "note-value-128-and-duplets",
+   "input": "c'128 d'8D 8D: e f 4: g",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.03125,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.03125,
+      "duration": 0.75,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 0.78125,
+      "duration": 0.75,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.53125,
+      "duration": 0.75,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 2.28125,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "tempo-decimals-and-beat-unit",
+   "input": "tempo=72.5 c tempo=60'4. d tempo=40'2 e",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "tempo_marker",
+      "velocity": 80,
+      "bpm": 72.5
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.0,
+      "kind": "tempo_marker",
+      "velocity": 80,
+      "bpm": 90,
+      "beat_unit": "4."
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "tempo_marker",
+      "velocity": 80,
+      "bpm": 80,
+      "beat_unit": "2"
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "tempo-ramp-decimals",
+   "input": "tempo=100 >> c d e tempo=101.5 f",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "tempo_marker",
+      "velocity": 80,
+      "bpm": 100
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "tempo_marker",
+      "velocity": 80,
+      "bpm": 100
+     },
+     {
+      "start": 1.0,
+      "duration": 0.0,
+      "kind": "tempo_marker",
+      "velocity": 80,
+      "bpm": 100.75
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "tempo_marker",
+      "velocity": 80,
+      "bpm": 101.5
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "grace-notes",
+   "input": "d'g c e'G d f'g g'g a [c e]'g C snare'g snare",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "grace": "acciaccatura"
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "grace": "appoggiatura"
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4,
+      "grace": "acciaccatura"
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4,
+      "grace": "acciaccatura"
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 0.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "c",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "e",
+        "octave": 4
+       }
+      ],
+      "grace": "acciaccatura"
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "snare",
+      "grace": "acciaccatura"
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "snare"
+     }
+    ]
+   }
+  },
+  {
+   "id": "grace-notes-slur-and-lyrics",
+   "input": "d'g( c) e \"la lo\"",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "slur": "start",
+      "grace": "acciaccatura"
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "lyric": "la",
+      "slur": "stop"
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "lyric": "lo"
+     }
+    ]
+   }
+  },
+  {
+   "id": "grace-notes-in-ramp",
+   "input": "p@ >> d'g c d e ff@ f",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "note",
+      "velocity": 49,
+      "letter": "d",
+      "octave": 4,
+      "grace": "acciaccatura"
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 49,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 75,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 101,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 101,
+      "letter": "f",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "marks-27",
+   "input": "C$arp c$staccatissimo d$sfz e$fp f$trem g$harmonic [c e g]$arp$sfz",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C",
+      "octave": 4,
+      "decorations": [
+       "arp"
+      ]
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "decorations": [
+       "staccatissimo"
+      ]
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "decorations": [
+       "sfz"
+      ]
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "decorations": [
+       "fp"
+      ]
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4,
+      "decorations": [
+       "trem"
+      ]
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4,
+      "decorations": [
+       "harmonic"
+      ]
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "c",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "e",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "g",
+        "octave": 4
+       }
+      ],
+      "decorations": [
+       "arp",
+       "sfz"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "harmony-symbols",
+   "input": "$Am7 c d $G7/B e transpose=2 $C f",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "harmony",
+      "velocity": 80,
+      "symbol": "Am7"
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "harmony",
+      "velocity": 80,
+      "symbol": "G7",
+      "bass": "B"
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 0.0,
+      "kind": "harmony",
+      "velocity": 80,
+      "symbol": "D"
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "navigation-dc-fine",
+   "input": "4: c d $fine e f $dc",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "fine"
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "dc_fine"
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "fine"
+     }
+    ]
+   }
+  },
+  {
+   "id": "navigation-ds-coda",
+   "input": "4: c $segno d $tocoda e $ds $coda f",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "segno"
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "tocoda"
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "ds_coda"
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "tocoda"
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "coda"
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "navigation-skips-repeats",
+   "input": "4: |: c d |1. e f :| |2. g a || b c $dc",
+   "time_sig": "2/4",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "ending",
+      "value": 1
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "ending",
+      "value": 2
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "dc"
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 12.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 13.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 14.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 15.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "navigation-relative",
+   "input": "rel: c e g $fine a b $dc",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "fine"
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "dc_fine"
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "fine"
+     }
+    ]
+   }
+  },
+  {
+   "id": "navigation-signs-only",
+   "input": "4: $segno c $coda d",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "segno"
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.0,
+      "kind": "navigation",
+      "velocity": 80,
+      "name": "coda"
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "verses",
+   "input": "c d e \"la la la\" \"2: lo lo lo\" \"3: li * li\"",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "lyric": "la",
+      "verses": {
+       "2": "lo",
+       "3": "li"
+      }
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "lyric": "la",
+      "verses": {
+       "2": "lo"
+      }
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "lyric": "la",
+      "verses": {
+       "2": "lo",
+       "3": "li"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "verses-voices",
+   "input": "{ c d ; e } f \"2: a b c\"",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "verses": {
+       "2": "a"
+      }
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "verses": {
+       "2": "b"
+      }
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4,
+      "verses": {
+       "2": "c"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "error-grace-without-note",
+   "input": "c d'g",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-grace-before-rest",
+   "input": "d'g r",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-grace-tie",
+   "input": "d'g~ d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-tie-to-grace",
+   "input": "c~ d'g c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-unknown-harmony",
+   "input": "$Cxyz c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-ds-without-segno",
+   "input": "c $ds",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-two-jumps",
+   "input": "c $dc d $dc",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-fine-and-coda",
+   "input": "c $fine d $tocoda e $dc $coda f",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-music-after-jump",
+   "input": "c $dc d",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-tocoda-without-coda",
+   "input": "c $tocoda d $dc",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-tempo-unit",
+   "input": "tempo=60'3 c",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "warning-extra-syllables-verse",
+   "input": "c d \"2: a b c\"",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "verses": {
+       "2": "a"
+      }
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "verses": {
+       "2": "b"
+      }
+     }
+    ],
+    "warnings": [
+     {
+      "start": 4,
+      "end": 14,
       "bar": 0
      }
     ]

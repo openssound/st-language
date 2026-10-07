@@ -13,11 +13,11 @@ from typing import List, Optional, Tuple
 from .instruments import InstrumentProfile
 
 
-# Versione del linguaggio con cui e' scritto il file: "ST: 2.6" (riga
+# Versione del linguaggio con cui e' scritto il file: "ST: 2.7" (riga
 # facoltativa in cima; i lettori piu' vecchi la ignorano).
 RE_ST_VERSION = re.compile(r"^ST:\s*(\d+)\.(\d+)$")
 # La versione del linguaggio che questo lettore conosce (vedi la specifica).
-LANGUAGE_VERSION = (2, 6)
+LANGUAGE_VERSION = (2, 7)
 
 # "Levare: 1" (o "Pickup:"): la battuta in levare, in quarti (anche "1.5" o
 # "1/2"); la battuta 1 e' la prima intera.
@@ -46,6 +46,16 @@ RE_MASTER = re.compile(r"^Master:\s*(\d+)$", re.IGNORECASE)
 
 # "Tonalita: Am" persiste la tonalita' del brano (vedi core.chords.parse_key_signature).
 RE_KEY = re.compile(r"^(?:Tonalita|Tonalità|Key):\s*(.+)$", re.IGNORECASE)
+# 2.7: la tonalita' per battuta, come Tempo e Metrica: "Tonalita: 1: C, 17: G".
+_KEY_VALUE = r"[A-G][#b♭]?m?"
+RE_KEY_LIST_HDR = re.compile(rf"^(?:Tonalita|Tonalità|Key):\s*(\d+\s*:\s*{_KEY_VALUE}(?:\s*,\s*\d+\s*:\s*{_KEY_VALUE})*)$",
+                             re.IGNORECASE)
+RE_BAR_KEY = re.compile(rf"(\d+)\s*:\s*({_KEY_VALUE})")
+
+# 2.7: titolo e autori del brano (testo libero fino a fine riga).
+RE_TITLE = re.compile(r"^(?:Titolo|Title):\s*(.*)$", re.IGNORECASE)
+RE_COMPOSER = re.compile(r"^(?:Autore|Composer):\s*(.*)$", re.IGNORECASE)
+RE_LYRICIST = re.compile(r"^(?:Parole|Lyricist):\s*(.*)$", re.IGNORECASE)
 
 # "Ambiente: sala" persiste l'ambiente del riverbero del synth (vedi core.effects).
 RE_AMBIENTE = re.compile(r"^(?:Ambiente|Room):\s*(\w+)$", re.IGNORECASE)
@@ -136,7 +146,7 @@ RE_KV_COLON = re.compile(r"(\w+):\s*([\w.-]+)")
 
 _TRACK_HDR_PATTERNS = (RE_ST_VERSION, RE_PICKUP, RE_TEMPO, RE_METRICA, RE_MASTER, RE_KEY, RE_PATTERN_HDR, RE_TRACK_HDR,
                         RE_TRACK_HDR_EXPLICIT, RE_MIXER_HDR, RE_BOX_HDR,
-                        RE_AUDIO_HDR, RE_EFFECTS_HDR, RE_MASTER_CHAIN_HDR)
+                        RE_AUDIO_HDR, RE_EFFECTS_HDR, RE_MASTER_CHAIN_HDR, RE_TITLE, RE_COMPOSER, RE_LYRICIST)
 
 VOLUME_MAX = 200  # 100 = guadagno originale (unita'), fino a 200 = raddoppio percepito
 
@@ -150,6 +160,11 @@ def _parse_bar_value_list(raw: str, is_metrica: bool = False) -> List[tuple]:
         value = value_s if is_metrica else int(value_s)
         result.append((bar, value))
     return sorted(result, key=lambda p: p[0])
+
+def parse_key_list(raw: str) -> List[Tuple[int, str]]:
+    """'1: C, 17: G' in [(battuta, tonalita')], ordinato per battuta."""
+    return sorted(((int(bar), key) for bar, key in RE_BAR_KEY.findall(raw)), key=lambda p: p[0])
+
 
 def _si(value: Optional[str], default: bool) -> bool:
     if value is None:
@@ -193,6 +208,10 @@ def _parse_instrument_body(name: str, body: str) -> InstrumentProfile:
     ottava=3 range=36-96 poly=si voicing=spread)."""
     kv = dict(RE_KV_EQUALS.findall(body))
     range_low, range_high = 40, 88
+    try:
+        transposition = int(kv.get("trasposizione", kv.get("transposition", 0)))
+    except ValueError:
+        transposition = 0
     if "range" in kv and "-" in kv["range"]:
         lo, hi = kv["range"].split("-", 1)
         try:
@@ -208,6 +227,7 @@ def _parse_instrument_body(name: str, body: str) -> InstrumentProfile:
         range_high=range_high,
         polyphonic=_si(kv.get("poly"), True),
         voicing_style=kv.get("voicing", "spread"),
+        transposition=max(-48, min(48, transposition)),
     )
 
 def _parse_mixer_body(body: str) -> dict:

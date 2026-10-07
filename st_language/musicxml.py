@@ -83,13 +83,17 @@ _DRUM_DISPLAY = {
     "tom_hi": ("E", 5, "normal"), "tom1": ("D", 5, "normal"), "tom_lowmid": ("D", 5, "normal"),
     "tom2": ("B", 4, "normal"), "tom_highfloor": ("A", 4, "normal"), "floor": ("G", 4, "normal"),
     "tambourine": ("B", 5, "triangle"), "cowbell": ("E", 5, "triangle"),
+    "side_stick": ("C", 5, "x"), "triangle": ("A", 5, "triangle"), "triangle_mute": ("A", 5, "triangle"),
 }
 _DRUM_DEFAULT_DISPLAY = ("C", 5, "normal")
 
 _ARTICULATIONS = {"staccato": "staccato", "mute": "staccatissimo", "legato": "tenuto"}
 # Segni sulle note ($accent...) come elementi di <notations>.
-_DECORATION_ARTICULATIONS = {"accent": "accent", "marcato": "strong-accent", "tenuto": "tenuto"}
-_DECORATION_ORNAMENTS = {"tr": "trill-mark", "mordent": "mordent", "turn": "turn"}
+_DECORATION_ARTICULATIONS = {"accent": "accent", "marcato": "strong-accent", "tenuto": "tenuto",
+                             "staccatissimo": "staccatissimo"}
+_DECORATION_ORNAMENTS = {"tr": "trill-mark", "mordent": "mordent", "turn": "turn",
+                         "trem": 'tremolo type="single">3</tremolo'}
+_DECORATION_DYNAMICS = ("sfz", "fp")
 
 
 def _decorations_xml(decorations) -> str:
@@ -99,7 +103,13 @@ def _decorations_xml(decorations) -> str:
         xml += "<articulations>" + "".join(f"<{a}/>" for a in arts) + "</articulations>"
     orns = [_DECORATION_ORNAMENTS[d] for d in decorations if d in _DECORATION_ORNAMENTS]
     if orns:
-        xml += "<ornaments>" + "".join(f"<{o}/>" for o in orns) + "</ornaments>"
+        xml += "<ornaments>" + "".join(f"<{o}/>" if not o.endswith("</tremolo") else f"<{o}>"
+                                       for o in orns) + "</ornaments>"
+    if "harmonic" in decorations:
+        xml += "<technical><harmonic/></technical>"
+    dyns = [d for d in decorations if d in _DECORATION_DYNAMICS]
+    if dyns:
+        xml += "<dynamics>" + "".join(f"<{d}/>" for d in dyns) + "</dynamics>"
     if "fermata" in decorations:
         xml += '<fermata type="upright"/>'
     return xml
@@ -115,7 +125,28 @@ _CHORD_KINDS = {
     (0, 2, 7): "suspended-second", (0, 5, 7): "suspended-fourth", (0, 7): "power",
     (0, 4, 7, 10, 14): "dominant-ninth", (0, 4, 7, 11, 14): "major-ninth",
     (0, 3, 7, 10, 14): "minor-ninth",
+    (0, 4, 7, 10, 14, 17): "dominant-11th", (0, 3, 7, 10, 14, 17): "minor-11th",
+    (0, 4, 7, 10, 14, 21): "dominant-13th", (0, 3, 7, 10, 14, 21): "minor-13th",
+    (0, 4, 7, 11, 14, 21): "major-13th",
 }
+
+# Figura del metronomo (tempo=60'4.): numero della figura -> tipo MusicXML
+_BEAT_UNITS = {"1": "whole", "2": "half", "4": "quarter", "8": "eighth", "16": "16th", "32": "32nd",
+               "64": "64th", "128": "128th"}
+
+
+def _metronome_xml(bpm, unit: Optional[str]) -> str:
+    """<metronome> di un tempo: in quarti, o nella figura scritta (tempo=60'4.)."""
+    name, dots, per_minute = "quarter", 0, bpm
+    if unit:
+        number = unit.rstrip(".")
+        dots = len(unit) - len(number)
+        name = _BEAT_UNITS.get(number, "quarter")
+        per_minute = bpm / float(Fraction(4, int(number)) * _DOTS[dots][1])
+    per_minute = round(per_minute, 2)
+    text = str(int(per_minute)) if per_minute == int(per_minute) else str(per_minute)
+    return (f"<metronome><beat-unit>{name}</beat-unit>" + "<beat-unit-dot/>" * dots
+            + f"<per-minute>{text}</per-minute></metronome>")
 
 
 @dataclass
@@ -140,9 +171,12 @@ class _Item:
     voice: int = 1
     lyric: Optional[str] = None            # sillaba come scritta ("Ma-", "_")
     lyric_xml: str = ""                    # <lyric> gia' pronto (vedi _mark_lyrics)
+    verses: Tuple[Tuple[int, str], ...] = ()   # strofe dopo la prima: ((2, "la"), ...)
     slur: Optional[str] = None             # legatura di portamento: start/continue/stop
     swing: Optional[Tuple[float, float]] = None
     decorations: Tuple[str, ...] = ()      # segni: accent, fermata, tr...
+    # note di abbellimento prima dell'attacco: [(altezze, colpi di batteria, slash)]
+    graces: Tuple[Tuple[Tuple[_Pitch, ...], Tuple[str, ...], bool], ...] = ()
 
 
 @dataclass
@@ -197,6 +231,60 @@ def key_fifths(key: str) -> Optional[Tuple[int, str]]:
     return fifths, "minor" if minor else "major"
 
 
+def song_key_changes(project) -> List[Tuple[Fraction, str]]:
+    """[(inizio della battuta, tonalita')] dei cambi di tonalita' del brano
+    (Tonalita: 1: C, 17: G), senza quella iniziale."""
+    changes = getattr(project, "key_changes", None) or []
+    meter = project.meter()
+    return [(Fraction(meter.start_of(bar)).limit_denominator(1 << 16), key)
+            for bar, key in changes if bar > 1 and key_fifths(key)]
+
+
+# Intervallo diatonico (in gradi) per ogni intervallo cromatico dentro
+# l'ottava, per l'elemento <transpose> degli strumenti traspositori.
+_DIATONIC_STEPS = {0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3, 7: 4, 8: 5, 9: 5, 10: 6, 11: 6}
+
+
+def transpose_xml(chromatic: int) -> str:
+    """<transpose> di uno strumento che suona 'chromatic' semitoni rispetto
+    allo scritto (tromba in Si bemolle: -2)."""
+    octaves, rest = divmod(abs(chromatic), 12)
+    diatonic = _DIATONIC_STEPS[rest] + 7 * octaves
+    sign = -1 if chromatic < 0 else 1
+    return (f"<transpose><diatonic>{sign * diatonic}</diatonic>"
+            f"<chromatic>{chromatic}</chromatic></transpose>")
+
+
+def written_fifths(fifths: int, chromatic: int) -> int:
+    """Le alterazioni in chiave della parte scritta di uno strumento
+    traspositore: la tonalita' spostata di -chromatic semitoni."""
+    if not chromatic:
+        return fifths
+    shifted = (fifths - 7 * chromatic) % 12
+    return shifted - 12 if shifted > 6 else shifted
+
+
+def _written_items(items: List[_Item], chromatic: int, flats: bool) -> List[_Item]:
+    """Gli attacchi come si scrivono per uno strumento traspositore: le
+    altezze (e gli abbellimenti) spostate di -chromatic, le sigle anche."""
+    from .chords import transpose_chord_root
+
+    def move(pitches):
+        return [_spell_midi(p.midi - chromatic, flats) for p in pitches]
+    out = []
+    for item in items:
+        harmony = item.harmony
+        if harmony:
+            symbol, bass = harmony
+            symbol = transpose_chord_root(symbol, -chromatic)
+            if bass:
+                bass = transpose_chord_root(bass, -chromatic)
+            harmony = (symbol, bass)
+        graces = tuple((tuple(move(p)), d, slash) for p, d, slash in item.graces)
+        out.append(dataclasses.replace(item, pitches=move(item.pitches), harmony=harmony, graces=graces))
+    return out
+
+
 def _spell_midi(midi: int, flats: bool) -> _Pitch:
     step, alter = (_STEPS_FLAT if flats else _STEPS_SHARP)[midi % 12]
     return _Pitch(step, alter, midi // 12 - 1, midi)
@@ -226,44 +314,61 @@ def _track_items(events: List[Event], instrument, flats: bool, grid: Optional[in
     """Attacchi della traccia e cambi del pedale (tempo, 'start'/'stop')."""
     items: List[_Item] = []
     pedals: List[Tuple[Fraction, str]] = []
+    graces: Dict[int, list] = {}         # voce -> abbellimenti che aspettano la loro nota
     for ev in events:
         start = _frac(ev.start, grid)
         end = _frac(ev.start + ev.duration, grid)
         if ev.kind == "sustain":
             pedals.append((start, "start" if ev.name == "on" else "stop"))
             continue
+        if ev.grace and ev.kind in ("note", "chord", "block", "percussion"):
+            grace = _Item(start, start)
+            _fill_item(grace, ev, instrument, flats)
+            graces.setdefault(ev.voice, []).append(
+                (tuple(grace.pitches), tuple(grace.drums), ev.grace == "acciaccatura"))
+            continue
         if ev.kind in ("rest", "tempo_marker") or end <= start:
             continue
         item = _Item(start, end, articulation=ev.articulation, velocity=ev.velocity,
                      voice=ev.voice, lyric=ev.lyric, slur=ev.slur, swing=ev.swing,
-                     decorations=tuple(ev.decorations or ()))
-        if ev.kind in ("note", "slide"):
-            item.pitches.append(_spell_letter(ev.letter, ev.octave))
-        elif ev.kind == "chord":
-            item.pitches = _voiced_pitches(ev.symbol, ev.octave, ev.voicing, ev.bass, instrument, flats)
-            item.harmony = (ev.symbol, ev.bass)
-        elif ev.kind == "percussion":
-            item.drums.append(ev.name)
-        elif ev.kind == "block":
-            for sub in ev.items:
-                if sub["kind"] == "note":
-                    item.pitches.append(_spell_letter(sub["letter"], sub["octave"]))
-                elif sub["kind"] == "chord":
-                    item.pitches += _voiced_pitches(sub["symbol"], sub["octave"], sub.get("voicing"),
-                                                    sub.get("bass"), instrument, flats)
-                    if item.harmony is None:
-                        item.harmony = (sub["symbol"], sub.get("bass"))
-                elif sub["kind"] == "percussion":
-                    item.drums.append(sub["name"])
-        else:
+                     decorations=tuple(ev.decorations or ()),
+                     verses=tuple(sorted((ev.verses or {}).items())))
+        if not _fill_item(item, ev, instrument, flats):
             continue
-        seen = set()
-        item.pitches = [p for p in sorted(item.pitches, key=lambda p: p.midi)
-                        if not (p.midi in seen or seen.add(p.midi))]
-        item.drums = list(dict.fromkeys(item.drums))
         if item.pitches or item.drums:
+            waiting = graces.pop(ev.voice, [])
+            item.graces = tuple(g for g in waiting) if waiting else ()
             items.append(item)
     return items, pedals
+
+
+def _fill_item(item: _Item, ev: Event, instrument, flats: bool) -> bool:
+    """Le altezze, i colpi e la sigla di un evento; False se non suona."""
+    if ev.kind in ("note", "slide"):
+        item.pitches.append(_spell_letter(ev.letter, ev.octave))
+    elif ev.kind == "chord":
+        item.pitches = _voiced_pitches(ev.symbol, ev.octave, ev.voicing, ev.bass, instrument, flats)
+        item.harmony = (ev.symbol, ev.bass)
+    elif ev.kind == "percussion":
+        item.drums.append(ev.name)
+    elif ev.kind == "block":
+        for sub in ev.items:
+            if sub["kind"] == "note":
+                item.pitches.append(_spell_letter(sub["letter"], sub["octave"]))
+            elif sub["kind"] == "chord":
+                item.pitches += _voiced_pitches(sub["symbol"], sub["octave"], sub.get("voicing"),
+                                                sub.get("bass"), instrument, flats)
+                if item.harmony is None:
+                    item.harmony = (sub["symbol"], sub.get("bass"))
+            elif sub["kind"] == "percussion":
+                item.drums.append(sub["name"])
+    else:
+        return False
+    seen = set()
+    item.pitches = [p for p in sorted(item.pitches, key=lambda p: p.midi)
+                    if not (p.midi in seen or seen.add(p.midi))]
+    item.drums = list(dict.fromkeys(item.drums))
+    return True
 
 
 def _track_wedges(events: List[Event], grid: Optional[int]) -> List[Tuple[Fraction, Fraction, str]]:
@@ -336,7 +441,8 @@ def _track_repeats(events: List[Event], grid: Optional[int]) -> List[dict]:
 def _item_signature(item: _Item, offset: Fraction) -> tuple:
     return (item.start - offset, item.end - offset, tuple(p.midi for p in item.pitches), tuple(item.drums),
             item.harmony, item.articulation, item.velocity, item.voice, item.lyric, item.slur,
-            item.decorations)
+            item.decorations, tuple((tuple(p.midi for p in g[0]), g[1], g[2]) for g in item.graces),
+            item.verses)
 
 
 def _repeat_layout(measures, regions: List[dict], items_by_track: List[List[_Item]]
@@ -434,6 +540,22 @@ def _track_texts(events: List[Event], grid: Optional[int]) -> List[Tuple[Fractio
     return [(_frac(ev.start, grid), ev.name) for ev in events if ev.kind == "text"]
 
 
+# Segni di navigazione (eventi 'navigation'): elemento o parole sopra il pentagramma
+_NAVIGATION_XML = {"segno": "<segno/>", "coda": "<coda/>"}
+NAVIGATION_WORDS = {"tocoda": "To Coda", "fine": "Fine", "dc": "D.C.", "dc_fine": "D.C. al Fine",
+                    "dc_coda": "D.C. al Coda", "ds": "D.S.", "ds_fine": "D.S. al Fine", "ds_coda": "D.S. al Coda"}
+
+
+def _track_navigation(events: List[Event], grid: Optional[int]) -> List[Tuple[Fraction, str]]:
+    """I segni di navigazione della prima voce: (tempo, nome)."""
+    return [(_frac(ev.start, grid), ev.name) for ev in events if ev.kind == "navigation" and ev.voice == 1]
+
+
+def _track_harmonies(events: List[Event], grid: Optional[int]) -> List[Tuple[Fraction, str, Optional[str]]]:
+    """Le sigle senza suono ($Am7) della traccia."""
+    return [(_frac(ev.start, grid), ev.symbol, ev.bass) for ev in events if ev.kind == "harmony"]
+
+
 def _swing_changes(items: List[_Item]) -> List[Tuple[Fraction, str]]:
     """Dove lo swing comincia, cambia o finisce: la partitura scrive le note
     diritte con l'indicazione "Swing" (o "Swing 16") e "Straight"."""
@@ -463,24 +585,33 @@ def _monophonic(items: List[_Item]) -> List[_Item]:
     return out
 
 
+def _item_syllables(item: _Item) -> Dict[int, str]:
+    """{strofa: sillaba} di un attacco (la 1 e' item.lyric)."""
+    out = {1: item.lyric} if item.lyric else {}
+    out.update(dict(item.verses))
+    return out
+
+
 def _mark_lyrics(items: List[_Item]) -> None:
-    """Il testo cantato come <lyric>: 'Ma-' apre o continua una parola
-    (syllabic begin/middle), la sillaba dopo la chiude (end), '_' prolunga
-    la sillaba precedente (extend)."""
-    continues = False
+    """Il testo cantato come <lyric>, una per strofa: 'Ma-' apre o continua
+    una parola (syllabic begin/middle), la sillaba dopo la chiude (end), '_'
+    prolunga la sillaba precedente (extend)."""
+    continues: Dict[int, bool] = {}
     for item in sorted(items, key=lambda i: i.start):
-        syllable = item.lyric
-        if not syllable:
-            continue
-        if syllable == "_":
-            item.lyric_xml = '<lyric number="1"><extend/></lyric>'
-            continue
-        hyphen = syllable.endswith("-") and len(syllable) > 1
-        text = syllable[:-1] if hyphen else syllable
-        syllabic = ("middle" if hyphen else "end") if continues else ("begin" if hyphen else "single")
-        continues = hyphen
-        item.lyric_xml = (f'<lyric number="1"><syllabic>{syllabic}</syllabic>'
-                          f"<text>{escape(text)}</text></lyric>")
+        xml = ""
+        for number, syllable in sorted(_item_syllables(item).items()):
+            if syllable == "_":
+                xml += f'<lyric number="{number}"><extend/></lyric>'
+                continue
+            hyphen = syllable.endswith("-") and len(syllable) > 1
+            text = syllable[:-1] if hyphen else syllable
+            syllabic = (("middle" if hyphen else "end") if continues.get(number)
+                        else ("begin" if hyphen else "single"))
+            continues[number] = hyphen
+            xml += (f'<lyric number="{number}"><syllabic>{syllabic}</syllabic>'
+                    f"<text>{escape(text)}</text></lyric>")
+        if xml:
+            item.lyric_xml = xml
 
 
 def _note_value(q: Fraction):
@@ -730,6 +861,9 @@ def _entry_xml(entry: _Entry, divisions: int, voice: int, staff: int, drum_ids: 
 
     if entry.first_of_item and item.harmony:
         xml += _harmony_xml(*item.harmony).replace("<staff>1</staff>", f"<staff>{staff}</staff>")
+    if entry.first_of_item:
+        for pitches, drums, slash in item.graces:
+            xml += _grace_xml(pitches, drums, slash, voice, staff, drum_ids)
     heads = [("pitch", p) for p in item.pitches] + [("drum", d) for d in item.drums]
     for i, (kind, value) in enumerate(heads):
         note = "<note>" + ("<chord/>" if i else "")
@@ -771,6 +905,8 @@ def _entry_xml(entry: _Entry, divisions: int, voice: int, staff: int, drum_ids: 
             notations += f"<articulations><{_ARTICULATIONS[item.articulation]}/></articulations>"
         if i == 0 and entry.first_of_item and item.decorations:
             notations += _decorations_xml(item.decorations)
+        if entry.first_of_item and "arp" in item.decorations and len(heads) > 1:
+            notations += "<arpeggiate/>"
         if i == 0 and entry.first_of_item and item.slur == "start":
             notations += '<slur type="start" number="1"/>'
         if i == 0 and not entry.tie_start and item.slur == "stop":
@@ -780,6 +916,28 @@ def _entry_xml(entry: _Entry, divisions: int, voice: int, staff: int, drum_ids: 
         if entry.first_of_item and i == 0:
             note += item.lyric_xml
         xml += note + "</note>"
+    return xml
+
+
+def _grace_xml(pitches, drums, slash: bool, voice: int, staff: int, drum_ids: Dict[str, str]) -> str:
+    """Una nota di abbellimento (senza durata) prima dell'attacco."""
+    xml = ""
+    heads = [("pitch", p) for p in pitches] + [("drum", d) for d in drums]
+    for i, (kind, value) in enumerate(heads):
+        note = "<note>" + ('<grace slash="yes"/>' if slash else "<grace/>") + ("<chord/>" if i else "")
+        if kind == "pitch":
+            note += f"<pitch><step>{value.step}</step>"
+            if value.alter:
+                note += f"<alter>{value.alter}</alter>"
+            note += f"<octave>{value.octave}</octave></pitch>"
+        else:
+            step, octave, _head = _DRUM_DISPLAY.get(value, _DRUM_DEFAULT_DISPLAY)
+            note += (f"<unpitched><display-step>{step}</display-step>"
+                     f"<display-octave>{octave}</display-octave></unpitched>")
+            if value in drum_ids:
+                note += f'<instrument id="{drum_ids[value]}"/>'
+        note += f"<voice>{voice}</voice><type>eighth</type><staff>{staff}</staff></note>"
+        xml += note
     return xml
 
 
@@ -855,12 +1013,16 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
     else:
         divisions = _grid_divisions(times) or QUANT_GRID
 
+    title = getattr(project, "title", "") or project.name
+    creators = "".join(f'<creator type="{kind}">{escape(name)}</creator>'
+                       for kind, name in (("composer", getattr(project, "composer", "")),
+                                          ("lyricist", getattr(project, "lyricist", ""))) if name)
     out = ['<?xml version="1.0" encoding="UTF-8" standalone="no"?>',
            '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" '
            '"http://www.musicxml.org/dtds/partwise.dtd">',
            '<score-partwise version="4.0">',
-           f"<work><work-title>{escape(project.name)}</work-title></work>",
-           "<identification><encoding><software>SoundText</software>"
+           f"<work><work-title>{escape(title)}</work-title></work>",
+           f"<identification>{creators}<encoding><software>SoundText</software>"
            f"<encoding-date>{datetime.date.today().isoformat()}</encoding-date></encoding></identification>",
            "<part-list>"]
     drum_ids_by_part: Dict[str, Dict[str, str]] = {}
@@ -870,7 +1032,12 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
         out.append(f'<score-part id="{pid}"><part-name>{escape(track.name)}</part-name>')
         if instrument.is_percussion:
             used = list(dict.fromkeys(d for item in parsed[track.name][0] for d in item.drums))
-            ids = {d: f"{pid}-I{PERCUSSION_MAP.get(d, 38) + 1}" for d in used}
+            ids: Dict[str, str] = {}
+            for d in used:        # due nomi per lo stesso suono (rimshot, side_stick): id distinti
+                iid = f"{pid}-I{PERCUSSION_MAP.get(d, 38) + 1}"
+                while iid in ids.values():
+                    iid += "b"
+                ids[d] = iid
             drum_ids_by_part[pid] = ids
             for d, iid in ids.items():
                 out.append(f'<score-instrument id="{iid}"><instrument-name>{escape(d)}</instrument-name></score-instrument>')
@@ -888,9 +1055,13 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
 
     layout = _repeat_layout(measures, [r for t in tracks for r in _track_repeats(events_by_track[t.name], grid)],
                             [parsed[t.name][0] for t in tracks])
+    key_changes = {t: key_fifths(k) for t, k in song_key_changes(project)}
     for n, track in enumerate(tracks, 1):
         pid = f"P{n}"
         items, pedals = parsed[track.name]
+        chromatic = getattr(track.instrument, "transposition", 0) or 0
+        if chromatic and not track.instrument.is_percussion:
+            items = _written_items(items, chromatic, bool(key and written_fifths(key[0], chromatic) < 0))
         _drop_repeated_harmonies(items)
         clefs = _clefs(track, items)
         is_drums = track.instrument.is_percussion
@@ -899,7 +1070,9 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
                      for i in items if any(p.midi >= 60 for p in i.pitches)]
             lower = [dataclasses.replace(i, pitches=[p for p in i.pitches if p.midi < 60], drums=[],
                                          harmony=None,
-                                         lyric=i.lyric if not any(p.midi >= 60 for p in i.pitches) else None)
+                                         graces=() if any(p.midi >= 60 for p in i.pitches) else i.graces,
+                                         lyric=i.lyric if not any(p.midi >= 60 for p in i.pitches) else None,
+                                         verses=i.verses if not any(p.midi >= 60 for p in i.pitches) else ())
                      for i in items if any(p.midi < 60 for p in i.pitches)]
             staff_items = [upper, lower]
             # la sigla va sopra il primo pentagramma anche se li' c'e' una pausa
@@ -921,12 +1094,19 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
 
         directions: List[_Direction] = []
         if n == 1:
+            units = {_frac(ev.start, grid): ev.beat_unit for evs in events_by_track.values() for ev in evs
+                     if ev.kind == "tempo_marker" and ev.beat_unit}
             for t, bpm in tempo_map:
                 directions.append(_Direction(t, _direction_xml(
-                    f'<metronome><beat-unit>quarter</beat-unit><per-minute>{bpm}</per-minute></metronome>',
-                    1, sound=f'<sound tempo="{bpm}"/>')))
+                    _metronome_xml(bpm, units.get(t)), 1, sound=f'<sound tempo="{bpm}"/>')))
         for item in harmonies:
             directions.append(_Direction(item.start, _harmony_xml(*item.harmony)))
+        for t, symbol, bass in _track_harmonies(events_by_track[track.name], grid):
+            if chromatic and not is_drums:
+                from .chords import transpose_chord_root
+                symbol = transpose_chord_root(symbol, -chromatic)
+                bass = transpose_chord_root(bass, -chromatic) if bass else None
+            directions.append(_Direction(t, _harmony_xml(symbol, bass)))
         if not is_drums:
             first_voice = min((i.voice for i in items), default=1)
             for t, mark in _dynamic_changes(_monophonic([i for i in items if i.voice == first_voice])):
@@ -936,6 +1116,9 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
                 directions.append(_Direction(t, _direction_xml(f"<words>{words}</words>", 1)))
         for t, words in _track_texts(events_by_track[track.name], grid):
             directions.append(_Direction(t, _direction_xml(f"<words>{escape(words)}</words>", 1)))
+        for t, name in _track_navigation(events_by_track[track.name], grid):
+            inner = _NAVIGATION_XML.get(name) or f"<words>{escape(NAVIGATION_WORDS.get(name, name))}</words>"
+            directions.append(_Direction(t, _direction_xml(inner, 1)))
         for t, kind in pedals:
             directions.append(_Direction(t, _direction_xml(
                 f'<pedal type="{kind}" line="yes"/>', len(clefs), placement="below")))
@@ -957,7 +1140,12 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
             if number == 1:
                 attributes += f"<divisions>{divisions}</divisions>"
                 if key and not is_drums:
-                    attributes += f"<key><fifths>{key[0]}</fifths><mode>{key[1]}</mode></key>"
+                    attributes += (f"<key><fifths>{written_fifths(key[0], chromatic)}</fifths>"
+                                   f"<mode>{key[1]}</mode></key>")
+            elif m_start in key_changes and not is_drums:
+                new_key = key_changes[m_start]
+                attributes += (f"<key><fifths>{written_fifths(new_key[0], chromatic)}</fifths>"
+                               f"<mode>{new_key[1]}</mode></key>")
             if (num, den) != previous_sig:
                 attributes += f"<time><beats>{num}</beats><beat-type>{den}</beat-type></time>"
                 previous_sig = (num, den)
@@ -970,6 +1158,8 @@ def project_to_musicxml(project: "Song", only_audible: bool = True,
                     if octave_change:
                         attributes += f"<clef-octave-change>{octave_change}</clef-octave-change>"
                     attributes += "</clef>"
+                if chromatic and not is_drums:
+                    attributes += transpose_xml(chromatic)
             if attributes:
                 out.append(f"<attributes>{attributes}</attributes>")
             if left_bar:

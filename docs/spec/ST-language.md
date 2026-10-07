@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.6** · Reference implementation: the `st_language` Python
+**Version 2.7** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -114,13 +114,15 @@ A-Z or a-z, `word` is one or more letters, digits or `_`):
 token        = grid | velocity | tempo | ramp | control | swing | shift | anchor
              | transpose | reset
              | pitch-mode | key-mode | sustain
-             | bar-check | repeat | text | lyric | pattern-ref | midi-ref
-             | group | voices | sounding ;
+             | bar-check | repeat | text | harmony | navigation | lyric
+             | pattern-ref | midi-ref | group | voices | sounding ;
 
-grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
+grid         = number [ tuplet ] ":" ;                          (* 4:  8T:  8D: *)
+tuplet       = "T" | "Q" | "S" | "D" ;
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
 dynamic      = "pppp" | "ppp" | "pp" | "p" | "mp" | "mf" | "f" | "ff" | "fff" | "ffff" ;
-tempo        = "tempo=" number ;                               (* tempo=120 *)
+tempo        = "tempo=" number [ "." digit { digit } ]
+               [ "'" note-number [ "." [ "." ] ] ] ;           (* tempo=120  tempo=72.5  tempo=60'4. *)
 ramp         = ( ">>" | "<<" ) [ curve ] ;                       (* >>  >>exp *)
 curve        = "lin" | "exp" | "log" | "s" ;
 control      = control-name "=" [ "-" ] number [ "." digit { digit } ] ;
@@ -137,7 +139,10 @@ sustain      = "SON" | "SOFF" ;
 bar-check    = "|" ;
 repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| |1. *)
 text         = '$"' { any character except '"' } '"' ;          (* $"rit." *)
-lyric        = '"' { any character except '"' } '"' ;
+harmony      = "$" root quality [ "/" bass ] ;                  (* $Am7  $G7/B *)
+navigation   = "$segno" | "$coda" | "$tocoda" | "$fine" | "$dc" | "$ds" ;
+lyric        = '"' [ verse ":" ] { any character except '"' } '"' ;   (* "la la"  "2: lo lo" *)
+verse        = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
 pattern-ref  = [ number ] "%" word [ ( "+" | "-" ) number ] ;      (* %Riff  3%Riff  %Riff+7 *)
 midi-ref     = [ number ] "&" '"' file-name '"' [ ( "+" | "-" ) number ] ;
                                                   (* &"Riff"  2&"Blues/bass line"-12 *)
@@ -149,7 +154,8 @@ voice        = { token } ;
 sounding     = ( note | chord | percussion | rest | block | slide ) [ value ]
                { mark } [ hairpin ] [ "~" ] [ "(" | ")" ] ;
 mark         = "$" ( "accent" | "marcato" | "tenuto" | "fermata" | "tr"
-                     | "mordent" | "turn" ) ;                      (* c$tr *)
+                     | "mordent" | "turn" | "arp" | "staccatissimo"
+                     | "sfz" | "fp" | "trem" | "harmonic" ) ;      (* c$tr *)
 hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
@@ -168,8 +174,9 @@ block        = [ number ] "[" atom { atom } "]" ;
 atom         = note | chord | percussion ;
 slide        = slide-point ">" slide-point { ">" slide-point } ;
 slide-point  = [ number ] pitch [ octave ] ;
-value        = "'" ( "1" | "2" | "4" | "8" | "16" | "32" | "64" )
-               [ "T" | "Q" | "S" ] [ "." [ "." ] ] [ modifier ] ;
+value        = "'" ( note-number [ tuplet ] [ "." [ "." ] ] | "g" | "G" )
+               [ modifier ] ;                                   (* c'8.  c'8T  d'g *)
+note-number  = "1" | "2" | "4" | "8" | "16" | "32" | "64" | "128" ;
 number       = digit { digit } ;
 ```
 
@@ -198,6 +205,10 @@ Notes on the grammar:
   contain `|`, values or nested blocks.
 - A `;` outside a voice block is not part of any token rule and makes
   the token invalid.
+- A token `$` followed by a lowercase name is a navigation sign (section
+  8.11) when it stands alone, a mark (section 6.11) at the end of a
+  sounding token; `$` followed by an uppercase letter A-G is a chord
+  symbol (section 8.10).
 
 ---
 
@@ -222,7 +233,8 @@ time, starting at 0) and a **current state**:
 eighth, `16:` sixteenth, `2:` half, `1:` whole; any positive N is
 allowed (`12:` is a triplet eighth). A letter after N makes a **tuplet**
 grid: `T` multiplies the unit by 2/3 (triplets), `Q` by 4/5
-(quintuplets), `S` by 4/7 (septuplets). `N` MUST be positive.
+(quintuplets), `S` by 4/7 (septuplets), `D` by 3/2 (duplets: two notes
+in the time of three, as in 6/8). `N` MUST be positive.
 
 **Duration.** A sounding token lasts `multiplier × unit`, where the
 multiplier is the leading number (1 if absent) and the unit is the grid
@@ -323,8 +335,8 @@ atoms are ignored.
 
 A value after `'` gives the duration directly instead of the grid unit:
 the number is the note (1 whole = 4 beats, 2 half, 4 quarter, 8 eighth,
-16, 32, 64), a tuplet letter scales it like a tuplet grid, and one or two
-dots multiply it by 3/2 or 7/4:
+16, 32, 64, 128), a tuplet letter scales it like a tuplet grid, and one or
+two dots multiply it by 3/2 or 7/4:
 
 | Token | Beats |
 | --- | --- |
@@ -332,10 +344,12 @@ dots multiply it by 3/2 or 7/4:
 | `c'8.` | 3/4 |
 | `c'2..` | 7/2 |
 | `c'8T` | 1/3 |
+| `c'8D` | 3/4 |
 | `2c'8` | 1 |
 
 The value applies **only to that token**: the grid does not change. It
-works with notes, chords, blocks, rests, percussion and slides.
+works with notes, chords, blocks, rests, percussion and slides. The
+values `'g` and `'G` are grace notes (section 6.12).
 
 ### 6.7 Articulation
 
@@ -407,9 +421,32 @@ event gets the field `decorations` with the names in the order written
 | `$tr` | trill | alternates the note and the next one above in the key |
 | `$mordent` | mordent | note, the one below in the key, note |
 | `$turn` | turn | above, note, below, note |
+| `$arp` | arpeggio (rolled chord) | the notes of a chord or block enter one after the other, from the lowest |
+| `$staccatissimo` | staccatissimo | very short (a quarter of the length) |
+| `$sfz` | sforzando | louder than `$marcato` |
+| `$fp` | forte-piano | louder attack, like `$accent` |
+| `$trem` | tremolo (on drums: a roll) | the note repeated in 32nd notes |
+| `$harmonic` | harmonic | as written |
 
 An unknown name is an error; on a rest only `$fermata` is allowed. The
 marks do not change the event's `start`, `duration` and `velocity`.
+
+### 6.12 Grace notes
+
+A note, chord, block or percussion with the value `'g` is an
+**acciaccatura**, with `'G` an **appoggiatura**: `d'g c`, `[c e]'G C`,
+`snare'g snare` (a flam). A grace note takes **no written time**: its
+event has `duration` 0, starts at the cursor and has the field `grace`
+(`acciaccatura` or `appoggiatura`); the cursor does not move. Several
+grace notes may precede the same note (`c'g d'g e`). It is sounded just
+before the note that follows (section 13).
+
+A grace note MUST be followed by the note, chord, block or percussion it
+decorates: before a rest, a voice block or the end of the text it is an
+error, as are a tie or a hairpin on it, a tie that reaches it, and a
+grace value on a rest or a slide. A slur may start on a grace note
+(`d'g( c)`). Grace notes do not take syllables (section 8.5), and a
+velocity ramp (section 7.3) does not count them.
 
 ---
 
@@ -430,6 +467,14 @@ are fixed velocities:
 from the cursor on. It produces
 an event of kind `tempo_marker` with `bpm` = N. Tempo is global: a
 marker in any track changes the tempo of the whole song.
+
+N may have decimals (`tempo=72.5`). A note value after it gives the note
+that is counted: `tempo=60'4.` is 60 dotted quarters per minute, `tempo=40'2`
+40 half notes (the value is a note number with optional dots, no tuplet
+letter). `bpm` is always in quarter notes per minute (`tempo=60'4.` gives
+90) and MUST be within 1-999; the event also gets the field `beat_unit`
+with the value as written (`4.`), for the score. `bpm` is an integer when
+it is one.
 
 ### 7.3 Ramps
 
@@ -453,14 +498,16 @@ ramp, for x from 0 (start) to 1 (end):
 | `s` | x² (3 − 2x) | smooth at both ends |
 
 - **Velocity ramp** (crescendo/diminuendo): let the events produced
-  between opening and closing, except `control` events, be e₀…eₖ₋₁ (k
+  between opening and closing, except `control`, `repeat`, `text` and
+  `harmony` events and grace notes, be e₀…eₖ₋₁ (k
   events). Event i gets `round(v₀ + (v₁ - v₀) × f(i / (k-1)))` (with
   k = 1: the end value), where v₀ is the velocity at the opening and v₁
   the closing value, clamped to 1-127.
 - **Tempo ramp** (accelerando/rallentando): for each of those events, a
   `tempo_marker` at its start with the interpolated tempo (same
-  formula). With no events in between, a single marker with the end
-  value is placed at the cursor.
+  formula; if the start or the end value has decimals, the result is
+  rounded to 2 decimals instead of to an integer). With no events in
+  between, a single marker with the end value is placed at the cursor.
 
 ### 7.4 Sustain pedal
 
@@ -693,6 +740,17 @@ containing at least one note or chord — not rests, not percussion.
 
 Syllables are stored in the event's `lyric` field.
 
+**Verses.** A lyric that starts with a digit 1-9, a colon and a space
+belongs to that verse: `"2: Ev- ry where that Ma- ry went"`; without a
+number (or with `1:`) it is verse 1, as above. Each verse has its own
+pending events: a verse-N lyric takes the sung events since the previous
+verse-N lyric (or the start), so the verses can be written one after the
+other under the same music. The first voice of a voice block shares them
+with the surrounding text, as for verse 1. The syllables of verses 2 and
+up go in the event field `verses`, an object from the verse number to the
+syllable (`{"2": "lo"}` in the conformance suite); the rules for `*`, `_`
+and `-` are the same.
+
 ### 8.6 Bar checks
 
 `|` asserts that a bar ends at the cursor. It takes no time and is not
@@ -758,6 +816,57 @@ state and no grid. Inside a pattern or a repeated group it is evaluated
 at every repetition, at the absolute position in the song; in a voice
 block each voice reaches the bar from the block's own start.
 
+### 8.10 Chord symbols
+
+`$Am7`, `$G7/B`: a **chord symbol** written above the staff, which does
+not sound (a lead sheet's harmony over a melody). It is an event of kind
+`harmony` at the cursor, with `symbol` and `bass` and duration 0. The
+quality MUST be one of section 9.1. A transposition in force (section
+7.8) transposes it like a chord.
+
+### 8.11 Navigation: D.C., D.S., Coda, Fine
+
+The signs of a score that send the player back are written as tokens:
+
+| Token | Sign |
+| --- | --- |
+| `$segno` | 𝄋 segno |
+| `$coda` | 𝄌 coda (where the coda starts) |
+| `$tocoda` | "to Coda": on the way back, jump to `$coda` from here |
+| `$fine` | Fine: on the way back, stop here |
+| `$dc` | D.C. (da capo): go back to the start |
+| `$ds` | D.S. (dal segno): go back to `$segno` |
+
+Like repeats, they are expanded before interpretation (after patterns,
+groups and repeats are read):
+
+    A $fine B $dc                       A B A
+    $segno A $tocoda B $ds $coda C      A B A C
+
+- The text is played up to `$dc` or `$ds`; then from the start (`$dc`)
+  or from `$segno` (`$ds`) up to `$fine`, or up to `$tocoda` and then
+  from `$coda` to the end, or, with neither, up to the jump again.
+- On the way back the repeats are played once, with their last ending
+  (section 8.7), as is customary; the passes of groups `N(...)` are
+  played as written.
+- In relative mode the way back starts from the previous note the text
+  had at the point it goes back to, and the coda from the one before the
+  jump.
+- A text has at most one `$dc` or `$ds`. It is an error to write a `$ds`
+  without a `$segno` before it, both `$fine` and `$tocoda`, a `$fine` or
+  `$tocoda` that is not between the point it goes back to and the jump, a
+  `$tocoda` without a `$coda` after the jump, a `$coda` after the jump
+  without a `$tocoda`, and music after the jump outside the coda (only bar
+  checks may follow it).
+- Without a `$dc` or `$ds` the signs only mark the score.
+
+The expansion inserts zero-length events of kind `navigation` with
+`name` = the sign, in the order they are played: `segno`, `coda`,
+`tocoda`, `fine` where they are met the first time; the jump as `dc` or
+`ds`, followed by `_fine` or `_coda` when the way back ends at `$fine` or
+at the coda (`ds_coda`: "D.S. al Coda"); on the way back only the final
+`fine`, or the `tocoda` and the `coda` where the coda starts.
+
 ---
 
 ## 9. Chords and drums
@@ -781,7 +890,17 @@ Intervals are semitones above the root:
 | `sus4` | 0 5 7 | | `7#9` | 0 4 7 10 15 |
 | `6` | 0 4 7 9 | | `5` | 0 7 |
 | `11` | 0 4 7 10 14 17 | | `13` | 0 4 7 10 14 21 |
-| `maj13` | 0 4 7 11 14 21 | | | |
+| `maj13` | 0 4 7 11 14 21 | | `7#5`, `aug7` | 0 4 8 10 |
+| `7b5` | 0 4 6 10 | | `m11` | 0 3 7 10 14 17 |
+| `m13` | 0 3 7 10 14 21 | | `69` | 0 4 7 9 14 |
+| `maj7#11` | 0 4 7 11 18 | | `7#11` | 0 4 7 10 18 |
+| `9sus4` | 0 5 7 10 14 | | `7b13` | 0 4 7 10 20 |
+| `add11` | 0 4 7 17 | | `madd9` | 0 3 7 14 |
+| `7sus2` | 0 2 7 10 | | `sus` | 0 5 7 |
+| `13b9` | 0 4 7 10 13 21 | | | |
+
+The six-nine chord is written `69` (`C69`): in `C6/9` the slash would be
+the alternate bass.
 
 An unknown quality is an error.
 
@@ -826,6 +945,11 @@ style, and its General MIDI program. The built-in instruments are:
 Other names are resolved by an implementation-defined table of aliases
 (e.g. `violin`, `electric_bass`, `drum_kit`) and General MIDI names.
 
+An instrument may be **transposing** (section 12.2, `trasposizione=N`):
+N is the number of semitones between what it plays and what is written
+in its part (a B♭ trumpet is −2). The text is always written at sounding
+pitch; the transposition only changes the written part of the score.
+
 ### 9.5 Drum names
 
 | Name | GM note | Name | GM note | Name | GM note |
@@ -842,6 +966,10 @@ Other names are resolved by an implementation-defined table of aliases
 | conga_open | 63 | conga_low | 64 | timbale_hi | 65 |
 | timbale_low | 66 | cabasa | 69 | maracas | 70 |
 | claves | 75 | woodblock_hi | 76 | woodblock_low | 77 |
+| side_stick | 37 | vibraslap | 58 | agogo_hi | 67 |
+| agogo_low | 68 | whistle_short | 71 | whistle_long | 72 |
+| guiro_short | 73 | guiro_long | 74 | cuica_mute | 78 |
+| cuica_open | 79 | triangle_mute | 80 | triangle | 81 |
 
 ---
 
@@ -857,7 +985,8 @@ conforming parser MUST report at least these errors:
   block and `|` inside a block);
 - unknown percussion name, chord quality or voicing style;
 - velocity outside 1-127; grid with N = 0; note value other than 1, 2,
-  4, 8, 16, 32, 64;
+  4, 8, 16, 32, 64, 128 (or `g`, `G`); a tempo outside 1-999 or with a
+  note value that is not one of these;
 - a note outside MIDI 0-127;
 - `*+` or `*-` outside relative mode; a key that is not valid or has more
   than 7 accidentals;
@@ -876,7 +1005,10 @@ conforming parser MUST report at least these errors:
 - an undefined pattern, a too-deep or cyclic reference, an unresolvable
   MIDI reference, a MIDI reference without quotes or with an unclosed
   quote;
-- an empty block `[]` or an empty voice block.
+- an empty block `[]` or an empty voice block;
+- a grace note not used as required by section 6.12; a chord symbol with
+  an unknown quality; navigation signs not written as required by
+  section 8.11.
 
 ### 10.2 Warnings
 
@@ -918,18 +1050,19 @@ Interpreting a track produces a list of events. Each event has:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `kind` | string | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker`, `control`, `repeat`, `text` |
+| `kind` | string | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker`, `control`, `repeat`, `text`, `harmony`, `navigation` |
 | `start` | number | start, in beats from the beginning of the track |
 | `duration` | number | duration in beats (0 for `sustain` and `tempo_marker`, and for `control` without a ramp) |
 | `velocity` | 1-127 | current velocity (default 80) |
 | `letter`, `octave` | | note pitch (`note`, first tap of `slide`), with the accidental that sounds: the key's one included, none for a natural, the octave resolved |
-| `symbol`, `voicing`, `bass`, `octave` | | chord (`chord`) |
-| `name` | string | drum name (`percussion`); `on`/`off` (`sustain`); automation name (`control`) |
+| `symbol`, `voicing`, `bass`, `octave` | | chord (`chord`); `symbol` and `bass` also for `harmony` |
+| `name` | string | drum name (`percussion`); `on`/`off` (`sustain`); automation name (`control`); sign (`navigation`) |
 | `items` | list | atoms of a `block`: each with `kind` and its fields |
 | `articulation` | string | `staccato`, `mute`, `legato` |
 | `slide_points` | list | taps after the first (`slide`), as [letter, octave] |
 | `slide_segment_durations` | list | segment durations (`slide`) |
-| `bpm` | integer | tempo (`tempo_marker`) |
+| `bpm` | number | tempo in quarter notes per minute (`tempo_marker`) |
+| `beat_unit` | string | the note counted by the tempo, as written (`4.`), when given (`tempo_marker`) |
 | `value` | number | automation value (`control`; at the end of a ramp) |
 | `start_value` | number | value at the start of a ramp (`control`) |
 | `curve` | string | ramp curve: `lin`, `exp`, `log`, `s` (`control` ramps) |
@@ -939,6 +1072,8 @@ Interpreting a track produces a list of events. Each event has:
 | `decorations` | list | marks of the event (section 6.11) |
 | `voice` | integer | voice number (1 outside voice blocks) |
 | `lyric` | string | syllable (sung events) |
+| `verses` | object | syllables of verses 2 and up: verse number → syllable |
+| `grace` | string | `acciaccatura` or `appoggiatura` (grace notes, section 6.12) |
 
 Events appear in interpretation order (all events of the first voice of
 a block, then the second voice, …), which is not necessarily sorted by
@@ -959,17 +1094,23 @@ ignored (free text).
 
 | Line | Meaning |
 | --- | --- |
-| `ST: 2.6` | version of the language the file is written in |
+| `ST: 2.7` | version of the language the file is written in |
 | `Tempo: 120 BPM` | tempo |
 | `Tempo: 1: 120, 5: 140` | tempo per bar (bar: bpm, …) |
 | `Metrica: 3/4` | meter |
 | `Metrica: 1: 4/4, 5: 3/4` | meter per bar |
 | `Levare: 1` | pickup bar, in beats (`1`, `1.5`, `1/2`; section 12.3) |
 | `Tonalita: Am` | key (A-G, optional accidental, optional `m`) |
+| `Tonalita: 1: C, 17: G` | key per bar (bar: key, …) |
+| `Titolo: Blue Moon` | title |
+| `Autore: R. Rodgers` | composer |
+| `Parole: L. Hart` | lyricist |
 
-With a per-bar list, the song tempo/meter is the bar-1 value, or the
-first value if bar 1 is not listed. `Tempo`, `Metrica`, `Levare` and
-`Tonalita` are case-insensitive; the other headers are written as shown.
+With a per-bar list, the song tempo/meter/key is the bar-1 value, or the
+first value if bar 1 is not listed. `Tempo`, `Metrica`, `Levare`,
+`Tonalita`, `Titolo`, `Autore` and `Parole` are case-insensitive; the
+other headers are written as shown. The title, composer and lyricist run
+to the end of the line; without a title, a score uses the file name.
 
 **Version.** `ST: M.m` is optional and goes before the other blocks. A
 reader that meets a version newer than the one it knows SHOULD warn that
@@ -978,8 +1119,10 @@ versions before 2.6 ignore it (it is a line outside any block).
 
 **Keywords.** The keywords of the file can be written in Italian or in
 English: `Metrica`/`Meter`, `Tonalita`/`Key`, `Levare`/`Pickup`,
-`Traccia`/`Track`, `Strumento`/`Instrument`; in an instrument body
-`percussione`/`percussion` and `ottava`/`octave`; yes/no values as
+`Traccia`/`Track`, `Strumento`/`Instrument`, `Titolo`/`Title`,
+`Autore`/`Composer`, `Parole`/`Lyricist`; in an instrument body
+`percussione`/`percussion`, `ottava`/`octave` and
+`trasposizione`/`transposition`; yes/no values as
 `si`/`yes`/`no`. Writers SHOULD use the Italian forms, which every
 version reads.
 
@@ -991,8 +1134,8 @@ version reads.
 | `Traccia Name [Instrument]:` | track text |
 | `Piano:`, `Piano 2:` (a known instrument name, optional index) | text of the track `Piano` / `Piano 2` |
 | `Box Track "Name" \|beat:` | a box of the track `Track` starting at `beat` |
-| `Strumento Name:` | instrument definition (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`); a block without `program=` defines nothing |
-| `Mixer Track:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) of a track |
+| `Strumento Name:` | instrument definition (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`, optionally `trasposizione=-2`, section 9.4); a block without `program=` defines nothing |
+| `Mixer Track:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) of a track; readers ignore the keys they do not know |
 
 Track and box bodies keep their **line breaks** (comments end at line
 ends); pattern bodies are tokenized. Instrument and mixer blocks are
@@ -1070,6 +1213,14 @@ audible track:
   `$mordent` plays note, next pitch below, note and `$turn` above, note,
   below, note, each ornament note 1/8 beat long except the last;
   `$fermata` halves the tempo of the whole song during the event;
+  `$sfz` × 1.5 and `$fp` × 1.25 on the velocity; `$staccatissimo`
+  sounds 25 % of the length; `$trem` repeats the note in 1/8-beat
+  strokes; `$arp` delays each note of a chord or block by 1/16 beat
+  from the lowest; `$harmonic` sounds as written;
+- grace notes: the grace notes before a note sound one after the other
+  from the note's start, each 1/8 beat long (at most an equal share of
+  the note), and the note starts after them, shortened by as much;
+- `harmony` and `navigation` events do not sound;
 - repeats are played as expanded; the score export prints a repeat (and
   its endings) instead of the written-out music when it starts and ends
   on bar lines, no note crosses its boundaries and every pass is the same
@@ -1090,7 +1241,13 @@ audible track:
   omitted). The score export draws ramps of `vol` and `expr` (hairpins
   included) as crescendo/diminuendo wedges;
 - lyrics → *lyrics* meta events (syllables continuing a word without a
-  trailing space, word ends with one; `_` not written).
+  trailing space, word ends with one; `_` not written); only verse 1.
+
+The score export (informative) writes the song's title, composer and
+lyricist, a key change where the per-bar key list changes it, the written
+part of a transposing instrument (transposed and with the MusicXML
+`transpose` element), chord symbols, grace notes, the new marks, the
+navigation signs over the written-out music, and one lyric line per verse.
 
 **MTXT.** The reference implementation also writes the same MIDI as
 [MTXT 1.0](https://github.com/Daninet/mtxt) text (one event per line,
@@ -1109,12 +1266,26 @@ either `"error": true` or the expected events (section 11 fields,
 numbers rounded to 9 decimals, `voice` omitted when 1, block atoms
 without their multiplier) and the expected warnings (character range of
 the token and bar number; 0 for lyrics and for the pickup bar; a case
-may give the pickup in beats as `pickup`). A parser conforms to this
+may give the pickup in beats as `pickup`). In the `verses` field the
+verse numbers are JSON object keys, so strings. A parser conforms to this
 version if it gives the same result for every case.
 
 ---
 
 ## Appendix A: changes
+
+**2.7** — completions: chord qualities `7#5` (`aug7`), `7b5`, `m11`, `m13`,
+`69`, `maj7#11`, `7#11`, `9sus4`, `7b13`, `add11`, `madd9`, `7sus2`,
+`sus`, `13b9` (section 9.1); the rest of the General MIDI drum set
+(section 9.5); the note value `'128` and the duplet letter `D` (sections
+4, 6.6); tempo with decimals and with the counted note `tempo=60'4.`
+(section 7.2); grace notes `'g` and `'G` (section 6.12); the marks
+`$arp`, `$staccatissimo`, `$sfz`, `$fp`, `$trem`, `$harmonic` (section
+6.11); chord symbols `$Am7` (section 8.10); D.C., D.S., Coda and Fine
+(section 8.11); lyric verses `"2: ..."` (section 8.5); in the song file
+the title, composer and lyricist, the key per bar and transposing
+instruments (sections 9.4, 12.1, 12.2). Every valid 2.6 text is valid
+2.7 text with the same events.
 
 **2.6** — consolidation: `reset:` (section 7.9), used as the box prefix
 (section 12.4); the table of state inheritance (section 4); MIDI file

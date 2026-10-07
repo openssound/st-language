@@ -19,6 +19,7 @@ di SoundText (core.midi_export), che aggiunge il mixaggio dell'app
 (volume master, umanizzazione, mandate degli effetti).
 """
 
+import dataclasses
 import struct
 from typing import List, Optional, Tuple, TYPE_CHECKING
 
@@ -159,6 +160,7 @@ _ARTICULATION_DURATION_FACTOR = {
     "staccato": 0.5,   # nota accorciata del 50%, il resto e' silenzio
     "mute": 0.15,      # nota "stoppata": molto breve
     "legato": 1.15,    # nota leggermente prolungata, per legare alla successiva
+    "staccatissimo": 0.25,   # il segno $staccatissimo (2.7)
 }
 
 
@@ -167,6 +169,8 @@ def effective_articulation(ev: Event) -> Optional[str]:
     legato per le note dentro una legatura di portamento (tranne l'ultima)."""
     if ev.articulation:
         return ev.articulation
+    if "staccatissimo" in (ev.decorations or ()):
+        return "staccatissimo"
     return "legato" if ev.slur in ("start", "continue") else None
 
 
@@ -192,10 +196,44 @@ def shift_ticks(ev: Event, tempo_ticks: List[Tuple[int, float]], tick: int,
 
 # Accenti: la nota suona piu' forte (la velocity scritta resta quella della
 # dinamica, cosi' la partitura non scrive un cambio di dinamica).
-DECORATION_VELOCITY_FACTOR = {"accent": 1.25, "marcato": 1.4}
-# Durata di ciascuna nota di un abbellimento (trillo, mordente, gruppetto):
-# una biscroma a 480 tick per quarto.
+DECORATION_VELOCITY_FACTOR = {"accent": 1.25, "marcato": 1.4, "sfz": 1.5, "fp": 1.25}
+# Durata di ciascuna nota di un abbellimento (trillo, mordente, gruppetto)
+# e di ciascun colpo del tremolo ($trem): una biscroma a 480 tick per quarto.
 ORNAMENT_STEP_TICKS = 60
+# Arpeggio ($arp): ogni nota dell'accordo entra una semibiscroma dopo la
+# precedente, dalla piu' grave.
+ARPEGGIO_STEP_TICKS = 30
+# Note di abbellimento (d'g, d'G): ciascuna dura una biscroma (1/8 di
+# quarto), presa dall'inizio della nota che segue.
+GRACE_STEP_BEATS = 0.125
+
+
+def sounding_events(events: List[Event]) -> List[Event]:
+    """Gli eventi come suonano le note di abbellimento: quelle che precedono
+    una nota (stessa voce, stesso inizio) suonano una dopo l'altra per una
+    biscroma ciascuna e la nota comincia dopo di loro (ne perde la durata).
+    Gli eventi del parser non cambiano: si lavora su copie."""
+    out: List[Event] = list(events)
+    pending: dict = {}                  # voce -> [indici degli abbellimenti in attesa]
+    for i, ev in enumerate(events):
+        if ev.grace:
+            pending.setdefault(ev.voice, []).append(i)
+            continue
+        graces = pending.pop(ev.voice, None)
+        if not graces or ev.duration <= 0:
+            continue
+        graces = [g for g in graces if abs(events[g].start - ev.start) < 1e-9]
+        if not graces:
+            continue
+        step = min(GRACE_STEP_BEATS, ev.duration / (len(graces) + 1))
+        for k, g in enumerate(graces):
+            out[g] = dataclasses.replace(events[g], start=ev.start + k * step, duration=step)
+        lead = len(graces) * step
+        out[i] = dataclasses.replace(ev, start=ev.start + lead, duration=ev.duration - lead)
+    for graces in pending.values():          # abbellimenti senza nota (non succede con un testo valido)
+        for g in graces:
+            out[g] = dataclasses.replace(events[g], duration=GRACE_STEP_BEATS)
+    return out
 
 
 def decorated_velocity(ev: Event, velocity: int) -> int:
@@ -219,13 +257,22 @@ def _scale_neighbour(note: int, step: int, key: Optional[str]) -> int:
     return max(0, min(127, candidate))
 
 
-def ornament_spans(ev: Event, note: int, start: int, stop: int, key: Optional[str] = None
-                   ) -> List[Tuple[int, int, int]]:
-    """Le note (inizio, fine, altezza) con cui suona una nota singola con un
-    abbellimento: $tr alterna la nota e quella sopra nella scala, $mordent fa
-    nota-sotto-nota, $turn sopra-nota-sotto-nota; senza abbellimenti (o su
-    accordi e blocchi) la nota cosi' com'e'."""
-    decos = set(ev.decorations or ()) & {"tr", "mordent", "turn"}
+def ornament_spans(ev: Event, note: int, start: int, stop: int, key: Optional[str] = None,
+                   notes: Optional[List[int]] = None) -> List[Tuple[int, int, int]]:
+    """Le note (inizio, fine, altezza) con cui suona una nota dell'evento con
+    i suoi segni: $arp fa entrare le note dell'accordo ('notes') una dopo
+    l'altra dalla piu' grave, $trem ribatte la nota a biscrome, $tr alterna
+    la nota e quella sopra nella scala, $mordent fa nota-sotto-nota, $turn
+    sopra-nota-sotto-nota; senza segni la nota cosi' com'e'."""
+    all_decos = set(ev.decorations or ())
+    if "arp" in all_decos and notes and len(notes) > 1:
+        rank = sorted(set(notes)).index(note) if note in notes else 0
+        start = min(start + rank * ARPEGGIO_STEP_TICKS, max(start, stop - 1))
+    if "trem" in all_decos and stop - start >= 2 * ORNAMENT_STEP_TICKS:
+        count = (stop - start) // ORNAMENT_STEP_TICKS
+        bounds = [start + (stop - start) * k // count for k in range(count + 1)]
+        return [(bounds[k], bounds[k + 1], note) for k in range(count)]
+    decos = all_decos & {"tr", "mordent", "turn"}
     if ev.kind != "note" or not decos or stop - start < 3:
         return [(start, stop, note)]
     upper, lower = _scale_neighbour(note, 1, key), _scale_neighbour(note, -1, key)
@@ -374,7 +421,7 @@ def _part_events(part, events: List[Event], slot: int, key: Optional[str] = None
     def tick(beats: float) -> int:
         return round(beats * TICKS_PER_BEAT)
 
-    for ev in events:
+    for ev in sounding_events(events):
         start, end = (tick(b) for b in sounding_span(ev))
         moved = shift_ticks(ev, tempo_ticks or [], start)
         start, end = max(0, start + moved), max(0, end + moved)
@@ -423,7 +470,7 @@ def _part_events(part, events: List[Event], slot: int, key: Optional[str] = None
         velocity = decorated_velocity(ev, round(ev.velocity * factor))
         stop = _apply_articulation(start, end, effective_articulation(ev))
         for n in notes:
-            for a, b, pitch in ornament_spans(ev, n, start, stop, key):
+            for a, b, pitch in ornament_spans(ev, n, start, stop, key, notes):
                 out.append((a, _ON, bytes([0x90 | channel, pitch, velocity])))
                 out.append((b, _OFF, bytes([0x80 | channel, pitch, 0])))
     if sustain:

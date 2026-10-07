@@ -62,6 +62,20 @@ PERCUSSION_MAP = {
     "claves": 75,
     "woodblock_hi": 76,
     "woodblock_low": 77,
+    # 2.7: il resto del set General MIDI (35-81). Vanno in fondo: i primi 36
+    # nomi sono i tasti della tastiera di SoundText.
+    "side_stick": 37,     # alias di rimshot, il nome General MIDI
+    "vibraslap": 58,
+    "agogo_hi": 67,
+    "agogo_low": 68,
+    "whistle_short": 71,
+    "whistle_long": 72,
+    "guiro_short": 73,
+    "guiro_long": 74,
+    "cuica_mute": 78,
+    "cuica_open": 79,
+    "triangle_mute": 80,
+    "triangle": 81,       # Open Triangle
 }
 
 DRUM_MIDI_CHANNEL = 9  # canale 10 (0-indexed) riservato alle percussioni GM
@@ -205,6 +219,10 @@ class InstrumentProfile:
     range_high: int = 84       # nota MIDI più alta suonabile
     polyphonic: bool = True    # False = strumento monofonico (es. Tromba)
     voicing_style: str = "spread"  # "spread" | "root_only" | "root_fifth" | "monophonic"
+    # Strumento traspositore (2.7): semitoni fra il suono e la parte scritta
+    # (tromba in Si bemolle -2: suona un tono sotto lo scritto). Vale solo
+    # per la partitura; il testo si scrive in suoni reali.
+    transposition: int = 0
 
 
 # Strumenti iniziali richiesti dall'MVP (sezione 8 delle specifiche)

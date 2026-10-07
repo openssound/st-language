@@ -211,6 +211,40 @@ CASES = [
     ("pickup-meter-changes", "8: g a | 4: c d e | c d | bar=4 e",
      {"metrica_changes": [[1, "3/4"], [2, "2/4"]], "pickup": 1}),
     ("warning-pickup-bar", "4: g a | c e g |", {"time_sig": "3/4", "pickup": 1}),
+    # --- 2.7: accordi, percussioni, valori, tempo
+    ("chords-27", "C7#5 Caug7 C7b5 Cm11 Cm13 C69 Cmaj7#11 C7#11 C9sus4 C7b13 Cadd11 Cmadd9 C7sus2 Csus C13b9", {}),
+    ("percussion-27", "side_stick vibraslap agogo_hi agogo_low whistle_short whistle_long guiro_short "
+                      "guiro_long cuica_mute cuica_open triangle_mute triangle", {}),
+    ("note-value-128-and-duplets", "c'128 d'8D 8D: e f 4: g", {}),
+    ("tempo-decimals-and-beat-unit", "tempo=72.5 c tempo=60'4. d tempo=40'2 e", {}),
+    ("tempo-ramp-decimals", "tempo=100 >> c d e tempo=101.5 f", {}),
+    # --- 2.7: abbellimenti, segni, sigle senza suono
+    ("grace-notes", "d'g c e'G d f'g g'g a [c e]'g C snare'g snare", {}),
+    ("grace-notes-slur-and-lyrics", 'd\'g( c) e "la lo"', {}),
+    ("grace-notes-in-ramp", "p@ >> d'g c d e ff@ f", {}),
+    ("marks-27", "C$arp c$staccatissimo d$sfz e$fp f$trem g$harmonic [c e g]$arp$sfz", {}),
+    ("harmony-symbols", "$Am7 c d $G7/B e transpose=2 $C f", {}),
+    # --- 2.7: D.C., D.S., Coda, Fine
+    ("navigation-dc-fine", "4: c d $fine e f $dc", {}),
+    ("navigation-ds-coda", "4: c $segno d $tocoda e $ds $coda f", {}),
+    ("navigation-skips-repeats", "4: |: c d |1. e f :| |2. g a || b c $dc", {"time_sig": "2/4"}),
+    ("navigation-relative", "rel: c e g $fine a b $dc", {}),
+    ("navigation-signs-only", "4: $segno c $coda d", {}),
+    # --- 2.7: strofe
+    ("verses", 'c d e "la la la" "2: lo lo lo" "3: li * li"', {}),
+    ("verses-voices", '{ c d ; e } f "2: a b c"', {}),
+    ("error-grace-without-note", "c d'g", {}),
+    ("error-grace-before-rest", "d'g r", {}),
+    ("error-grace-tie", "d'g~ d", {}),
+    ("error-tie-to-grace", "c~ d'g c", {}),
+    ("error-unknown-harmony", "$Cxyz c", {}),
+    ("error-ds-without-segno", "c $ds", {}),
+    ("error-two-jumps", "c $dc d $dc", {}),
+    ("error-fine-and-coda", "c $fine d $tocoda e $dc $coda f", {}),
+    ("error-music-after-jump", "c $dc d", {}),
+    ("error-tocoda-without-coda", "c $tocoda d $dc", {}),
+    ("error-tempo-unit", "tempo=60'3 c", {}),
+    ("warning-extra-syllables-verse", 'c d "2: a b c"', {}),
     # --- avvisi (il testo e' valido)
     ("warning-bar-missing", "4: c d e | f g a b |", {}),
     ("warning-bar-extra", "8: c d e f g a b c d | e", {}),
@@ -246,6 +280,8 @@ def event_json(ev) -> dict:
             continue
         if key == "items":
             value = [{k: v for k, v in item.items() if v is not None and k != "mult"} for item in value]
+        if key == "verses":          # numeri delle strofe come chiavi JSON (stringhe)
+            value = {str(k): v for k, v in sorted(value.items())}
         out[key] = _round(value)
     return out
 
@@ -278,7 +314,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "2.6", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.7", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 

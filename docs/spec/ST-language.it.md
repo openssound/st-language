@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.6** · Implementazione di riferimento: la libreria Python
+**Versione 2.7** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -118,13 +118,15 @@ A-Z o a-z, `word` sono una o piu' lettere, cifre o `_`):
 token        = grid | velocity | tempo | ramp | control | swing | shift | anchor
              | transpose | reset
              | pitch-mode | key-mode | sustain
-             | bar-check | repeat | text | lyric | pattern-ref | midi-ref
-             | group | voices | sounding ;
+             | bar-check | repeat | text | harmony | navigation | lyric
+             | pattern-ref | midi-ref | group | voices | sounding ;
 
-grid         = number [ "T" | "Q" | "S" ] ":" ;                 (* 4:  8T: *)
+grid         = number [ tuplet ] ":" ;                          (* 4:  8T:  8D: *)
+tuplet       = "T" | "Q" | "S" | "D" ;
 velocity     = ( number | dynamic ) "@" ;                       (* 100@  mf@ *)
 dynamic      = "pppp" | "ppp" | "pp" | "p" | "mp" | "mf" | "f" | "ff" | "fff" | "ffff" ;
-tempo        = "tempo=" number ;                               (* tempo=120 *)
+tempo        = "tempo=" number [ "." digit { digit } ]
+               [ "'" note-number [ "." [ "." ] ] ] ;           (* tempo=120  tempo=72.5  tempo=60'4. *)
 ramp         = ( ">>" | "<<" ) [ curve ] ;                       (* >>  >>exp *)
 curve        = "lin" | "exp" | "log" | "s" ;
 control      = control-name "=" [ "-" ] number [ "." digit { digit } ] ;
@@ -141,7 +143,10 @@ sustain      = "SON" | "SOFF" ;
 bar-check    = "|" ;
 repeat       = "|:" | ":|" | "||" | "|" digit "." | ":|" digit "." ;   (* |: :| |1. *)
 text         = '$"' { any character except '"' } '"' ;          (* $"rit." *)
-lyric        = '"' { qualunque carattere tranne '"' } '"' ;
+harmony      = "$" root quality [ "/" bass ] ;                  (* $Am7  $G7/B *)
+navigation   = "$segno" | "$coda" | "$tocoda" | "$fine" | "$dc" | "$ds" ;
+lyric        = '"' [ verse ":" ] { qualunque carattere tranne '"' } '"' ;   (* "la la"  "2: lo lo" *)
+verse        = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
 pattern-ref  = [ number ] "%" word [ ( "+" | "-" ) number ] ;      (* %Riff  3%Riff  %Riff+7 *)
 midi-ref     = [ number ] "&" '"' file-name '"' [ ( "+" | "-" ) number ] ;
                                                   (* &"Riff"  2&"Blues/bass line"-12 *)
@@ -153,7 +158,8 @@ voice        = { token } ;
 sounding     = ( note | chord | percussion | rest | block | slide ) [ value ]
                { mark } [ hairpin ] [ "~" ] [ "(" | ")" ] ;
 mark         = "$" ( "accent" | "marcato" | "tenuto" | "fermata" | "tr"
-                     | "mordent" | "turn" ) ;                      (* c$tr *)
+                     | "mordent" | "turn" | "arp" | "staccatissimo"
+                     | "sfz" | "fp" | "trem" | "harmonic" ) ;      (* c$tr *)
 hairpin      = "<" | ">" ;                                      (* 2c<  c'2> *)
 note         = [ number ] pitch [ octave ] [ modifier ] ;
 pitch        = "a" | "b" | "c" | "d" | "e" | "f" | "g" , [ accidental ] ;
@@ -172,8 +178,9 @@ block        = [ number ] "[" atom { atom } "]" ;
 atom         = note | chord | percussion ;
 slide        = slide-point ">" slide-point { ">" slide-point } ;
 slide-point  = [ number ] pitch [ octave ] ;
-value        = "'" ( "1" | "2" | "4" | "8" | "16" | "32" | "64" )
-               [ "T" | "Q" | "S" ] [ "." [ "." ] ] [ modifier ] ;
+value        = "'" ( note-number [ tuplet ] [ "." [ "." ] ] | "g" | "G" )
+               [ modifier ] ;                                   (* c'8.  c'8T  d'g *)
+note-number  = "1" | "2" | "4" | "8" | "16" | "32" | "64" | "128" ;
 number       = digit { digit } ;
 ```
 
@@ -202,6 +209,10 @@ Note sulla grammatica:
   `|`, valori di nota o altri blocchi.
 - Un `;` fuori da un blocco di voci non appartiene a nessuna regola e
   rende il token non valido.
+- Un token `$` seguito da un nome minuscolo e' un segno di navigazione
+  (sezione 8.11) quando sta da solo, un segno sulla nota (sezione 6.11) in
+  fondo a un token che suona; `$` seguito da una lettera maiuscola A-G e'
+  una sigla d'accordo (sezione 8.10).
 
 ---
 
@@ -226,7 +237,8 @@ tempo corrente, che parte da 0) e uno **stato corrente**:
 croma, `16:` semicroma, `2:` minima, `1:` semibreve; vale qualunque N
 positivo (`12:` e' una croma di terzina). Una lettera dopo N fa una
 griglia a **tuplet**: `T` moltiplica l'unita' per 2/3 (terzine), `Q` per
-4/5 (quintine), `S` per 4/7 (settimine). `N` DEVE essere positivo.
+4/5 (quintine), `S` per 4/7 (settimine), `D` per 3/2 (duine: due note
+nel tempo di tre, come in 6/8). `N` DEVE essere positivo.
 
 **Durata.** Un token che suona dura `moltiplicatore × unita'`, dove il
 moltiplicatore e' il numero iniziale (1 se manca) e l'unita' e' quella di
@@ -329,7 +341,7 @@ moltiplicatori dentro gli atomi si ignorano.
 
 Un valore dopo `'` da' direttamente la durata, al posto dell'unita' di
 griglia: il numero e' la figura (1 semibreve = 4 quarti, 2 minima, 4
-semiminima, 8 croma, 16, 32, 64), una lettera di tuplet la scala come
+semiminima, 8 croma, 16, 32, 64, 128), una lettera di tuplet la scala come
 una griglia a tuplet, e uno o due punti la moltiplicano per 3/2 o 7/4:
 
 | Token | Quarti |
@@ -338,10 +350,12 @@ una griglia a tuplet, e uno o due punti la moltiplicano per 3/2 o 7/4:
 | `c'8.` | 3/4 |
 | `c'2..` | 7/2 |
 | `c'8T` | 1/3 |
+| `c'8D` | 3/4 |
 | `2c'8` | 1 |
 
 Il valore vale **solo per quel token**: la griglia non cambia. Vale per
-note, accordi, blocchi, pause, percussioni e slide.
+note, accordi, blocchi, pause, percussioni e slide. I valori `'g` e `'G`
+sono note di abbellimento (sezione 6.12).
 
 ### 6.7 Articolazione
 
@@ -416,9 +430,34 @@ una volta ciascuno):
 | `$tr` | trillo | alterna la nota e quella sopra nella tonalita' |
 | `$mordent` | mordente | nota, quella sotto nella tonalita', nota |
 | `$turn` | gruppetto | sopra, nota, sotto, nota |
+| `$arp` | arpeggio (accordo arpeggiato) | le note di un accordo o di un blocco entrano una dopo l'altra, dalla piu' grave |
+| `$staccatissimo` | staccatissimo | molto breve (un quarto della durata) |
+| `$sfz` | sforzando | piu' forte di `$marcato` |
+| `$fp` | forte-piano | attacco piu' forte, come `$accent` |
+| `$trem` | tremolo (sulla batteria: rullata) | la nota ribattuta a biscrome |
+| `$harmonic` | armonico | come scritto |
 
 Un nome sconosciuto e' un errore; su una pausa va solo `$fermata`. I
 segni non cambiano `start`, `duration` e `velocity` dell'evento.
+
+### 6.12 Note di abbellimento
+
+Una nota, un accordo, un blocco o una percussione con il valore `'g` e'
+un'**acciaccatura**, con `'G` un'**appoggiatura**: `d'g c`, `[c e]'G C`,
+`snare'g snare` (un flam). Un abbellimento **non occupa tempo scritto**:
+il suo evento ha `duration` 0, comincia nel punto del cursore e ha il
+campo `grace` (`acciaccatura` o `appoggiatura`); il cursore non si
+sposta. Piu' abbellimenti possono precedere la stessa nota (`c'g d'g e`).
+Si suona subito prima della nota che segue (sezione 13).
+
+Un abbellimento DEVE essere seguito dalla nota, dall'accordo, dal blocco
+o dalla percussione che abbellisce: prima di una pausa, di un blocco di
+voci o della fine del testo e' un errore, come lo sono una legatura di
+valore o una forcella su di esso, una legatura di valore che vi arriva e
+un valore di abbellimento su una pausa o su uno slide. Una legatura di
+portamento puo' cominciare su un abbellimento (`d'g( c)`). Gli
+abbellimenti non prendono sillabe (sezione 8.5) e una rampa di velocity
+(sezione 7.3) non li conta.
 
 ---
 
@@ -439,6 +478,14 @@ classiche sono velocity fisse:
 dal cursore in poi. Produce un
 evento di tipo `tempo_marker` con `bpm` = N. Il tempo e' globale: un
 marcatore in una traccia qualsiasi cambia il tempo di tutto il brano.
+
+N puo' avere decimali (`tempo=72.5`). Un valore di nota dopo N dice la
+figura che si conta: `tempo=60'4.` sono 60 semiminime puntate al minuto,
+`tempo=40'2` 40 minime (il valore e' una figura con punti facoltativi,
+senza lettera di tuplet). `bpm` e' sempre in quarti al minuto
+(`tempo=60'4.` da' 90) e DEVE stare in 1-999; l'evento riceve anche il
+campo `beat_unit` con il valore come scritto (`4.`), per la partitura.
+`bpm` e' un intero quando lo e'.
 
 ### 7.3 Rampe
 
@@ -464,13 +511,14 @@ per x da 0 (inizio) a 1 (fine):
 
 - **Rampa di velocity** (crescendo/diminuendo): siano e₀…eₖ₋₁ (k eventi)
   gli eventi prodotti fra apertura e chiusura, esclusi gli eventi
-  `control`. L'evento i riceve `round(v₀ + (v₁ - v₀) × f(i / (k-1)))`
+  `control`, `repeat`, `text` e `harmony` e le note di abbellimento. L'evento i riceve `round(v₀ + (v₁ - v₀) × f(i / (k-1)))`
   (con k = 1: il valore finale), dove v₀ e' la velocity all'apertura e
   v₁ il valore di chiusura, limitato a 1-127.
 - **Rampa di tempo** (accelerando/rallentando): per ciascuno di quegli
   eventi, un `tempo_marker` al suo inizio con il tempo interpolato (stessa
-  formula). Senza eventi in mezzo, un solo marcatore con il valore finale
-  nel punto del cursore.
+  formula; se il valore iniziale o quello finale ha decimali, il risultato
+  si arrotonda a 2 decimali invece che all'intero). Senza eventi in mezzo,
+  un solo marcatore con il valore finale nel punto del cursore.
 
 ### 7.4 Pedale del sustain
 
@@ -713,6 +761,17 @@ accordo — non pause, non percussioni.
 
 Le sillabe vanno nel campo `lyric` dell'evento.
 
+**Strofe.** Un testo che comincia con una cifra 1-9, i due punti e uno
+spazio appartiene a quella strofa: `"2: Ev- ry where that Ma- ry went"`;
+senza numero (o con `1:`) e' la strofa 1, come sopra. Ogni strofa ha i
+suoi eventi in attesa: un testo della strofa N prende gli eventi cantati
+dal testo precedente della strofa N (o dall'inizio), cosi' le strofe si
+possono scrivere una dopo l'altra sotto la stessa musica. La prima voce di
+un blocco di voci li condivide con il testo intorno, come per la strofa
+1. Le sillabe dalla strofa 2 in poi vanno nel campo `verses` dell'evento,
+un oggetto dal numero della strofa alla sillaba (`{"2": "lo"}` nella
+suite di conformita'); le regole per `*`, `_` e `-` sono le stesse.
+
 ### 8.6 Controlli di battuta
 
 `|` dichiara che nel punto del cursore finisce una battuta. Non occupa
@@ -782,6 +841,58 @@ la griglia. Dentro un pattern o un gruppo ripetuto si valuta a ogni
 ripetizione, nella posizione assoluta del brano; in un blocco di voci ogni
 voce raggiunge la battuta partendo dall'inizio del blocco.
 
+### 8.10 Sigle d'accordo
+
+`$Am7`, `$G7/B`: una **sigla d'accordo** scritta sopra il pentagramma,
+che non suona (l'armonia di un lead sheet sopra una melodia). E' un
+evento di tipo `harmony` nel punto del cursore, con `symbol` e `bass` e
+durata 0. La qualita' DEVE essere una della sezione 9.1. Una
+trasposizione in vigore (sezione 7.8) la traspone come un accordo.
+
+### 8.11 Navigazione: D.C., D.S., Coda, Fine
+
+I segni di una partitura che fanno tornare indietro si scrivono come
+token:
+
+| Token | Segno |
+| --- | --- |
+| `$segno` | 𝄋 segno |
+| `$coda` | 𝄌 coda (dove comincia la coda) |
+| `$tocoda` | "alla Coda": nella ripresa, da qui si salta a `$coda` |
+| `$fine` | Fine: nella ripresa ci si ferma qui |
+| `$dc` | D.C. (da capo): si torna all'inizio |
+| `$ds` | D.S. (dal segno): si torna a `$segno` |
+
+Come i ritornelli, si espandono prima dell'interpretazione (dopo aver
+letto pattern, gruppi e ritornelli):
+
+    A $fine B $dc                       A B A
+    $segno A $tocoda B $ds $coda C      A B A C
+
+- Il testo si suona fino a `$dc` o `$ds`; poi dall'inizio (`$dc`) o da
+  `$segno` (`$ds`) fino a `$fine`, oppure fino a `$tocoda` e poi da
+  `$coda` alla fine, oppure, senza nessuno dei due, di nuovo fino al
+  salto.
+- Nella ripresa i ritornelli si suonano una volta, con l'ultima casella
+  (sezione 8.7), come si usa; i passaggi dei gruppi `N(...)` si suonano
+  come sono scritti.
+- Nel modo relativo la ripresa riparte dalla nota precedente che il testo
+  aveva nel punto a cui si torna, e la coda da quella prima del salto.
+- Un testo ha al piu' un `$dc` o `$ds`. E' un errore scrivere un `$ds`
+  senza un `$segno` prima, sia `$fine` sia `$tocoda`, un `$fine` o un
+  `$tocoda` che non sta fra il punto a cui si torna e il salto, un
+  `$tocoda` senza un `$coda` dopo il salto, un `$coda` dopo il salto senza
+  un `$tocoda`, e musica dopo il salto fuori dalla coda (possono seguirlo
+  solo controlli di battuta).
+- Senza `$dc` o `$ds` i segni marcano soltanto la partitura.
+
+L'espansione inserisce eventi di durata nulla di tipo `navigation` con
+`name` = il segno, nell'ordine in cui si suonano: `segno`, `coda`,
+`tocoda`, `fine` dove si incontrano la prima volta; il salto come `dc` o
+`ds`, seguito da `_fine` o `_coda` quando la ripresa finisce a `$fine` o
+alla coda (`ds_coda`: "D.S. al Coda"); nella ripresa solo il `fine`
+finale, oppure il `tocoda` e il `coda` dove comincia la coda.
+
 ---
 
 ## 9. Accordi e percussioni
@@ -805,7 +916,17 @@ qualita'. Gli intervalli sono semitoni sopra la fondamentale:
 | `sus4` | 0 5 7 | | `7#9` | 0 4 7 10 15 |
 | `6` | 0 4 7 9 | | `5` | 0 7 |
 | `11` | 0 4 7 10 14 17 | | `13` | 0 4 7 10 14 21 |
-| `maj13` | 0 4 7 11 14 21 | | | |
+| `maj13` | 0 4 7 11 14 21 | | `7#5`, `aug7` | 0 4 8 10 |
+| `7b5` | 0 4 6 10 | | `m11` | 0 3 7 10 14 17 |
+| `m13` | 0 3 7 10 14 21 | | `69` | 0 4 7 9 14 |
+| `maj7#11` | 0 4 7 11 18 | | `7#11` | 0 4 7 10 18 |
+| `9sus4` | 0 5 7 10 14 | | `7b13` | 0 4 7 10 20 |
+| `add11` | 0 4 7 17 | | `madd9` | 0 3 7 14 |
+| `7sus2` | 0 2 7 10 | | `sus` | 0 5 7 |
+| `13b9` | 0 4 7 10 13 21 | | | |
+
+L'accordo di sesta e nona si scrive `69` (`C69`): in `C6/9` la barra
+sarebbe il basso alternativo.
 
 Una qualita' sconosciuta e' un errore.
 
@@ -855,6 +976,12 @@ Gli altri nomi si risolvono con una tabella di alias a scelta
 dell'implementazione (es. `violin`, `electric_bass`, `drum_kit`) e con i
 nomi General MIDI.
 
+Uno strumento puo' essere **traspositore** (sezione 12.2,
+`trasposizione=N`): N e' il numero di semitoni fra quello che suona e
+quello che e' scritto nella sua parte (una tromba in Si♭ e' −2). Il testo
+si scrive sempre in suoni reali; la trasposizione cambia solo la parte
+scritta della partitura.
+
 ### 9.5 Nomi delle percussioni
 
 | Nome | Nota GM | Nome | Nota GM | Nome | Nota GM |
@@ -871,6 +998,10 @@ nomi General MIDI.
 | conga_open | 63 | conga_low | 64 | timbale_hi | 65 |
 | timbale_low | 66 | cabasa | 69 | maracas | 70 |
 | claves | 75 | woodblock_hi | 76 | woodblock_low | 77 |
+| side_stick | 37 | vibraslap | 58 | agogo_hi | 67 |
+| agogo_low | 68 | whistle_short | 71 | whistle_long | 72 |
+| guiro_short | 73 | guiro_long | 74 | cuica_mute | 78 |
+| cuica_open | 79 | triangle_mute | 80 | triangle | 81 |
 
 ---
 
@@ -886,7 +1017,8 @@ conforme DEVE segnalare almeno questi errori:
   `;` fuori da un blocco di voci e `|` dentro un blocco);
 - nome di percussione, qualita' di accordo o stile di voicing sconosciuti;
 - velocity fuori da 1-127; griglia con N = 0; valore di nota diverso da
-  1, 2, 4, 8, 16, 32, 64;
+  1, 2, 4, 8, 16, 32, 64, 128 (o `g`, `G`); un tempo fuori da 1-999 o con
+  un valore di nota che non e' uno di questi;
 - una nota fuori dall'intervallo MIDI 0-127;
 - `*+` o `*-` fuori dal modo relativo; una tonalita' non valida o con piu' di
   7 alterazioni;
@@ -905,7 +1037,10 @@ conforme DEVE segnalare almeno questi errori:
 - un pattern non definito, un riferimento troppo profondo o ciclico, un
   riferimento MIDI che non si risolve, senza virgolette o con la
   virgoletta non chiusa;
-- un blocco vuoto `[]` o un blocco di voci vuoto.
+- un blocco vuoto `[]` o un blocco di voci vuoto;
+- una nota di abbellimento usata diversamente dalla sezione 6.12; una
+  sigla d'accordo con una qualita' sconosciuta; segni di navigazione
+  scritti diversamente dalla sezione 8.11.
 
 ### 10.2 Avvisi
 
@@ -951,18 +1086,19 @@ ha:
 
 | Campo | Tipo | Significato |
 | --- | --- | --- |
-| `kind` | stringa | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker`, `control`, `repeat`, `text` |
+| `kind` | stringa | `note`, `chord`, `percussion`, `rest`, `block`, `slide`, `sustain`, `tempo_marker`, `control`, `repeat`, `text`, `harmony`, `navigation` |
 | `start` | numero | inizio, in quarti dall'inizio della traccia |
 | `duration` | numero | durata in quarti (0 per `sustain` e `tempo_marker`, e per `control` senza rampa) |
 | `velocity` | 1-127 | velocity corrente (di default 80) |
 | `letter`, `octave` | | altezza della nota (`note`, prima tappa di `slide`), con l'alterazione che suona: compresa quella della tonalita', nessuna per un bequadro, l'ottava risolta |
-| `symbol`, `voicing`, `bass`, `octave` | | accordo (`chord`) |
-| `name` | stringa | nome della percussione (`percussion`); `on`/`off` (`sustain`); nome dell'automazione (`control`) |
+| `symbol`, `voicing`, `bass`, `octave` | | accordo (`chord`); `symbol` e `bass` anche per `harmony` |
+| `name` | stringa | nome della percussione (`percussion`); `on`/`off` (`sustain`); nome dell'automazione (`control`); segno (`navigation`) |
 | `items` | elenco | atomi di un `block`: ciascuno con `kind` e i suoi campi |
 | `articulation` | stringa | `staccato`, `mute`, `legato` |
 | `slide_points` | elenco | tappe dopo la prima (`slide`), come [lettera, ottava] |
 | `slide_segment_durations` | elenco | durate dei segmenti (`slide`) |
-| `bpm` | intero | tempo (`tempo_marker`) |
+| `bpm` | numero | tempo in quarti al minuto (`tempo_marker`) |
+| `beat_unit` | stringa | la figura contata dal tempo, come scritta (`4.`), se c'e' (`tempo_marker`) |
 | `value` | numero | valore dell'automazione (`control`; alla fine di una rampa) |
 | `start_value` | numero | valore all'inizio di una rampa (`control`) |
 | `curve` | stringa | curva della rampa: `lin`, `exp`, `log`, `s` (rampe `control`) |
@@ -972,6 +1108,8 @@ ha:
 | `decorations` | elenco | segni dell'evento (sezione 6.11) |
 | `voice` | intero | numero di voce (1 fuori dai blocchi di voci) |
 | `lyric` | stringa | sillaba (eventi cantati) |
+| `verses` | oggetto | sillabe delle strofe dalla 2 in poi: numero della strofa → sillaba |
+| `grace` | stringa | `acciaccatura` o `appoggiatura` (note di abbellimento, sezione 6.12) |
 
 Gli eventi compaiono nell'ordine di interpretazione (tutti gli eventi
 della prima voce di un blocco, poi della seconda, …), non per forza in
@@ -993,18 +1131,24 @@ libero).
 
 | Riga | Significato |
 | --- | --- |
-| `ST: 2.6` | versione del linguaggio in cui e' scritto il file |
+| `ST: 2.7` | versione del linguaggio in cui e' scritto il file |
 | `Tempo: 120 BPM` | tempo |
 | `Tempo: 1: 120, 5: 140` | tempo per battuta (battuta: bpm, …) |
 | `Metrica: 3/4` | metrica |
 | `Metrica: 1: 4/4, 5: 3/4` | metrica per battuta |
 | `Levare: 1` | battuta in levare, in quarti (`1`, `1.5`, `1/2`; sezione 12.3) |
 | `Tonalita: Am` | tonalita' (A-G, alterazione e `m` facoltative) |
+| `Tonalita: 1: C, 17: G` | tonalita' per battuta (battuta: tonalita', …) |
+| `Titolo: Blue Moon` | titolo |
+| `Autore: R. Rodgers` | autore della musica |
+| `Parole: L. Hart` | autore del testo |
 
-Con un elenco per battuta, il tempo/la metrica del brano sono quelli
-della battuta 1, o il primo valore se la battuta 1 non c'e'. `Tempo`,
-`Metrica`, `Levare` e `Tonalita` non distinguono maiuscole e minuscole;
-le altre intestazioni si scrivono come indicato.
+Con un elenco per battuta, il tempo/la metrica/la tonalita' del brano
+sono quelli della battuta 1, o il primo valore se la battuta 1 non c'e'.
+`Tempo`, `Metrica`, `Levare`, `Tonalita`, `Titolo`, `Autore` e `Parole`
+non distinguono maiuscole e minuscole; le altre intestazioni si scrivono
+come indicato. Titolo e autori arrivano fino a fine riga; senza titolo,
+una partitura usa il nome del file.
 
 **Versione.** `ST: M.m` e' facoltativa e va prima degli altri blocchi. Un
 lettore che trova una versione piu' recente di quella che conosce
@@ -1014,8 +1158,10 @@ la ignorano (e' una riga fuori da ogni blocco).
 
 **Parole chiave.** Le parole chiave del file si possono scrivere in
 italiano o in inglese: `Metrica`/`Meter`, `Tonalita`/`Key`,
-`Levare`/`Pickup`, `Traccia`/`Track`, `Strumento`/`Instrument`; nel corpo
-di uno strumento `percussione`/`percussion` e `ottava`/`octave`; i valori
+`Levare`/`Pickup`, `Traccia`/`Track`, `Strumento`/`Instrument`,
+`Titolo`/`Title`, `Autore`/`Composer`, `Parole`/`Lyricist`; nel corpo di
+uno strumento `percussione`/`percussion`, `ottava`/`octave` e
+`trasposizione`/`transposition`; i valori
 si'/no come `si`/`yes`/`no`. Chi scrive il file DOVREBBE usare le forme
 italiane, che ogni versione legge.
 
@@ -1027,8 +1173,8 @@ italiane, che ogni versione legge.
 | `Traccia Nome [Strumento]:` | testo della traccia |
 | `Piano:`, `Piano 2:` (il nome di uno strumento conosciuto, indice facoltativo) | testo della traccia `Piano` / `Piano 2` |
 | `Box Traccia "Nome" \|quarto:` | un box della traccia `Traccia` che comincia a `quarto` |
-| `Strumento Nome:` | definizione di strumento (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`); un blocco senza `program=` non definisce nulla |
-| `Mixer Traccia:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) di una traccia |
+| `Strumento Nome:` | definizione di strumento (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`, facoltativo `trasposizione=-2`, sezione 9.4); un blocco senza `program=` non definisce nulla |
+| `Mixer Traccia:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) di una traccia; i lettori ignorano le chiavi che non conoscono |
 
 I corpi di tracce e box conservano gli **a capo** (i commenti finiscono a
 fine riga); i corpi dei pattern si dividono in token. I blocchi Strumento
@@ -1111,7 +1257,15 @@ una traccia per ogni traccia udibile:
   sulla nota; `$mordent` suona nota, altezza sotto, nota e `$turn` sopra,
   nota, sotto, nota, ogni nota dell'abbellimento lunga 1/8 di quarto
   tranne l'ultima; `$fermata` dimezza il tempo di tutto il brano durante
-  l'evento;
+  l'evento; `$sfz` × 1,5 e `$fp` × 1,25 sulla velocity; `$staccatissimo`
+  suona il 25 % della durata; `$trem` ribatte la nota a colpi di 1/8 di
+  quarto; `$arp` ritarda ogni nota di un accordo o di un blocco di 1/16 di
+  quarto, dalla piu' grave; `$harmonic` suona come scritto;
+- note di abbellimento: gli abbellimenti prima di una nota suonano uno
+  dopo l'altro dall'inizio della nota, ciascuno lungo 1/8 di quarto (al
+  piu' una parte uguale della nota), e la nota comincia dopo di loro,
+  accorciata di altrettanto;
+- gli eventi `harmony` e `navigation` non suonano;
 - i ritornelli si suonano espansi; l'esportazione in partitura scrive un
   ritornello (con le sue caselle) invece della musica per esteso quando
   comincia e finisce sulle stanghette, nessuna nota ne attraversa i
@@ -1135,7 +1289,14 @@ una traccia per ogni traccia udibile:
   di crescendo/diminuendo;
 - testo cantato → eventi meta *lyrics* (le sillabe che continuano una
   parola senza spazio dopo, le fini di parola con uno spazio; `_` non si
-  scrive).
+  scrive); solo la strofa 1.
+
+L'esportazione in partitura (informativa) scrive titolo e autori del
+brano, un cambio di armatura dove l'elenco per battuta cambia la
+tonalita', la parte scritta di uno strumento traspositore (trasposta e con
+l'elemento `transpose` di MusicXML), le sigle d'accordo, le note di
+abbellimento, i nuovi segni, i segni di navigazione sopra la musica
+scritta per esteso, e una riga di testo per strofa.
 
 **MTXT.** L'implementazione di riferimento scrive lo stesso MIDI anche
 come testo [MTXT 1.0](https://github.com/Daninet/mtxt) (un evento per
@@ -1155,13 +1316,28 @@ input, `"error": true` oppure gli eventi attesi (campi della sezione 11,
 numeri arrotondati a 9 decimali, `voice` omesso quando vale 1, atomi dei
 blocchi senza il moltiplicatore) e gli avvisi attesi (intervallo di
 caratteri del token e numero di battuta; 0 per il testo cantato e per la
-battuta in levare; un caso puo' dare il levare in quarti come `pickup`). Un
+battuta in levare; un caso puo' dare il levare in quarti come `pickup`;
+nel campo `verses` i numeri delle strofe sono chiavi di un oggetto JSON,
+quindi stringhe). Un
 parser e' conforme a questa versione se da' lo stesso risultato per ogni
 caso.
 
 ---
 
 ## Appendice A: modifiche
+
+**2.7** — completamenti: le qualita' di accordo `7#5` (`aug7`), `7b5`,
+`m11`, `m13`, `69`, `maj7#11`, `7#11`, `9sus4`, `7b13`, `add11`, `madd9`,
+`7sus2`, `sus`, `13b9` (sezione 9.1); il resto della batteria General
+MIDI (sezione 9.5); il valore `'128` e la lettera di duina `D` (sezioni 4,
+6.6); il tempo con i decimali e con la figura contata `tempo=60'4.`
+(sezione 7.2); le note di abbellimento `'g` e `'G` (sezione 6.12); i
+segni `$arp`, `$staccatissimo`, `$sfz`, `$fp`, `$trem`, `$harmonic`
+(sezione 6.11); le sigle d'accordo `$Am7` (sezione 8.10); D.C., D.S., Coda
+e Fine (sezione 8.11); le strofe del testo `"2: ..."` (sezione 8.5); nel
+file del brano titolo e autori, la tonalita' per battuta e gli strumenti
+traspositori (sezioni 9.4, 12.1, 12.2). Ogni testo 2.6 valido e' un testo
+2.7 valido con gli stessi eventi.
 
 **2.6** — consolidamento: `reset:` (sezione 7.9), usato come prefisso dei
 box (sezione 12.4); la tabella dell'eredita' dello stato (sezione 4);

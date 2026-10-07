@@ -30,7 +30,7 @@ from .stfile import (
     RE_TEMPO, RE_TEMPO_LIST_HDR, RE_TRACK_HDR, RE_TRACK_HDR_EXPLICIT, short_track_header,
     RE_PICKUP, RE_ST_VERSION, LANGUAGE_VERSION, parse_pickup, instrument_blocks,
     _extract_box_blocks, _extract_named_blocks, _parse_bar_value_list, _parse_instrument_body,
-    _parse_mixer_body,
+    _parse_mixer_body, RE_KEY_LIST_HDR, RE_TITLE, RE_COMPOSER, RE_LYRICIST, parse_key_list,
 )
 
 AUDIO_INSTRUMENT_NAME = "Audio"     # tracce audio di SoundText: senza notazione, saltate
@@ -80,6 +80,10 @@ class Song:
     instruments: Dict[str, InstrumentProfile] = field(default_factory=dict)   # dichiarati nel file
     pickup: float = 0.0                    # battuta in levare, in quarti (Levare:)
     st_version: Optional[tuple] = None     # versione dichiarata dal file (ST: 2.6), se c'e'
+    key_changes: List[tuple] = field(default_factory=list)        # [(battuta, "G")] (2.7)
+    title: str = ""                        # Titolo: (2.7); senza, la partitura usa name
+    composer: str = ""                     # Autore:
+    lyricist: str = ""                     # Parole:
 
     def instrument(self, name: str) -> InstrumentProfile:
         return instrument_for(name, known={**DEFAULT_INSTRUMENTS, **self.instruments})
@@ -283,11 +287,28 @@ def read_song(text: str, name: str = "ST") -> Song:
                 flush()
             song.time_sig = m.group(1)
             continue
+        m = RE_KEY_LIST_HDR.match(line)
+        if m:
+            if mode:
+                flush()
+            song.key_changes = parse_key_list(m.group(1))
+            first = next((k for b, k in song.key_changes if b == 1), None)
+            song.key = first if first is not None else song.key_changes[0][1]
+            continue
         m = RE_KEY.match(line)
         if m:
             if mode:
                 flush()
             song.key = m.group(1).strip()
+            continue
+        for rx, attr in ((RE_TITLE, "title"), (RE_COMPOSER, "composer"), (RE_LYRICIST, "lyricist")):
+            m = rx.match(line)
+            if m:
+                break
+        if m:
+            if mode:
+                flush()
+            setattr(song, attr, m.group(1).strip())
             continue
         if RE_MASTER.match(line) or RE_AMBIENTE.match(line):
             if mode:

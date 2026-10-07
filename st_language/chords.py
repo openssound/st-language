@@ -48,6 +48,22 @@ CHORD_QUALITIES = {
     "11": [0, 4, 7, 10, 14, 17],
     "13": [0, 4, 7, 10, 14, 21],        # l'11 e' omesso, come da prassi jazz comune
     "maj13": [0, 4, 7, 11, 14, 21],
+    # 2.7: le qualita' piu' comuni dei lead sheet che mancavano
+    "7#5": [0, 4, 8, 10],
+    "7b5": [0, 4, 6, 10],
+    "m11": [0, 3, 7, 10, 14, 17],
+    "m13": [0, 3, 7, 10, 14, 21],         # come per '13', l'11 e' omesso
+    "69": [0, 4, 7, 9, 14],               # "6/9": la barra e' gia' il basso alternativo
+    "maj7#11": [0, 4, 7, 11, 18],
+    "7#11": [0, 4, 7, 10, 18],
+    "9sus4": [0, 5, 7, 10, 14],
+    "7b13": [0, 4, 7, 10, 20],
+    "add11": [0, 4, 7, 17],
+    "madd9": [0, 3, 7, 14],
+    "7sus2": [0, 2, 7, 10],
+    "13b9": [0, 4, 7, 10, 13, 21],
+    "aug7": [0, 4, 8, 10],                # alias di '7#5'
+    "sus": [0, 5, 7],                     # alias di 'sus4'
 }
 
 # La classe di caratteri include '#' per poter esprimere qualita' come
@@ -422,7 +438,8 @@ GUITAR_VOICING_PATTERNS: Dict[str, Dict[str, List[int]]] = {
 
 # Alias di qualita' che condividono la stessa voce in tabella (stessi
 # intervalli in CHORD_QUALITIES, un solo insieme di voicing curati).
-_QUALITY_ALIASES = {"": "maj", "min": "m", "min7": "m7", "°": "dim", "°7": "dim7", "7alt": "7b9"}
+_QUALITY_ALIASES = {"": "maj", "min": "m", "min7": "m7", "°": "dim", "°7": "dim7", "7alt": "7b9",
+                     "aug7": "7#5", "sus": "sus4"}
 
 
 def _canonical_quality(quality: str) -> str:
@@ -501,8 +518,8 @@ def recognize_chord(midi_notes: List[int]) -> Optional[Tuple[int, str, int]]:
     best = None  # (score, root_pc, quality)
     for root_pc in observed:
         for quality, intervals in CHORD_QUALITIES.items():
-            if quality == "":
-                continue  # alias di 'maj', evita doppioni
+            if quality in ("", "aug7", "sus"):
+                continue  # alias ('maj', '7#5', 'sus4'): evita doppioni
             candidate = {(root_pc + iv) % 12 for iv in intervals}
             if candidate - observed:
                 continue  # l'accordo candidato deve essere interamente coperto dalle note presenti

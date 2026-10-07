@@ -25,8 +25,9 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from .instruments import PERCUSSION_MAP
 from .musicxml import (QUANT_GRID, _Direction, _Entry, _Item, _clefs, _drop_repeated_harmonies,
                        _dynamic_changes, _frac, _grid_divisions, _mark_lyrics, _measures, _monophonic,
-                       _repeat_layout, _spell_midi, _staff_entries, _track_items, _track_repeats,
-                       _track_texts, key_fifths)
+                       _repeat_layout, _spell_midi, _staff_entries, _track_harmonies, _track_items,
+                       _track_navigation, _track_repeats, _track_texts, _item_syllables, key_fifths,
+                       song_key_changes, NAVIGATION_WORDS)
 
 if TYPE_CHECKING:          # solo per le annotazioni (nessun import circolare)
     from .song import Part, Song  # noqa: F401
@@ -43,7 +44,9 @@ _MINOR_NAMES = {-7: "Abm", -6: "Ebm", -5: "Bbm", -4: "Fm", -3: "Cm", -2: "Gm", -
                 1: "Em", 2: "Bm", 3: "F#m", 4: "C#m", 5: "G#m", 6: "D#m", 7: "A#m"}
 _ARTICULATIONS = {"staccato": ".", "mute": "!wedge!", "legato": "!tenuto!"}
 _DECORATIONS = {"accent": "!accent!", "marcato": "!marcato!", "tenuto": "!tenuto!", "fermata": "!fermata!",
-                "tr": "!trill!", "mordent": "!lowermordent!", "turn": "!turn!"}
+                "tr": "!trill!", "mordent": "!lowermordent!", "turn": "!turn!",
+                "arp": "!arpeggio!", "staccatissimo": "!wedge!", "sfz": "!sfz!", "fp": "!fp!",
+                "trem": "!///!", "harmonic": "!open!"}
 
 
 def key_name(key: str) -> str:
@@ -103,7 +106,10 @@ def _drum_items(items: List[_Item]) -> List[_Item]:
     out = []
     for item in items:
         pitches = sorted({PERCUSSION_MAP.get(d, 38) for d in item.drums})
-        out.append(dataclasses.replace(item, pitches=[_spell_midi(p, False) for p in pitches], drums=[]))
+        graces = tuple((tuple(_spell_midi(PERCUSSION_MAP.get(d, 38), False) for d in drums), (), slash)
+                       for _pitches, drums, slash in item.graces)
+        out.append(dataclasses.replace(item, pitches=[_spell_midi(p, False) for p in pitches], drums=[],
+                                       graces=graces))
     return out
 
 
@@ -114,12 +120,12 @@ def _clef_text(sign: str, octave_change: int) -> str:
     return name + ("-8" if octave_change < 0 else "+8" if octave_change > 0 else "")
 
 
-def _lyric_syllable(entry: _Entry) -> str:
-    """La sillaba w: di una nota: '*' senza testo, '_' per la nota legata
-    che prosegue (lo standard le conta come note distinte)."""
+def _lyric_syllable(entry: _Entry, verse: int = 1) -> str:
+    """La sillaba w: di una nota nella strofa 'verse': '*' senza testo, '_'
+    per la nota legata che prosegue (lo standard le conta come note distinte)."""
     if not entry.first_of_item:
         return "_ "
-    syllable = entry.item.lyric
+    syllable = _item_syllables(entry.item).get(verse)
     if not syllable:
         return "* "
     if syllable == "_":
@@ -140,7 +146,8 @@ class _Voice:
         self.first = first              # prima voce del pentagramma (pause visibili)
         self.transpose = transpose      # semitoni fra suono e scrittura (chiave all'ottava)
         self.directions: List[_Direction] = []
-        self.has_lyrics = any(i.lyric for i in items)
+        self.verses = sorted({n for i in items for n in _item_syllables(i)})
+        self.has_lyrics = bool(self.verses)
 
 
 def _entry_text(entry: _Entry, voice: _Voice, bar_alters, signature) -> str:
@@ -158,6 +165,13 @@ def _entry_text(entry: _Entry, voice: _Voice, bar_alters, signature) -> str:
         out += _ARTICULATIONS[entry.item.articulation]
     if entry.first_of_item:
         out += "".join(_DECORATIONS[d] for d in entry.item.decorations if d in _DECORATIONS)
+    if entry.first_of_item and entry.item.graces:
+        # {/g} acciaccatura, {g} appoggiatura; un abbellimento di piu' note si
+        # scrive come sequenza (le note di un abbellimento ABC sono singole)
+        slash = "/" if entry.item.graces[0][2] else ""
+        out += "{" + slash + "".join(pitch_text(p.step, p.alter, p.octave + voice.transpose // 12, bar_alters,
+                                                  signature)
+                                       for pitches, _drums, _slash in entry.item.graces for p in pitches) + "}"
     notes = [pitch_text(p.step, p.alter, p.octave + voice.transpose // 12, bar_alters, signature)
              for p in entry.item.pitches]
     body = notes[0] if len(notes) == 1 else "[" + "".join(notes) + "]"
@@ -165,10 +179,10 @@ def _entry_text(entry: _Entry, voice: _Voice, bar_alters, signature) -> str:
     return out + body + length_suffix(units) + ("-" if entry.tie_start else "") + slur_end
 
 
-def _measure_text(entries: List[_Entry], voice: _Voice, signature) -> Tuple[str, List[str]]:
-    """La battuta di una voce e le sue sillabe."""
+def _measure_text(entries: List[_Entry], voice: _Voice, signature) -> Tuple[str, Dict[int, List[str]]]:
+    """La battuta di una voce e le sue sillabe, per strofa."""
     parts: List[str] = []
-    syllables: List[str] = []
+    syllables: Dict[int, List[str]] = {n: [] for n in voice.verses}
     bar_alters: Dict[str, int] = {}
     in_tuplet = False
     for i, entry in enumerate(entries):
@@ -186,8 +200,9 @@ def _measure_text(entries: List[_Entry], voice: _Voice, signature) -> Tuple[str,
             in_tuplet = False
         joined = entry.beam in ("begin", "continue")
         parts.append(text + ("" if joined else " "))
-        if entry.item is not None and voice.has_lyrics:
-            syllables.append(_lyric_syllable(entry))
+        if entry.item is not None:
+            for n in voice.verses:
+                syllables[n].append(_lyric_syllable(entry, n))
     return "".join(parts).rstrip(), syllables
 
 
@@ -244,8 +259,13 @@ def project_to_abc(project: "Song", only_audible: bool = True,
         if n == 1:
             directions += [_Direction(t, f"[Q:1/4={bpm}]") for t, bpm in tempo_map if t > 0]
         directions += [_Direction(i.start, chord_symbol(*i.harmony)) for i in items if i.harmony]
+        directions += [_Direction(t, chord_symbol(symbol, bass))
+                       for t, symbol, bass in _track_harmonies(events_by_track[track.name], grid)]
         directions += [_Direction(t, '"^' + words.replace('"', "'") + '"')
                        for t, words in _track_texts(events_by_track[track.name], grid)]
+        directions += [_Direction(t, {"segno": "!segno!", "coda": "!coda!"}.get(name)
+                                  or '"^' + NAVIGATION_WORDS.get(name, name) + '"')
+                       for t, name in _track_navigation(events_by_track[track.name], grid)]
         if not drums:
             first_voice = min((i.voice for i in items), default=1)
             directions += [_Direction(t, f"!{mark}!") for t, mark in
@@ -278,7 +298,13 @@ def project_to_abc(project: "Song", only_audible: bool = True,
 
     first_sig = f"{measures[0][2]}/{measures[0][3]}"
     bpm = tempo_map[0][1] if tempo_map and tempo_map[0][0] == 0 else round(project.tempo_bpm)
-    out = ["X:1", f"T:{project.name}", f"M:{first_sig}", "L:1/8", f"Q:1/4={bpm}"]
+    out = ["X:1", f"T:{getattr(project, 'title', '') or project.name}"]
+    if getattr(project, "composer", ""):
+        out.append(f"C:{project.composer}")
+    if getattr(project, "lyricist", ""):
+        out.append(f"C:{project.lyricist} (lyrics)")
+    out += [f"M:{first_sig}", "L:1/8", f"Q:1/4={bpm}"]
+    key_changes = dict(song_key_changes(project))
     if len(voices) > 1:
         out.append("%%score " + " ".join(score))
     for voice in voices:
@@ -292,15 +318,21 @@ def project_to_abc(project: "Song", only_audible: bool = True,
         out.append(f"V:{voice.vid}")
         out.append(f"%%MIDI channel {DRUM_CHANNEL}" if voice.drums else f"%%MIDI program {voice.program}")
         line: List[str] = []
-        syllables: List[str] = []
+        syllables: Dict[int, List[str]] = {n: [] for n in voice.verses}
         previous_sig = (measures[0][2], measures[0][3])
+        voice_signature = signature
         for number, (m_index, marks) in enumerate(layout, 1):
             m_start, m_len, num, den = measures[m_index]
+            changes_key = m_start in key_changes and number > 1 and not voice.drums
+            if changes_key:
+                voice_signature = key_alters(key_fifths(key_changes[m_start])[0])
             entries = _staff_entries(voice.items, voice.directions, m_start, m_len, num, den)
-            text, bar_syllables = _measure_text(entries, voice, signature)
+            text, bar_syllables = _measure_text(entries, voice, voice_signature)
             if (num, den) != previous_sig:
                 text = f"[M:{num}/{den}] " + text
                 previous_sig = (num, den)
+            if changes_key:
+                text = f"[K:{key_name(key_changes[m_start])}] " + text
             if marks.ending_start:
                 text = f"[{marks.ending_start} " + text
             if number == 1 and marks.forward:
@@ -314,17 +346,18 @@ def project_to_abc(project: "Song", only_audible: bool = True,
             else:
                 bar = "|]" if last else "|"
             line.append(text + " " + bar)
-            syllables += bar_syllables
+            for n in voice.verses:
+                syllables[n] += bar_syllables[n]
             if number % BARS_PER_LINE == 0 or last:
                 out.append(" ".join(line))
-                if voice.has_lyrics:
-                    # sempre una riga w: (anche vuota): per lo standard la
-                    # successiva si allinea dopo le note di questa
-                    words = "".join(syllables).split(" ")
+                # una riga w: per strofa, sempre (anche vuota): per lo standard
+                # la successiva si allinea dopo le note di questa
+                for n in voice.verses:
+                    words = "".join(syllables[n]).split(" ")
                     while words and words[-1] in ("*", ""):
                         words.pop()
                     out.append(("w: " + " ".join(words)).rstrip())
-                line, syllables = [], []
+                line, syllables = [], {n: [] for n in voice.verses}
     return "\n".join(out) + "\n"
 
 

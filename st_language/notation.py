@@ -37,6 +37,11 @@ BAR_CHECK = "|"
 # Ritornelli: |: ... :| (con le caselle |1. ... :| |2. ... ||) e la doppia
 # stanghetta ||; valgono anche come controlli di battuta (vedi expand_repeats).
 REPEAT_START, REPEAT_END, DOUBLE_BAR = "|:", ":|", "||"
+# Segni di navigazione (2.7): $segno, $coda, $tocoda ("al Coda"), $fine,
+# $dc (da capo) e $ds (dal segno); si espandono come i ritornelli.
+RE_NAVIGATION = re.compile(r"^\$(segno|coda|tocoda|fine|dc|ds)$")
+# Strofa del testo cantato (2.7): "2: Ma- ry had..." (senza numero, la 1).
+RE_VERSE = re.compile(r"^([1-9]):(?=\s|$)\s*(.*)$", re.DOTALL)
 RE_ENDING = re.compile(r"^\|([1-9])\.$")
 RE_REPEAT_END_ENDING = re.compile(r"^:\|([1-9])\.$")
 # Segnaposto interni (non scrivibili: contengono un carattere di controllo)
@@ -304,8 +309,9 @@ TUPLET_SCALE = {
     "T": Fraction(2, 3),
     "Q": Fraction(4, 5),
     "S": Fraction(4, 7),
+    "D": Fraction(3, 2),      # duina (2.7): due note nello spazio di tre
 }
-RE_GRID = re.compile(r"^(\d+)([TQS])?:$")
+RE_GRID = re.compile(r"^(\d+)([TQSD])?:$")
 # Valore di nota esplicito, in alternativa alla griglia: c*4'8. (croma
 # puntata), d'16 (semicroma), [c e g]'2 (minima), r'4 (pausa di
 # semiminima), e'8T (croma di terzina). Il numero e' la figura (1 =
@@ -313,8 +319,11 @@ RE_GRID = re.compile(r"^(\d+)([TQS])?:$")
 # (8T: ecc.), i punti allungano di meta' (uno) o di tre quarti (due). Vale
 # solo per quel token: la griglia corrente non cambia. Va in fondo al
 # token, prima o dopo l'eventuale articolazione (c'8! = c!'8).
-RE_NOTE_VALUE = re.compile(r"^(.+?)'(\d+)([TQS]?)(\.{0,2})([!x_]?)$")
-NOTE_VALUES = (1, 2, 4, 8, 16, 32, 64)
+RE_NOTE_VALUE = re.compile(r"^(.+?)'(\d+|[gG])([TQSD]?)(\.{0,2})([!x_]?)$")
+# Note di abbellimento (2.7): d'g acciaccatura, d'G appoggiatura. Non occupano
+# tempo scritto: si suonano subito prima della nota che segue.
+GRACE_VALUES = {"'g": "acciaccatura", "'G": "appoggiatura"}
+NOTE_VALUES = (1, 2, 4, 8, 16, 32, 64, 128)
 _DOT_SCALE = {0: Fraction(1), 1: Fraction(3, 2), 2: Fraction(7, 4)}
 # Blocco di voci { voce1 ; voce2 ... }: sequenze che partono insieme.
 RE_VOICES = re.compile(r"^\{(.*)\}$", re.DOTALL)
@@ -564,9 +573,9 @@ def split_marks(value: str) -> Tuple[str, str, bool, str, List[str]]:
 
 def note_value_beats(value: str) -> Fraction:
     """Durata in quarti di un valore di nota come "'8." (vedi RE_NOTE_VALUE)."""
-    m = re.match(r"^'(\d+)([TQS]?)(\.{0,2})$", value)
+    m = re.match(r"^'(\d+)([TQSD]?)(\.{0,2})$", value)
     if not m or int(m.group(1)) not in NOTE_VALUES:
-        raise NotationError(tr("Valore di nota non valido: dopo l'apostrofo va 1, 2, 4, 8, 16, 32 o 64 "
+        raise NotationError(tr("Valore di nota non valido: dopo l'apostrofo va 1, 2, 4, 8, 16, 32, 64 o 128 "
                                "(es. c'8 croma, c'4. semiminima puntata, c'8T croma di terzina)"), value)
     number, tuplet, dots = m.groups()
     beats = Fraction(4, int(number)) * _DOT_SCALE[len(dots)]
@@ -575,12 +584,20 @@ def note_value_beats(value: str) -> Fraction:
     return beats
 
 
+def _bpm_number(value: Fraction):
+    """Il tempo come numero dell'evento: intero se lo e' (tempo=120 -> 120),
+    altrimenti coi decimali (tempo=72.5 -> 72.5)."""
+    return int(value) if value.denominator == 1 else float(value)
+
+
 def is_lyric(tok: str) -> bool:
     return len(tok) >= 2 and tok[0] == LYRIC_QUOTE and tok[-1] == LYRIC_QUOTE
 
 
-# Tempo inline in una traccia (BPM, da qui in poi per tutto il brano): tempo=120
-RE_TEMPO_SET = re.compile(r"^tempo=(\d+)$")
+# Tempo inline in una traccia (BPM, da qui in poi per tutto il brano): tempo=120,
+# anche coi decimali (tempo=72.5) e con la figura che si conta (tempo=60'4.:
+# 60 semiminime puntate al minuto, cioe' 90 quarti).
+RE_TEMPO_SET = re.compile(r"^tempo=(\d+(?:\.\d+)?)(?:'(\d+)(\.{0,2}))?$")
 # Rampe: '>>' o '<<' (equivalenti), con la forma della curva facoltativa:
 # lin (di default), exp (parte piano e accelera: i fade dei volumi), log
 # (parte veloce e rallenta), s (morbida a inizio e fine).
@@ -613,10 +630,14 @@ CC_MAX = 119
 
 # Segni sulle note, in fondo al token prima della forcella e delle legature:
 # c$tr, C$fermata, [c e g]$accent$tenuto (vedi split_note_value).
-DECORATIONS = ("accent", "marcato", "tenuto", "fermata", "tr", "mordent", "turn")
+DECORATIONS = ("accent", "marcato", "tenuto", "fermata", "tr", "mordent", "turn",
+               # 2.7
+               "arp", "staccatissimo", "sfz", "fp", "trem", "harmonic")
 RE_DECORATIONS = re.compile(r"((?:\$[a-z]+)+)$")
 # Indicazione di testo sopra il pentagramma: $"rit.", $"dolce".
 RE_TEXT = re.compile(r'^\$"(.*)"$', re.DOTALL)
+# Sigla d'accordo senza suono (2.7): $Am7, $G7/B (scritta sopra il pentagramma).
+RE_HARMONY = re.compile(r"^\$([A-G][#b♭]?[A-Za-z0-9#°]*)(?:/([A-G][#b♭]?))?$")
 
 # Swing: 'swing=N' sposta la seconda croma di ogni coppia, 'swing16=N' la
 # seconda semicroma; N e' la percentuale della coppia data alla prima nota
@@ -673,7 +694,7 @@ class Event:
     # e' l'attesa sull'altezza finale. La somma coincide sempre con
     # 'duration' sopra.
     slide_segment_durations: Optional[List[float]] = None
-    bpm: Optional[int] = None               # per kind='tempo_marker'
+    bpm: Optional[float] = None             # per kind='tempo_marker' (in quarti al minuto; intero se lo e')
     # Voce dentro la traccia: 1 fuori dai blocchi { ; }, poi 1, 2... per le
     # voci di un blocco (la partitura le scrive come voci separate).
     voice: int = 1
@@ -697,6 +718,14 @@ class Event:
     # Micro-timing (vedi RE_SHIFT): millisecondi di anticipo (< 0) o
     # ritardo (> 0) con cui la nota suona rispetto a dove e' scritta.
     shift: Optional[int] = None
+    # per kind='tempo_marker' scritto con la figura (tempo=60'4.): la figura
+    # che si conta ("4."), per la partitura; bpm resta in quarti al minuto.
+    beat_unit: Optional[str] = None
+    # Nota di abbellimento (2.7, d'g / d'G): "acciaccatura" o "appoggiatura";
+    # durata 0, suona subito prima della nota che segue.
+    grace: Optional[str] = None
+    # Sillabe delle strofe dopo la prima (2.7, "2: ..."): {strofa: sillaba}.
+    verses: Optional[Dict[int, str]] = None
 
 
 @dataclass
@@ -1116,7 +1145,8 @@ def expand_repeats(tokens: List[str], origins: Optional[List[int]] = None,
     battuta invece di sollevare NotationError."""
     if origins is None:
         origins = list(range(len(tokens)))
-    if not any(_is_repeat_token(t) for t in tokens):
+    has_navigation = any(RE_NAVIGATION.match(t) for t in tokens)
+    if not has_navigation and not any(_is_repeat_token(t) for t in tokens):
         return list(tokens), list(origins)
     toks: List[str] = []
     orig: List[int] = []
@@ -1129,11 +1159,127 @@ def expand_repeats(tokens: List[str], origins: Optional[List[int]] = None,
             toks.append(t)
             orig.append(o)
     try:
+        if has_navigation:
+            return _expand_navigation(toks, orig)
         return _expand_repeats(toks, orig)
     except NotationError:
         if not lenient:
             raise
-        return [BAR_CHECK if _is_repeat_token(t) else t for t in toks], orig
+        return [BAR_CHECK if _is_repeat_token(t) else _navigation_marker(t) for t in toks], orig
+
+
+def _navigation_marker(tok: str) -> str:
+    """Il segno di navigazione ($segno...) come marcatore per l'evento
+    'navigation'; gli altri token restano com'erano."""
+    m = RE_NAVIGATION.match(tok)
+    return f"{_MARK}nav:{m.group(1)}" if m else tok
+
+
+def _collapse_repeats(toks: List[str], orig: List[int]) -> Tuple[List[str], List[int]]:
+    """Un tratto ripreso da D.C. o D.S.: i ritornelli si suonano una volta
+    sola, con l'ultima casella (come si usa); i segni di navigazione e le
+    ripetizioni dei gruppi non si segnano di nuovo."""
+    out: List[str] = []
+    out_o: List[int] = []
+    n = len(toks)
+    i = 0
+    while i < n:
+        t = toks[i]
+        if RE_NAVIGATION.match(t) or (t.startswith(_MARK) and t[1:].partition(":")[0] in
+                                      ("start", "again", "ending", "end")):
+            i += 1
+            continue
+        if t in (REPEAT_START, REPEAT_END, DOUBLE_BAR):
+            out.append(BAR_CHECK)
+            out_o.append(orig[i])
+            i += 1
+            continue
+        if RE_ENDING.match(t):
+            last, k = i, i + 1
+            while k < n and toks[k] not in (DOUBLE_BAR, REPEAT_START):
+                if RE_ENDING.match(toks[k]):
+                    last = k
+                k += 1
+            out.append(BAR_CHECK)
+            out_o.append(orig[i])
+            sub, sub_o = _collapse_repeats(toks[last + 1:k], orig[last + 1:k])
+            out += sub
+            out_o += sub_o
+            i = k
+            continue
+        out.append(t)
+        out_o.append(orig[i])
+        i += 1
+    return out, out_o
+
+
+def _expand_navigation(toks: List[str], orig: List[int]) -> Tuple[List[str], List[int]]:
+    """D.C. e D.S. scritti per esteso, come li suona un musicista:
+
+        A $fine B $dc                       A B A
+        $segno A $tocoda B $ds $coda C      A B A C
+
+    Al salto si riprende dall'inizio ($dc) o dal segno ($ds) e ci si ferma
+    a $fine, oppure a $tocoda per saltare a $coda; nella ripresa i
+    ritornelli si suonano una volta, con l'ultima casella."""
+    nav = [(i, RE_NAVIGATION.match(t).group(1)) for i, t in enumerate(toks) if RE_NAVIGATION.match(t)]
+
+    def first(name: str) -> Optional[int]:
+        return next((i for i, n in nav if n == name), None)
+
+    def signs(a: int, b: int) -> Tuple[List[str], List[int]]:
+        return [_navigation_marker(t) for t in toks[a:b]], orig[a:b]
+
+    jumps = [i for i, n in nav if n in ("dc", "ds")]
+    if not jumps:
+        return _expand_repeats(*signs(0, len(toks)))
+    if len(jumps) > 1:
+        raise NotationError(tr("Un solo salto per testo: $dc oppure $ds"), toks[jumps[1]])
+    jump = jumps[0]
+    kind = toks[jump][1:]
+    segno, fine, tocoda, coda = first("segno"), first("fine"), first("tocoda"), first("coda")
+    if kind == "ds" and (segno is None or segno > jump):
+        raise NotationError(tr("$ds (dal segno) vuole un $segno prima"), toks[jump])
+    target = 0 if kind == "dc" else segno + 1
+    if fine is not None and tocoda is not None:
+        raise NotationError(tr("Un salto finisce a $fine oppure va a $coda, non tutti e due"), toks[fine])
+    if fine is not None and not target <= fine < jump:
+        raise NotationError(tr("$fine va fra il punto a cui si torna e il salto ($dc o $ds)"), toks[fine])
+    after = [t for t in toks[jump + 1:(coda if coda is not None and coda > jump else len(toks))]
+             if t not in (BAR_CHECK, DOUBLE_BAR)]
+    if tocoda is not None:
+        if not target <= tocoda < jump:
+            raise NotationError(tr("$tocoda va fra il punto a cui si torna e il salto ($dc o $ds)"), toks[tocoda])
+        if coda is None or coda < jump:
+            raise NotationError(tr("$tocoda vuole un $coda dopo il salto ($dc o $ds)"), toks[tocoda])
+    elif coda is not None and coda > jump:
+        raise NotationError(tr("$coda dopo il salto vuole un $tocoda da cui arrivarci"), toks[coda])
+    if after:
+        raise NotationError(tr("Dopo il salto ($dc o $ds) la musica non si suona: "
+                               "metti la coda dopo $coda"), after[0])
+    variant = "_fine" if fine is not None else ("_coda" if tocoda is not None else "")
+
+    first_toks, first_orig = signs(0, jump)
+    insert = target if kind == "dc" else target          # il punto a cui si torna, per rel:
+    first_toks.insert(insert, f"{_MARK}navmark:0")
+    first_orig.insert(insert, orig[min(insert, len(orig) - 1)])
+    out, out_o = _expand_repeats(first_toks, first_orig)
+    out += [f"{_MARK}nav:{kind}{variant}", f"{_MARK}navmark:1", f"{_MARK}navjump:0"]
+    out_o += [orig[jump]] * 3
+    end = fine if fine is not None else (tocoda if tocoda is not None else jump)
+    again, again_o = _collapse_repeats(toks[target:end], orig[target:end])
+    out += again
+    out_o += again_o
+    if fine is not None:
+        out.append(f"{_MARK}nav:fine")
+        out_o.append(orig[fine])
+    if tocoda is not None:
+        out += [f"{_MARK}nav:tocoda", f"{_MARK}navjump:1", f"{_MARK}nav:coda"]
+        out_o += [orig[tocoda], orig[coda], orig[coda]]
+        rest, rest_o = _expand_repeats(*signs(coda + 1, len(toks)))
+        out += rest
+        out_o += rest_o
+    return out, out_o
 
 
 def _expand_repeats(toks: List[str], orig: List[int]) -> Tuple[List[str], List[int]]:
@@ -1313,20 +1459,27 @@ def _parse_atom(tok: str, default_octave: int, pitch: Optional[_PitchState] = No
 
 def _sings(ev: Event) -> bool:
     """Se l'evento riceve una sillaba del testo cantato (note e accordi,
-    non pause ne' percussioni)."""
+    non pause ne' percussioni ne' abbellimenti)."""
+    if ev.grace:
+        return False
     return ev.kind in ("note", "chord", "slide") or (
         ev.kind == "block" and any(it["kind"] != "percussion" for it in ev.items))
 
 
-def _assign_lyrics(syllables: List[str], targets: List[Event]) -> int:
+def _assign_lyrics(syllables: List[str], targets: List[Event], verse: int = 1) -> int:
     """Una sillaba per nota, nell'ordine; '_' fa durare la sillaba
     precedente anche su questa nota, '*' la lascia senza sillaba. Ritorna
-    quante sillabe avanzano (piu' sillabe che note)."""
+    quante sillabe avanzano (piu' sillabe che note). Le strofe dopo la prima
+    vanno nel campo verses."""
     for n, syllable in enumerate(syllables):
         if n >= len(targets):
             return len(syllables) - n
-        if syllable != "*":
+        if syllable == "*":
+            continue
+        if verse == 1:
             targets[n].lyric = syllable
+        else:
+            targets[n].verses = {**(targets[n].verses or {}), verse: syllable}
     return 0
 
 
@@ -1374,6 +1527,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                          initial_velocity: int = 80, voice: int = 1,
                          extras: Optional[dict] = None,
                          pending_lyrics: Optional[List["Event"]] = None,
+                         pending_verses: Optional[Tuple[List["Event"], Dict[int, int]]] = None,
                          initial_controls: Optional[Dict[str, float]] = None,
                          initial_swing: Optional[Tuple[float, float]] = None,
                          initial_pitch: Optional["_PitchState"] = None,
@@ -1426,6 +1580,11 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
     # portamento aperta con le note che ne fanno parte.
     pending_tie: Optional[Event] = None
     slur_notes: Optional[List[Event]] = None
+    pending_grace: Optional[str] = None      # token dell'ultimo abbellimento che aspetta la sua nota
+    nav_refs: Dict[str, Tuple[str, int]] = {}  # rel: la nota da cui riparte una ripresa D.C./D.S.
+    # Strofe dopo la prima: tutti gli eventi cantati e, per strofa, da dove
+    # prende la prossima sillaba (condivisi con la prima voce di un blocco).
+    sung, verse_pos = pending_verses if pending_verses is not None else ([], {})
     swing = initial_swing
     shift = initial_shift
     pitch = initial_pitch.copy() if initial_pitch is not None else _PitchState(default_octave)
@@ -1457,7 +1616,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
         start_value = pending_ramp["start_value"]
         start_index = pending_ramp["start_index"]
         # le automazioni (vol=, forcelle...) scritte dentro la rampa non contano
-        affected = [ev for ev in events[start_index:] if ev.kind not in ("control", "repeat", "text")]
+        affected = [ev for ev in events[start_index:]
+                    if ev.kind not in ("control", "repeat", "text", "harmony") and not ev.grace]
         n = len(affected)
         if n == 0 and pending_ramp["kind"] == "tempo":
             # Nessun evento dentro la rampa ('tempo=120 >> tempo=140 c'): non c'e'
@@ -1477,7 +1637,10 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 interp = round(start_value + (end_value - start_value) * frac)
                 ev.velocity = max(1, min(127, interp))
             else:  # tempo
-                interp = round(start_value + (end_value - start_value) * frac)
+                if isinstance(start_value, int) and isinstance(end_value, int):
+                    interp = round(start_value + (end_value - start_value) * frac)
+                else:     # un estremo coi decimali (tempo=72.5): due decimali
+                    interp = _bpm_number(Fraction(round(start_value + (end_value - start_value) * frac, 2)))
                 events.append(Event(start=ev.start, duration=0.0, kind="tempo_marker", bpm=interp))
         pending_ramp = None
 
@@ -1486,6 +1649,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
         events.append(ev)
         if _sings(ev):
             lyric_targets.append(ev)
+            sung.append(ev)
         return ev
 
     def _sounding(ev: Event, dur: Fraction, hairpin: str, tie: bool, slur: str,
@@ -1493,7 +1657,17 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
         """Aggiunge un evento che suona, con legature, forcella e swing: se
         la nota precedente finiva con '~' questo token la allunga invece di
         crearne una nuova (deve avere la stessa altezza)."""
-        nonlocal pending_tie, slur_notes
+        nonlocal pending_tie, slur_notes, pending_grace
+        if ev.grace:
+            if pending_tie is not None:
+                raise NotationError(tr("La legatura di valore (~) deve arrivare a una nota uguale, "
+                                       "non a un abbellimento"), tok)
+            if tie or hairpin:
+                raise NotationError(tr("Un abbellimento (d'g, d'G) non puo' avere una legatura di valore (~) "
+                                       "ne' una forcella"), tok)
+            pending_grace = tok
+        else:
+            pending_grace = None
         if pending_tie is not None:
             if _pitch_key(pending_tie) != _pitch_key(ev):
                 raise NotationError(tr("La legatura di valore (~) collega due note diverse: "
@@ -1555,8 +1729,19 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 continue
 
             if tok.startswith(_MARK):
-                # inizio, ripetizione, casella o fine di un ritornello (vedi expand_repeats)
                 name, _, number = tok[1:].partition(":")
+                if name == "nav":
+                    # segno di navigazione, nell'ordine in cui si suona (vedi _expand_navigation)
+                    events.append(Event(start=float(cursor), duration=0.0, kind="navigation", name=number,
+                                        voice=voice))
+                    continue
+                if name == "navmark":          # rel: la ripresa riparte dalla stessa nota
+                    nav_refs[number] = pitch.ref
+                    continue
+                if name == "navjump":
+                    pitch.ref = nav_refs.get(number, pitch.ref)
+                    continue
+                # inizio, ripetizione, casella o fine di un ritornello (vedi expand_repeats)
                 events.append(Event(start=float(cursor), duration=0.0, kind="repeat", name=name,
                                     value=int(number) if number else None, voice=voice))
                 # nel modo relativo ogni passaggio riparte dalla stessa nota
@@ -1603,9 +1788,27 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                                     voice=voice))
                 continue
 
+            m = RE_HARMONY.match(tok)
+            if m:
+                from .chords import parse_chord_symbol
+                symbol, bass = m.groups()
+                parse_chord_symbol(symbol)
+                if pitch.semitones:
+                    symbol, bass, _octave = _transpose_chord(symbol, bass, 4, pitch.semitones, pitch)
+                events.append(Event(start=float(cursor), duration=0.0, kind="harmony", symbol=symbol,
+                                    bass=bass, voice=voice))
+                continue
+
             if is_lyric(tok):
-                extra = _assign_lyrics(tok[1:-1].split(), lyric_targets)
-                lyric_targets.clear()
+                verse_match = RE_VERSE.match(tok[1:-1])
+                verse = int(verse_match.group(1)) if verse_match else 1
+                words = verse_match.group(2) if verse_match else tok[1:-1]
+                if verse == 1:
+                    extra = _assign_lyrics(words.split(), lyric_targets)
+                    lyric_targets.clear()
+                else:
+                    extra = _assign_lyrics(words.split(), sung[verse_pos.get(verse, 0):], verse)
+                    verse_pos[verse] = len(sung)
                 if extra and extras is not None:
                     extras.setdefault("lyric_issues", {})[index] = (
                         tr("testo cantato: 1 sillaba in piu' delle note") if extra == 1 else
@@ -1617,6 +1820,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 if pending_tie is not None or slur_notes is not None:
                     raise NotationError(tr("Una legatura (~ o parentesi) non puo' attraversare un blocco di voci: "
                                            "chiudila prima"), tok)
+                if pending_grace is not None:
+                    raise NotationError(tr("Un abbellimento (d'g, d'G) va subito prima della sua nota"), tok)
                 voices = split_voices(m.group(1))
                 if not any(v.strip() for v in voices):
                     raise NotationError(tr("Blocco di voci vuoto"), tok)
@@ -1635,6 +1840,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                         voice_tokens, default_octave, grid_beats, lenient, voice_ranges,
                         initial_velocity=velocity, voice=voice + k, extras=None,
                         pending_lyrics=lyric_targets if k == 0 else None,
+                        pending_verses=(sung, verse_pos) if k == 0 else None,
                         initial_controls=controls, initial_swing=swing, initial_pitch=pitch,
                         initial_shift=shift, meter=meter, origin_beat=origin_beat + cursor)
                     for ev in sub_events:
@@ -1666,9 +1872,17 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
 
             m = RE_TEMPO_SET.match(tok)
             if m:
-                new_tempo = int(m.group(1))
-                if not 1 <= new_tempo <= 999:
+                number, unit_number, unit_dots = m.groups()
+                written = Fraction(number)
+                if not 1 <= written <= 999:
                     raise NotationError(tr("Tempo fuori range (1-999 BPM)"), tok)
+                beat_unit = None
+                if unit_number is not None:
+                    beat_unit = unit_number + unit_dots
+                    written *= note_value_beats("'" + beat_unit)
+                    if not 1 <= written <= 999:
+                        raise NotationError(tr("Tempo fuori range (1-999 BPM)"), tok)
+                new_tempo = _bpm_number(written)
                 if pending_ramp and pending_ramp["kind"] == "tempo":
                     _finalize_ramp(new_tempo)
                 elif pending_ramp:
@@ -1682,7 +1896,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                         "chiudila con un altro N@ prima, oppure sposta tempo=N dopo la chiusura"), tok
                     )
                 else:
-                    events.append(Event(start=float(cursor), duration=0.0, kind="tempo_marker", bpm=new_tempo))
+                    events.append(Event(start=float(cursor), duration=0.0, kind="tempo_marker", bpm=new_tempo,
+                                        beat_unit=beat_unit))
                 tempo = new_tempo
                 last_state_kind = "tempo"
                 continue
@@ -1791,11 +2006,18 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 if deco not in DECORATIONS:
                     raise NotationError(tr("Segno sconosciuto: '${deco}'. Ammessi: {0}",
                                            ", ".join("$" + d for d in DECORATIONS), deco=deco), tokens[index])
-            unit = note_value_beats(value) if value else grid_beats
+            grace = GRACE_VALUES.get(value)
+            unit = Fraction(0) if grace else (note_value_beats(value) if value else grid_beats)
             note_start = cursor
 
             m = RE_REST.match(tok)
             if m:
+                if grace:
+                    raise NotationError(tr("Un abbellimento (d'g, d'G) va su una nota, un accordo, un blocco "
+                                           "o una percussione"), tokens[index])
+                if pending_grace is not None:
+                    raise NotationError(tr("Un abbellimento (d'g, d'G) va subito prima della sua nota, "
+                                           "non di una pausa"), pending_grace)
                 if hairpin:
                     raise NotationError(tr("Una pausa non puo' avere una forcella ('<' o '>')"), tokens[index])
                 if tie or slur:
@@ -1814,6 +2036,9 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
 
             m = RE_SLIDE.match(tok)
             if m:
+                if grace:
+                    raise NotationError(tr("Un abbellimento (d'g, d'G) va su una nota, un accordo, un blocco "
+                                           "o una percussione"), tokens[index])
                 points = _parse_slide_points(m.group(1), default_octave, pitch)
                 segment_durations = _slide_segment_durations(points, unit)
                 dur = sum(segment_durations)
@@ -1846,8 +2071,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     pitch.ref = (first_note["letter"][0], first_note["octave"])
                 dur = unit * mult
                 _sounding(Event(start=float(cursor), duration=float(dur), kind="block",
-                                velocity=velocity, items=items), dur, hairpin, tie, slur, note_start, tokens[index],
-                          decorations)
+                                velocity=velocity, items=items, grace=grace), dur, hairpin, tie, slur, note_start,
+                          tokens[index], decorations)
                 cursor += dur
                 continue
 
@@ -1869,6 +2094,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                                         tokens[index])
                 ev = Event(start=start, duration=duration, kind="percussion", velocity=velocity,
                            name=atom["name"])
+            ev.grace = grace
             _sounding(ev, dur, hairpin, tie, slur, note_start, tokens[index], decorations)
             cursor += dur
         except (NotationError, ValueError):
@@ -1882,6 +2108,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
 
     if pending_tie is not None and not lenient:
         raise NotationError(tr("Legatura di valore (~) senza la nota che la continua"))
+    if pending_grace is not None and not lenient:
+        raise NotationError(tr("Un abbellimento (d'g, d'G) va subito prima della sua nota"), pending_grace)
     if slur_notes is not None and not lenient:
         raise NotationError(tr("Legatura di portamento aperta ma mai chiusa con ')'"))
     if pending_controls and not lenient:

@@ -186,3 +186,52 @@ def test_package_metadata_is_ready_for_pypi():
         if "contents: write" in block:
             writers.append(block.split(":", 1)[0].strip())
     assert writers == ["github-release"]
+
+
+# ------------------------------------------------------------------ 2.7 nelle esportazioni
+
+SONG_27 = """ST: 2.7
+Titolo: Prova
+Autore: A. Autore
+Parole: P. Paroliere
+Tempo: 100 BPM
+Tonalita: 1: C, 3: G
+
+Strumento TrombaSib:
+  program=56 percussione=no ottava=4 range=54-82 poly=no voicing=monophonic trasposizione=-2
+
+Traccia Tromba [TrombaSib]:
+  4: $segno $C7 d'g c e f g | a b c*5 d*5 $tocoda | f# g a b $ds $coda | c*5 C$arp 2r |
+  "la la la la" "2: lo lo lo lo"
+
+Piano:
+  4: C$arp [c e g]'g C c$trem d$staccatissimo
+"""
+
+
+def test_musicxml_has_the_27_features():
+    from st_language.musicxml import project_to_musicxml
+    xml = project_to_musicxml(st.read_song(SONG_27))
+    for needed in ("<work-title>Prova</work-title>", '<creator type="composer">A. Autore</creator>',
+                   '<creator type="lyricist">P. Paroliere</creator>', '<grace slash="yes"/>', "<arpeggiate/>",
+                   "<chromatic>-2</chromatic>", "<segno/>", "<coda/>", "D.S. al Coda", '<lyric number="2">',
+                   '<tremolo type="single">3</tremolo>', "<staccatissimo/>"):
+        assert needed in xml, needed
+    # tromba in Si bemolle: Do maggiore si scrive in Re (2 diesis), poi Sol diventa La (3)
+    assert "<key><fifths>2</fifths>" in xml and "<key><fifths>3</fifths>" in xml
+    # la sigla senza suono $C7 si scrive trasposta (D7) nella parte della tromba
+    assert "<root-step>D</root-step>" in xml
+
+
+def test_abc_has_title_verses_and_key_change():
+    from st_language.abc import project_to_abc
+    abc = project_to_abc(st.read_song(SONG_27))
+    assert "T:Prova" in abc and "C:A. Autore" in abc and "[K:G]" in abc and "{/" in abc
+    assert sum(line.startswith("w:") for line in abc.splitlines()) >= 2
+
+
+def test_midi_grace_note_sounds_before_the_note():
+    from st_language.midi import song_midi_tracks
+    song = st.read_song("Tempo: 120 BPM\n\nPiano:\n  d'g c\n")
+    ons = [(t, m[1]) for t, _o, m in sorted(song_midi_tracks(song)[0][1]) if m[0] & 0xF0 == 0x90]
+    assert ons == [(0, 62), (60, 60)]
