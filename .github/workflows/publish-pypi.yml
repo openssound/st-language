@@ -9,9 +9,8 @@ name: Publish st-language
 #                                  e la wheel alla release di GitHub
 #   - esecuzione manuale        -> prova e pubblica su TestPyPI (o su PyPI)
 #
-# Il "Source code (zip)" di una release GitHub e' generato da GitHub e
-# contiene tutto il repository (SoundText compreso): non si puo' cambiare.
-# Per questo alla release si allegano i file della sola libreria.
+# Alla release di GitHub si allegano lo sdist e la wheel, cioe' i file che
+# riceve chi fa pip install (il "Source code (zip)" e' tutto il repository).
 on:
   push:
     tags: ["st-language-v*"]
@@ -160,6 +159,6 @@ jobs:
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --latest=false \
               --title "st-language $version" \
-              --notes "ST-language $version, la libreria Python della notazione di SoundText: pip install st-language==$version. I file allegati sono la libreria con la specifica, la suite di conformita' e gli esempi (sdist) e la wheel; il pulsante Source code di GitHub contiene invece tutto il repository di SoundText."
+              --notes "ST-language $version, plain-text music notation for Python: pip install st-language==$version. Attached: the sdist (library, specification, conformance suite) and the wheel. Changes: see Appendix A of docs/spec/ST-language.md."
           fi
           gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber

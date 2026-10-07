@@ -1,10 +1,9 @@
 # Cosa entra nello sdist di st-language: la libreria (st_language/), la
-# specifica con la suite di conformita' e gli esempi; non l'applicazione
-# SoundText ne' i suoi test, che non fanno parte del pacchetto.
+# specifica con la suite di conformita' e l'esempio; non i test.
 include LICENSE
 include THIRD_PARTY_NOTICES.md
 include licenses/mtxt.txt
-include st_language/README.md
+include README.md
 include docs/spec/ST-language.md
 include docs/spec/ST-language.it.md
 include docs/spec/conformance/README.md

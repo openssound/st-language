@@ -6,7 +6,9 @@ modulation, effect sends, with curved ramps and hairpins), several
 voices and lyrics — and this is
 its reference implementation: a pure-Python library (no dependencies)
 with command-line tools to check songs and export them to **MIDI**,
-**MusicXML**, **ABC** and **MTXT**. It is the notation engine of
+**MusicXML**, **ABC** and **MTXT**. It also writes grace notes, chord
+symbols, D.C./D.S. with Coda and Fine, several lyric verses and
+transposing parts. It is the notation engine of
 [SoundText](https://github.com/openssound/soundtext), usable on its own.
 
 ```
@@ -27,8 +29,15 @@ pip install st-language
 ```
 
 Python 3.9 or later, no other packages needed. To work on the library
-itself: `pip install .` from the
-[SoundText repository](https://github.com/openssound/soundtext).
+itself, clone [this repository](https://github.com/openssound/st-language)
+and install it in development mode:
+
+```bash
+git clone https://github.com/openssound/st-language.git
+cd st-language
+pip install -e .
+python -m pytest tests            # the tests and the conformance suite
+```
 
 ## Command line
 
@@ -84,5 +93,6 @@ GPL-3.0-or-later, © 2026 Sergio Scolaro. The MTXT-derived voice-name table is M
 *In italiano:* ST-language e' la notazione musicale testuale di
 SoundText come libreria Python autonoma, senza dipendenze, con i comandi
 `st-language check | midi | musicxml | abc | mtxt | events` (e le scorciatoie
-`stcheck`, `st2mid`, `st2musicxml`, `st2abc`, `st2mtxt`). La specifica, anche in italiano, e'
-in `docs/spec/` del repository.
+`stcheck`, `st2mid`, `st2musicxml`, `st2abc`, `st2mtxt`). Si installa con
+`pip install st-language`. La specifica, anche in italiano, e' in
+`docs/spec/` del repository.
