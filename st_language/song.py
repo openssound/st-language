@@ -18,6 +18,7 @@ import os
 import re
 import warnings
 from dataclasses import dataclass, field
+from fractions import Fraction
 from typing import Dict, List, Optional
 
 from .instruments import DEFAULT_INSTRUMENTS, InstrumentProfile, instrument_for
@@ -129,6 +130,8 @@ class Song:
 # Grigliato usato per riempire i vuoti tra un box e il successivo: 1/16
 # (4.0/16 = 0.25 beat), abbastanza fine da rappresentare esattamente
 # qualunque posizione a cui il canvas puo' agganciare l'inizio di un box.
+# Un vuoto che non e' un multiplo (dopo un box che finisce in terzina, in
+# quintina...) si riempie con una pausa esatta (2.8, vedi _gap_rest).
 FILL_GRID_BEATS = 0.25
 
 
@@ -162,6 +165,23 @@ def clip_duration_beats(text: str, patterns: Dict[str, Pattern], default_octave:
     return max(e.start + e.duration for e in events)
 
 
+def _gap_rest(gap: float, fill_grid_beats: float = FILL_GRID_BEATS):
+    """(testo, quarti) della pausa che riempie un vuoto di 'gap' quarti
+    prima di un box (specifica, sezione 12.4): '16: Nr' se il vuoto e' un
+    multiplo di un sedicesimo, altrimenti la pausa esatta 'G: Nr' nella
+    griglia piu' semplice (p/q quarti: G = 4q, N = p; 1/3 -> '12: 1r').
+    (None, 0) se il vuoto e' nullo. Con l'arrotondamento ai sedicesimi di
+    prima (2.7) un box dopo un box in terzina slittava di 1/12 di quarto,
+    e lo scarto si sommava box dopo box."""
+    n = round(gap / fill_grid_beats)
+    if n > 0 and abs(n * fill_grid_beats - gap) < 1e-6:
+        return f"{_FILL_GRID_TOKEN} {n}r", n * fill_grid_beats
+    value = Fraction(gap).limit_denominator(1000)
+    if value <= 0:
+        return None, 0.0
+    return f"{4 * value.denominator}: {value.numerator}r", float(value)
+
+
 def flatten_clips_to_text(clips: List["Clip"], patterns: Dict[str, Pattern], default_octave: int,
                            fill_grid_beats: float = FILL_GRID_BEATS,
                            meter: Optional[Meter] = None) -> str:
@@ -179,10 +199,10 @@ def flatten_clips_to_text(clips: List["Clip"], patterns: Dict[str, Pattern], def
     for clip in ordered:
         gap = clip.start_beat - cursor
         if gap > 1e-9:
-            n = round(gap / fill_grid_beats)
-            if n > 0:
-                parts.append(f"{_FILL_GRID_TOKEN} {n}r")
-                cursor += n * fill_grid_beats
+            rest, beats = _gap_rest(gap, fill_grid_beats)
+            if rest:
+                parts.append(rest)
+                cursor += beats
         body = clip.text.strip()
         if COMMENT_MARK in body:
             body += "\n"   # un commento in fondo al box non deve inghiottire il box dopo

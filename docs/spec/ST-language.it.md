@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.7** · Implementazione di riferimento: la libreria Python
+**Versione 2.8** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -1131,7 +1131,7 @@ libero).
 
 | Riga | Significato |
 | --- | --- |
-| `ST: 2.7` | versione del linguaggio in cui e' scritto il file |
+| `ST: 2.8` | versione del linguaggio in cui e' scritto il file |
 | `Tempo: 120 BPM` | tempo |
 | `Tempo: 1: 120, 5: 140` | tempo per battuta (battuta: bpm, …) |
 | `Metrica: 3/4` | metrica |
@@ -1207,8 +1207,10 @@ Se una traccia ha dei box, il suo testo si costruisce da questi, in
 ordine di inizio:
 
 - il vuoto prima di ogni box (dalla fine del box precedente, o da 0) si
-  riempie di pause su una griglia di sedicesimi: `16: Nr` con N =
-  round(vuoto / 0,25);
+  riempie con una pausa: `16: Nr` con N = vuoto / 0,25 quando il vuoto e'
+  un numero intero di sedicesimi; altrimenti la pausa esatta `G: Nr`,
+  dove il vuoto e' p/q quarti ridotto ai minimi termini, G = 4q e N = p
+  (un vuoto di 8/3 dopo un box che finisce in terzina e' `12: 8r`);
 - ogni box porta `reset: ` seguito dal suo testo, cosi' parte sempre
   dallo stato iniziale (sezione 7.9); un box il cui testo contiene `//` e'
   seguito da un a capo;
@@ -1325,6 +1327,13 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.8** — il vuoto prima di un box che non e' un numero intero di
+sedicesimi si riempie con una pausa esatta invece di arrotondarlo ai
+sedicesimi (sezione 12.4): un box dopo uno che finisce in terzina o in
+quintina non slitta piu' di 1/12 o 1/10 di quarto. I testi di traccia non
+cambiano; un file di brano da' lo stesso testo, e quindi gli stessi
+eventi, quando tutti i vuoti sono numeri interi di sedicesimi.
 
 **2.7** — completamenti: le qualita' di accordo `7#5` (`aug7`), `7b5`,
 `m11`, `m13`, `69`, `maj7#11`, `7#11`, `9sus4`, `7b13`, `add11`, `madd9`,

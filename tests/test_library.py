@@ -115,6 +115,23 @@ def test_song_from_code_and_boxes():
     assert [e.start for e in voce.parsed_events(song.patterns) if e.kind == "note"] == [4.0, 5.0]
 
 
+def test_box_after_a_tuplet_box_starts_exactly_where_it_is():
+    """2.8: il vuoto prima di un box si riempie con una pausa esatta quando
+    non e' un multiplo di un sedicesimo. Con l'arrotondamento ai sedicesimi
+    il box dopo un box in terzina slittava di 1/12 di quarto (1/10 dopo
+    una quintina), e lo scarto si sommava box dopo box."""
+    from st_language.song import flatten_clips_to_text
+    for first in ("8T: c d e f", "8T: c d e f g", "16Q: c d e"):
+        clips = [st.Clip("A", first, 0.0), st.Clip("B", "4: g*6", 4.0), st.Clip("C", first, 8.0),
+                 st.Clip("D", "4: a*6", 12.0)]
+        text = flatten_clips_to_text(clips, {}, 4)
+        starts = {e.letter: e.start for e in st.parse(text) if e.kind == "note" and e.octave == 6}
+        assert starts == {"g": pytest.approx(4.0), "a": pytest.approx(12.0)}
+    # un vuoto multiplo di un sedicesimo resta scritto come prima
+    text = flatten_clips_to_text([st.Clip("A", "c", 2.5)], {}, 4)
+    assert text == "16: 10r reset: c"
+
+
 def test_plain_notation_file_is_a_one_track_song(tmp_path):
     path = tmp_path / "solo.txt"
     path.write_text("8: c d e f", encoding="utf-8")

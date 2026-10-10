@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.7** · Reference implementation: the `st_language` Python
+**Version 2.8** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -1094,7 +1094,7 @@ ignored (free text).
 
 | Line | Meaning |
 | --- | --- |
-| `ST: 2.7` | version of the language the file is written in |
+| `ST: 2.8` | version of the language the file is written in |
 | `Tempo: 120 BPM` | tempo |
 | `Tempo: 1: 120, 5: 140` | tempo per bar (bar: bpm, …) |
 | `Metrica: 3/4` | meter |
@@ -1165,8 +1165,10 @@ When a track has boxes, its text is built from them, in order of start
 beat:
 
 - the gap before each box (from the end of the previous box, or 0) is
-  filled with rests on a sixteenth grid: `16: Nr` with N = round(gap /
-  0.25);
+  filled with a rest: `16: Nr` with N = gap / 0.25 when the gap is a
+  whole number of sixteenths; otherwise the exact rest `G: Nr`, where the
+  gap is p/q quarter notes in lowest terms, G = 4q and N = p (a gap of
+  8/3 after a box that ends on a triplet is `12: 8r`);
 - each box contributes `reset: ` followed by its text, so it always starts
   from the initial state (section 7.9); a box whose text contains `//` is
   followed by a line break;
@@ -1273,6 +1275,13 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.8** — the gap before a box that is not a whole number of sixteenths
+is filled with an exact rest instead of being rounded to sixteenths
+(section 12.4): a box after one that ends on a triplet or a quintuplet
+no longer shifts by 1/12 or 1/10 of a quarter note. Track texts are
+unchanged; a song file gives the same text, and so the same events,
+whenever every gap is a whole number of sixteenths.
 
 **2.7** — completions: chord qualities `7#5` (`aug7`), `7b5`, `m11`, `m13`,
 `69`, `maj7#11`, `7#11`, `9sus4`, `7b13`, `add11`, `madd9`, `7sus2`,
