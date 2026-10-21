@@ -13,11 +13,11 @@ from typing import List, Optional, Tuple
 from .instruments import InstrumentProfile
 
 
-# Versione del linguaggio con cui e' scritto il file: "ST: 2.7" (riga
+# Versione del linguaggio con cui e' scritto il file: "ST: 2.9" (riga
 # facoltativa in cima; i lettori piu' vecchi la ignorano).
 RE_ST_VERSION = re.compile(r"^ST:\s*(\d+)\.(\d+)$")
 # La versione del linguaggio che questo lettore conosce (vedi la specifica).
-LANGUAGE_VERSION = (2, 8)
+LANGUAGE_VERSION = (2, 9)
 
 # "Levare: 1" (o "Pickup:"): la battuta in levare, in quarti (anche "1.5" o
 # "1/2"); la battuta 1 e' la prima intera.
@@ -37,7 +37,17 @@ def format_pickup(quarters: float) -> str:
 # Le parole chiave del file si scrivono in italiano o in inglese
 # (Metrica/Meter, Tonalita/Key, Traccia/Track, Strumento/Instrument...);
 # chi scrive il file usa sempre la forma italiana.
-RE_TEMPO = re.compile(r"^Tempo:\s*(\d+)\s*BPM$", re.IGNORECASE)
+# 2.9: il tempo anche coi decimali, come tempo=72.5 nelle tracce
+# ("Tempo: 101.4 BPM", "Tempo: 1: 96.5, 3: 98"); vedi parse_bpm.
+_BPM_VALUE = r"\d+(?:\.\d+)?"
+RE_TEMPO = re.compile(rf"^Tempo:\s*({_BPM_VALUE})\s*BPM$", re.IGNORECASE)
+
+
+def parse_bpm(raw: str):
+    """Il tempo di 'Tempo:': intero se lo e' ("96" e "96.0" -> 96),
+    altrimenti coi decimali ("101.4" -> 101.4), come tempo= nelle tracce."""
+    value = float(raw)
+    return int(value) if value.is_integer() else value
 
 RE_METRICA = re.compile(r"^(?:Metrica|Meter|Time):\s*(\d+/\d+)$", re.IGNORECASE)
 
@@ -61,11 +71,12 @@ RE_LYRICIST = re.compile(r"^(?:Parole|Lyricist):\s*(.*)$", re.IGNORECASE)
 RE_AMBIENTE = re.compile(r"^(?:Ambiente|Room):\s*(\w+)$", re.IGNORECASE)
 
 # Forma estesa con cambi a partire da una certa battuta: "Tempo: 1: 120, 5: 140, 9: 100"
-RE_TEMPO_LIST_HDR = re.compile(r"^Tempo:\s*(\d+\s*:\s*\d+(?:\s*,\s*\d+\s*:\s*\d+)*)$", re.IGNORECASE)
+RE_TEMPO_LIST_HDR = re.compile(rf"^Tempo:\s*(\d+\s*:\s*{_BPM_VALUE}(?:\s*,\s*\d+\s*:\s*{_BPM_VALUE})*)$",
+                               re.IGNORECASE)
 
 RE_METRICA_LIST_HDR = re.compile(r"^(?:Metrica|Meter|Time):\s*(\d+\s*:\s*\d+/\d+(?:\s*,\s*\d+\s*:\s*\d+/\d+)*)$", re.IGNORECASE)
 
-RE_BAR_VALUE = re.compile(r"(\d+)\s*:\s*(\d+(?:/\d+)?)")
+RE_BAR_VALUE = re.compile(r"(\d+)\s*:\s*(\d+(?:\.\d+|/\d+)?)")
 
 RE_PATTERN_HDR = re.compile(r"^Pattern\s+%(\w+):$")
 
@@ -166,12 +177,13 @@ VOLUME_MAX = 200  # 100 = guadagno originale (unita'), fino a 200 = raddoppio pe
 
 def _parse_bar_value_list(raw: str, is_metrica: bool = False) -> List[tuple]:
     """Parsa 'N: v, N: v, ...' in [(bar:int, value), ...], ordinato per
-    battuta. value e' str per la metrica (es. '3/4'), int per il tempo."""
+    battuta. value e' str per la metrica (es. '3/4'), per il tempo il
+    numero di parse_bpm (96, 96.5)."""
     pairs = RE_BAR_VALUE.findall(raw)
     result = []
     for bar_s, value_s in pairs:
         bar = int(bar_s)
-        value = value_s if is_metrica else int(value_s)
+        value = value_s if is_metrica else parse_bpm(value_s)
         result.append((bar, value))
     return sorted(result, key=lambda p: p[0])
 

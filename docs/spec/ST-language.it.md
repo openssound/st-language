@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.8** · Implementazione di riferimento: la libreria Python
+**Versione 2.9** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -1131,9 +1131,9 @@ libero).
 
 | Riga | Significato |
 | --- | --- |
-| `ST: 2.8` | versione del linguaggio in cui e' scritto il file |
-| `Tempo: 120 BPM` | tempo |
-| `Tempo: 1: 120, 5: 140` | tempo per battuta (battuta: bpm, …) |
+| `ST: 2.9` | versione del linguaggio in cui e' scritto il file |
+| `Tempo: 120 BPM` | tempo (anche coi decimali: `Tempo: 101.4 BPM`) |
+| `Tempo: 1: 120, 5: 140` | tempo per battuta (battuta: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | metrica |
 | `Metrica: 1: 4/4, 5: 3/4` | metrica per battuta |
 | `Levare: 1` | battuta in levare, in quarti (`1`, `1.5`, `1/2`; sezione 12.3) |
@@ -1145,6 +1145,12 @@ libero).
 
 Con un elenco per battuta, il tempo/la metrica/la tonalita' del brano
 sono quelli della battuta 1, o il primo valore se la battuta 1 non c'e'.
+Un tempo e' un numero di quarti al minuto, intero o coi decimali (2.9),
+come in `tempo=72.5` (sezione 7.2); un valore intero scritto col punto
+(`96.0`) vale `96`. Chi scrive il file DOVREBBE usare i decimali solo
+quando il tempo non e' intero, cosi' un file che non ne ha resta
+leggibile dai lettori 2.8, che una riga `Tempo:` coi decimali non la
+riconoscono affatto.
 `Tempo`, `Metrica`, `Levare`, `Tonalita`, `Titolo`, `Autore` e `Parole`
 non distinguono maiuscole e minuscole; le altre intestazioni si scrivono
 come indicato. Titolo e autori arrivano fino a fine riga; senza titolo,
@@ -1359,6 +1365,12 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.9** — l'intestazione `Tempo:` accetta tempi coi decimali, anche
+nell'elenco per battuta (`Tempo: 101.4 BPM`, `Tempo: 1: 96.5, 3: 98`),
+come gia' il comando `tempo=72.5` (sezione 12.1): il tempo ricavato da
+una ripresa non va piu' arrotondato battuta per battuta. I file senza
+decimali in `Tempo:` non cambiano.
 
 **2.8** — il vuoto prima di un box che non e' un numero intero di
 sedicesimi si riempie con una pausa esatta invece di arrotondarlo ai

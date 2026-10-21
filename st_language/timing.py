@@ -290,7 +290,10 @@ def with_fermatas(beat_map: List[Tuple[float, int]], spans: List[Tuple[float, fl
     out: List[Tuple[float, int]] = []
     for beat in points:
         slow = any(s <= beat < e for s, e in spans)
-        bpm = max(1, round(bpm_at(beat) * (FERMATA_TEMPO_FACTOR if slow else 1)))
+        base_bpm = bpm_at(beat)
+        bpm = base_bpm * (FERMATA_TEMPO_FACTOR if slow else 1)
+        # un tempo intero resta intero come prima; uno coi decimali (2.9) li tiene
+        bpm = max(1, round(bpm) if isinstance(base_bpm, int) else round(bpm, 3))
         if not out or out[-1][1] != bpm:
             out.append((beat, bpm))
     return out

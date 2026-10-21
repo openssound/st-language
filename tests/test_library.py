@@ -132,6 +132,33 @@ def test_box_after_a_tuplet_box_starts_exactly_where_it_is():
     assert text == "16: 10r reset: c"
 
 
+def test_tempo_header_with_decimals():
+    """2.9: 'Tempo:' coi decimali, anche per battuta; un valore intero resta int."""
+    from st_language.timing import build_tempo_beat_map, seconds_for_beats
+    song = st.read_song("ST: 2.9\nTempo: 101.4 BPM\n\nPiano:\n  c\n")
+    assert song.tempo_bpm == 101.4
+    song = st.read_song("Tempo: 1: 96.5, 3: 98\n\nPiano:\n  c\n")
+    assert song.tempo_changes == [(1, 96.5), (3, 98)] and song.tempo_bpm == 96.5
+    assert type(song.tempo_changes[1][1]) is int
+    assert type(st.read_song("Tempo: 96.0 BPM\n").tempo_bpm) is int
+    # 4 battute a 101,4 BPM
+    song = st.read_song("Tempo: 101.4 BPM\n\nPiano:\n  1: c c c c\n")
+    beat_map = build_tempo_beat_map(song)
+    assert beat_map == [(0.0, 101.4)]
+    assert seconds_for_beats(beat_map, 16) == pytest.approx(9.467, abs=1e-3)
+    # un file 2.8 si legge come prima
+    song = st.read_song("ST: 2.8\nTempo: 1: 120, 5: 140\n\nPiano:\n  c\n")
+    assert song.tempo_changes == [(1, 120), (5, 140)] and type(song.tempo_bpm) is int
+
+
+def test_decimal_tempo_survives_fermatas_in_midi(tmp_path):
+    from st_language.timing import with_fermatas
+    assert with_fermatas([(0.0, 101.4)], [(4.0, 6.0)]) == [(0.0, 101.4), (4.0, 50.7), (6.0, 101.4)]
+    assert with_fermatas([(0.0, 101)], [(4.0, 6.0)]) == [(0.0, 101), (4.0, 50), (6.0, 101)]
+    song = st.read_song("Tempo: 101.4 BPM\n\nPiano:\n  4: c d$fermata e f\n")
+    assert os.path.exists(st.to_midi(song, str(tmp_path / "t.mid")))
+
+
 def test_bar_starts_and_bar_at_beat():
     from st_language.timing import bar_at_beat, bar_starts, compute_bar_beat_offsets
     song = st.Song()

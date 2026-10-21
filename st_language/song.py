@@ -29,7 +29,7 @@ from .stfile import (
     RE_AMBIENTE, RE_AUDIO_HDR, RE_BOX_HDR, RE_EFFECTS_HDR, RE_INSTRUMENT_HDR, RE_KEY, RE_MASTER,
     RE_MASTER_CHAIN_HDR, RE_METRICA, RE_METRICA_LIST_HDR, RE_MIXER_HDR, RE_PATTERN_HDR, RE_SYNTH_HDR,
     RE_TEMPO, RE_TEMPO_LIST_HDR, RE_TRACK_HDR, RE_TRACK_HDR_EXPLICIT, short_track_header,
-    RE_PICKUP, RE_ST_VERSION, LANGUAGE_VERSION, parse_pickup, instrument_blocks,
+    RE_PICKUP, RE_ST_VERSION, LANGUAGE_VERSION, parse_bpm, parse_pickup, instrument_blocks,
     _extract_box_blocks, _extract_named_blocks, _parse_bar_value_list, _parse_instrument_body,
     _parse_mixer_body, RE_KEY_LIST_HDR, RE_TITLE, RE_COMPOSER, RE_LYRICIST, parse_key_list,
 )
@@ -71,10 +71,10 @@ class Part:
 @dataclass
 class Song:
     name: str = "ST"
-    tempo_bpm: int = 120
+    tempo_bpm: float = 120                # intero se lo e' (96), coi decimali dalla 2.9 (101.4)
     time_sig: str = "4/4"
     key: str = ""
-    tempo_changes: List[tuple] = field(default_factory=list)      # [(battuta, bpm)]
+    tempo_changes: List[tuple] = field(default_factory=list)      # [(battuta, bpm)], bpm come tempo_bpm
     metrica_changes: List[tuple] = field(default_factory=list)    # [(battuta, "N/D")]
     patterns: Dict[str, Pattern] = field(default_factory=dict)
     tracks: List[Part] = field(default_factory=list)
@@ -214,7 +214,7 @@ def flatten_clips_to_text(clips: List["Clip"], patterns: Dict[str, Pattern], def
 
 
 def song_from_notation(text: str, instrument: str = "Piano", name: str = "ST",
-                       tempo_bpm: int = 120, time_sig: str = "4/4") -> Song:
+                       tempo_bpm: float = 120, time_sig: str = "4/4") -> Song:
     """Un brano di una sola traccia da un testo in notazione."""
     song = Song(name=name, tempo_bpm=tempo_bpm, time_sig=time_sig)
     song.add_track(instrument, instrument, upgrade_midi_refs(text))
@@ -291,7 +291,7 @@ def read_song(text: str, name: str = "ST") -> Song:
         if m:
             if mode:
                 flush()
-            song.tempo_bpm = int(m.group(1))
+            song.tempo_bpm = parse_bpm(m.group(1))
             continue
         m = RE_METRICA_LIST_HDR.match(line)
         if m:

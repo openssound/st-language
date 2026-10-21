@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.8** · Reference implementation: the `st_language` Python
+**Version 2.9** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -1094,9 +1094,9 @@ ignored (free text).
 
 | Line | Meaning |
 | --- | --- |
-| `ST: 2.8` | version of the language the file is written in |
-| `Tempo: 120 BPM` | tempo |
-| `Tempo: 1: 120, 5: 140` | tempo per bar (bar: bpm, …) |
+| `ST: 2.9` | version of the language the file is written in |
+| `Tempo: 120 BPM` | tempo (also with decimals: `Tempo: 101.4 BPM`) |
+| `Tempo: 1: 120, 5: 140` | tempo per bar (bar: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | meter |
 | `Metrica: 1: 4/4, 5: 3/4` | meter per bar |
 | `Levare: 1` | pickup bar, in beats (`1`, `1.5`, `1/2`; section 12.3) |
@@ -1107,7 +1107,12 @@ ignored (free text).
 | `Parole: L. Hart` | lyricist |
 
 With a per-bar list, the song tempo/meter/key is the bar-1 value, or the
-first value if bar 1 is not listed. `Tempo`, `Metrica`, `Levare`,
+first value if bar 1 is not listed. A tempo is a number of quarter
+notes per minute, whole or with decimals (2.9), as in `tempo=72.5`
+(section 7.2); a whole value with a decimal point (`96.0`) is the same
+as `96`. Writers SHOULD write decimals only when the tempo is not whole,
+so that a file without them can still be read by 2.8 readers, which do
+not recognize a `Tempo:` line with decimals at all. `Tempo`, `Metrica`, `Levare`,
 `Tonalita`, `Titolo`, `Autore` and `Parole` are case-insensitive; the
 other headers are written as shown. The title, composer and lyricist run
 to the end of the line; without a title, a score uses the file name.
@@ -1305,6 +1310,12 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.9** — the `Tempo:` header accepts tempos with decimals, also in the
+per-bar list (`Tempo: 101.4 BPM`, `Tempo: 1: 96.5, 3: 98`), as the
+`tempo=72.5` command already did (section 12.1): the tempo measured from
+a recording no longer has to be rounded bar by bar. Files without
+decimals in `Tempo:` are unchanged.
 
 **2.8** — the gap before a box that is not a whole number of sixteenths
 is filled with an exact rest instead of being rounded to sixteenths
