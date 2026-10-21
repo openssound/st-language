@@ -104,7 +104,21 @@ RE_BOX_HDR = re.compile(r'^Box\s+(.+?)\s+"(.*)"\s*\|(\d+(?:\.\d+)?)\s*:$')
 # "Audio TrackName "NomeClip" |beat:" persiste una clip di una traccia audio
 # (core.model.AudioClip), con nel corpo 'file="percorso"' (relativo alla
 # cartella del file .st) ed eventualmente 'trim=inizio,fine' (secondi) e
-# 'gain=dB'. Stessa forma dei Box.
+# 'gain=dB'. Stessa forma dei Box. SoundText 1.8 scrive anche, solo quando
+# sono diverse dal valore di base, chiavi sue che un altro lettore puo'
+# ignorare (le legge core.project_io, come effetti e plugin):
+#   fade=entrata,uscita   dissolvenze in secondi del brano (base 0,0)
+#   fade_shape=equal      forma delle dissolvenze, linear o equal (base linear)
+#   mute                  la clip resta nel brano ma non suona
+#   stretch=1.05          durata nel brano / durata nel file (base 1)
+#   bpm=96                la clip segue il tempo del brano; e' il suo tempo
+#   take=2                la ripresa attiva, da 1, con le righe 'take':
+#   take "Ripresa 1" file="..." delta=-0.013
+# una per ripresa, dopo la riga principale; delta = secondi fra il punto di
+# quel file e quello del file attivo che suonano nello stesso istante. La
+# riga principale ha sempre il file attivo. _extract_box_blocks unisce le
+# righe di una clip con uno spazio: le righe 'take' arrivano accodate e il
+# primo file= e' quello attivo (SoundText ci conta).
 RE_AUDIO_HDR = re.compile(r'^Audio\s+(.+?)\s+"(.*)"\s*\|(\d+(?:\.\d+)?)\s*:$')
 
 RE_AUDIO_FILE = re.compile(r'file\s*=\s*"([^"]*)"')

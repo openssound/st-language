@@ -13,7 +13,10 @@ progetto abbiano sempre lo stesso effetto in entrambi i percorsi.
 """
 
 import re
+from bisect import bisect_right
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+
+from .notation import bar_starts as _bar_start_positions
 
 if TYPE_CHECKING:          # solo per le annotazioni (nessun import circolare)
     from .song import Part, Song  # noqa: F401
@@ -33,7 +36,9 @@ def compute_bar_beat_offsets(tempo_changes, metrica_changes, base_time_sig: str 
     con una metrica singola ('Metrica: 3/4') le battute verrebbero
     altrimenti contate in 4/4. Con una battuta in levare di 'pickup'
     quarti le battute dalla 2 in poi si spostano di tanto; quello che vale
-    alla battuta 1 vale gia' dall'inizio del brano (anche nel levare)."""
+    alla battuta 1 vale gia' dall'inizio del brano (anche nel levare): per
+    questo qui la battuta 1 e' a 0, mentre bar_starts la mette dopo il
+    levare, dove comincia davvero."""
     declared_bars = sorted({b for b, _ in tempo_changes} | {b for b, _ in metrica_changes} | {1})
     if not declared_bars:
         return {1: 0.0}
@@ -61,6 +66,39 @@ def compute_bar_beat_offsets(tempo_changes, metrica_changes, base_time_sig: str 
 
 def _pickup(project) -> float:
     return float(getattr(project, "pickup", 0.0) or 0.0)
+
+
+def bar_starts(song: "Song", until_beat: float) -> List[float]:
+    """L'inizio in beat (quarti) di ogni battuta, dalla 1 fino alla prima
+    che comincia oltre until_beat: bar_starts(...)[k] e' la battuta k + 1.
+    Tiene conto della metrica del brano, dei suoi cambi e del levare (la
+    battuta 1 comincia dopo il levare), come le ancore bar=N; una sola
+    passata, per chi chiede la battuta di tanti istanti (vedi bar_at_beat)."""
+    starts: List[float] = []
+    for start in _bar_start_positions(song.time_sig, song.metrica_changes, _pickup(song)):
+        starts.append(float(start))
+        if start > until_beat:
+            break
+    return starts
+
+
+def bar_at_beat(song: "Song", beat: float, starts: Optional[List[float]] = None,
+                nearest: bool = False) -> int:
+    """La battuta (da 1) che contiene beat; 0 prima della battuta 1 (il
+    levare). starts e' bar_starts gia' calcolato, per chi ne chiede tante:
+    se non c'e', o non arriva oltre beat, si calcola. Con nearest=True, la
+    battuta che comincia piu' vicino a beat (a pari distanza quella prima;
+    il levare comincia a 0), per esempio la battuta d'inizio di una ripresa."""
+    if not starts or starts[-1] <= beat:
+        starts = bar_starts(song, beat)
+    bar = bisect_right(starts, beat)          # battute che cominciano a beat o prima
+    if not nearest:
+        return bar
+    before = starts[bar - 1] if bar > 0 else (0.0 if _pickup(song) else None)
+    after = starts[bar]
+    if before is not None and beat - before <= after - beat:
+        return bar
+    return bar + 1
 
 
 def build_tempo_beat_map(project: "Song", tracks=None, midi_dir: Optional[str] = None,

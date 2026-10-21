@@ -1144,6 +1144,36 @@ add other block types (SoundText uses `Effetti`, `Plugin`, `Catena
 master`, `Audio`, `Master:` and `Ambiente:`); readers MUST skip blocks
 they do not know. A track whose instrument is `Audio` has no notation.
 
+**Audio clips (informative).** SoundText writes a clip of an audio track
+as `Audio Track "Name" |beat:`, the same form as a box, with
+`file="path"` (relative to the song file), optionally `trim=start,end`
+(seconds) and `gain=dB`. Since SoundText 1.8 the body may also hold the
+keys below, written only when they differ from the default; they are
+SoundText's own, and other readers MAY ignore them.
+
+| Key | Example | Meaning | Default |
+| --- | --- | --- | --- |
+| `fade=` | `fade=0.5,1.2` | fade in and fade out, in seconds of the song | `0,0` |
+| `fade_shape=` | `fade_shape=equal` | shape of the fades: `linear` or `equal` (equal power) | `linear` |
+| `mute` | `mute` | the clip stays in the song but does not sound | absent |
+| `stretch=` | `stretch=1.05` | length in the song / length in the file (time-stretch, pitch unchanged) | `1` |
+| `bpm=` | `bpm=96` | the clip follows the song tempo; the tempo it is in time with | absent |
+| `take=` | `take=2` | the active take, from 1 (only with `take` lines) | absent |
+
+With several takes, one `take` line per take follows the main line:
+
+```
+Audio Voce "Strofa" |0:
+  file="Voce ripresa 2.wav" trim=1.02,0 take=2
+  take "Ripresa 1" file="Voce ripresa 1.wav" delta=-0.013
+  take "Ripresa 2" file="Voce ripresa 2.wav" delta=0
+```
+
+`delta` is the time in seconds between the point of that file and the
+point of the active file that sound at the same moment. The main line
+always names the active file, so a reader that ignores `take` lines
+plays the right take.
+
 ### 12.3 Bar positions
 
 Bar starts are computed from the meter list: bar 1 starts at beat 0;

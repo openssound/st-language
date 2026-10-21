@@ -1184,6 +1184,38 @@ applicazioni POSSONO aggiungere altri tipi di blocco (SoundText usa
 i lettori DEVONO saltare i blocchi che non conoscono. Una traccia con
 strumento `Audio` non ha notazione.
 
+**Clip audio (informativo).** SoundText scrive una clip di una traccia
+audio come `Audio Traccia "Nome" |quarto:`, nella stessa forma di un box,
+con `file="percorso"` (relativo al file del brano) ed eventualmente
+`trim=inizio,fine` (secondi) e `gain=dB`. Da SoundText 1.8 il corpo puo'
+contenere anche le chiavi qui sotto, scritte solo quando sono diverse dal
+valore di base; sono proprie di SoundText e gli altri lettori POSSONO
+ignorarle.
+
+| Chiave | Esempio | Significato | Base |
+| --- | --- | --- | --- |
+| `fade=` | `fade=0.5,1.2` | dissolvenza in entrata e in uscita, in secondi del brano | `0,0` |
+| `fade_shape=` | `fade_shape=equal` | forma delle dissolvenze: `linear` o `equal` (equal power) | `linear` |
+| `mute` | `mute` | la clip resta nel brano ma non suona | assente |
+| `stretch=` | `stretch=1.05` | durata nel brano / durata nel file (time-stretch senza cambiare l'intonazione) | `1` |
+| `bpm=` | `bpm=96` | la clip segue il tempo del brano; e' il tempo a cui va a tempo | assente |
+| `take=` | `take=2` | la ripresa attiva, da 1 (solo con le righe `take`) | assente |
+
+Con piu' riprese, dopo la riga principale c'e' una riga `take` per
+ripresa:
+
+```
+Audio Voce "Strofa" |0:
+  file="Voce ripresa 2.wav" trim=1.02,0 take=2
+  take "Ripresa 1" file="Voce ripresa 1.wav" delta=-0.013
+  take "Ripresa 2" file="Voce ripresa 2.wav" delta=0
+```
+
+`delta` e' il tempo in secondi fra il punto di quel file e quello del
+file attivo che suonano nello stesso istante. La riga principale contiene
+sempre il file attivo: un lettore che ignora le righe `take` suona la
+ripresa giusta.
+
 ### 12.3 Posizione delle battute
 
 L'inizio delle battute si calcola dall'elenco delle metriche: la battuta

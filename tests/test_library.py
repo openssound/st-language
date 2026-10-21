@@ -132,6 +132,32 @@ def test_box_after_a_tuplet_box_starts_exactly_where_it_is():
     assert text == "16: 10r reset: c"
 
 
+def test_bar_starts_and_bar_at_beat():
+    from st_language.timing import bar_at_beat, bar_starts, compute_bar_beat_offsets
+    song = st.Song()
+    assert bar_starts(song, 10)[:4] == [0, 4, 8, 12] and bar_starts(song, 10)[-1] > 10
+    song = st.Song(metrica_changes=[(1, "4/4"), (3, "3/4")])
+    assert bar_starts(song, 12)[:5] == [0, 4, 8, 11, 14]
+    song = st.Song(pickup=1.0)
+    assert bar_starts(song, 6)[:3] == [1, 5, 9]
+    assert bar_at_beat(song, 0.5) == 0 and bar_at_beat(song, 1) == 1 and bar_at_beat(song, 4.99) == 1
+
+    song = st.Song(metrica_changes=[(1, "4/4"), (3, "3/4"), (7, "6/8"), (11, "5/4")])
+    starts = bar_starts(song, 1000)
+    assert bar_at_beat(song, 8.0, starts) == 3          # inizio di battuta
+    assert bar_at_beat(song, 9.5, starts) == 3          # a meta'
+    assert bar_at_beat(song, 10.999, starts) == 3       # appena prima della successiva
+    assert bar_at_beat(song, 10.9, starts, nearest=True) == 4
+    assert bar_at_beat(song, 9.5, starts, nearest=True) == 3      # a pari distanza quella prima
+    assert bar_at_beat(song, 2000) == bar_at_beat(song, 2000, starts)   # starts troppo corto: si ricalcola
+    for pickup in (0.0, 1.5):
+        song.pickup = pickup
+        starts = bar_starts(song, 1000)
+        offsets = compute_bar_beat_offsets([(200, 120)], song.metrica_changes, song.time_sig, pickup)
+        assert all(starts[bar - 1] == pytest.approx(offsets[bar]) for bar in range(2, 201))
+        assert all(bar_at_beat(song, starts[k] + 0.01, starts) == k + 1 for k in range(200))
+
+
 def test_plain_notation_file_is_a_one_track_song(tmp_path):
     path = tmp_path / "solo.txt"
     path.write_text("8: c d e f", encoding="utf-8")
