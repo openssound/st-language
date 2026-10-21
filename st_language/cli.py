@@ -45,9 +45,11 @@ def _line_col(text: str, offset: int):
     return line, col
 
 
-def check(song: Song) -> int:
+def check(song: Song, source: Optional[str] = None) -> int:
     """Stampa errori e avvisi; ritorna il numero di errori."""
     errors = 0
+    for line, message in song.file_warnings:
+        print(f"{source or song.name}:{line}: {tr('avviso')}: {message}")
     for part in song.tracks:
         if part.is_audio:
             continue
@@ -118,7 +120,7 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
         if command == "check":
             if len(args.files) > 1:
                 print(f"== {source}")
-            status = max(status, 1 if check(song) else 0)
+            status = max(status, 1 if check(song, source) else 0)
         elif command == "events":
             json.dump(events_json(song), sys.stdout, ensure_ascii=False, indent=1)
             print()

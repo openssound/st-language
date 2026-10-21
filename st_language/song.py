@@ -10,8 +10,9 @@ dei file") o costruito in codice.
 
 Della forma completa dei file .st di SoundText il lettore usa quello che
 riguarda la musica scritta (intestazioni, pattern, tracce, box, strumenti,
-mute/solo/volume/pan del mixer) e salta il resto (effetti, plugin, clip
-audio, riverbero), che e' proprio dell'applicazione.
+mute/solo/volume/pan del mixer, la conversione da cui e' nata una traccia
+di note) e salta il resto (effetti, plugin, clip audio, riverbero), che e'
+proprio dell'applicazione.
 """
 
 import os
@@ -29,6 +30,7 @@ from .stfile import (
     RE_AMBIENTE, RE_AUDIO_HDR, RE_BOX_HDR, RE_EFFECTS_HDR, RE_INSTRUMENT_HDR, RE_KEY, RE_MASTER,
     RE_MASTER_CHAIN_HDR, RE_METRICA, RE_METRICA_LIST_HDR, RE_MIXER_HDR, RE_PATTERN_HDR, RE_SYNTH_HDR,
     RE_TEMPO, RE_TEMPO_LIST_HDR, RE_TRACK_HDR, RE_TRACK_HDR_EXPLICIT, short_track_header,
+    RE_CONVERSION_HDR, conversion_blocks, parse_conversion_body,
     RE_PICKUP, RE_ST_VERSION, LANGUAGE_VERSION, parse_bpm, parse_pickup, instrument_blocks,
     _extract_box_blocks, _extract_named_blocks, _parse_bar_value_list, _parse_instrument_body,
     _parse_mixer_body, RE_KEY_LIST_HDR, RE_TITLE, RE_COMPOSER, RE_LYRICIST, parse_key_list,
@@ -57,6 +59,10 @@ class Part:
     pan: int = 64              # 0-127, 64 = centro
     clips: List[Clip] = field(default_factory=list)
     is_audio: bool = False
+    # 2.10: da quale traccia audio e' nata e con quali scelte (blocco
+    # 'Conversione Nome:', chiavi di stfile.parse_conversion_body); None se
+    # non viene da una conversione
+    conversion: Optional[dict] = None
 
     @property
     def instrument_name(self) -> str:
@@ -85,6 +91,8 @@ class Song:
     title: str = ""                        # Titolo: (2.7); senza, la partitura usa name
     composer: str = ""                     # Autore:
     lyricist: str = ""                     # Parole:
+    # avvisi sul file che non impediscono di leggerlo: [(riga da 1, messaggio)]
+    file_warnings: List[tuple] = field(default_factory=list)
 
     def instrument(self, name: str) -> InstrumentProfile:
         return instrument_for(name, known={**DEFAULT_INSTRUMENTS, **self.instruments})
@@ -257,7 +265,7 @@ def read_song(text: str, name: str = "ST") -> Song:
         mode, current_name, current_instrument, buffer = None, None, None, []
 
     skip_headers = (RE_MIXER_HDR, RE_EFFECTS_HDR, RE_MASTER_CHAIN_HDR, RE_SYNTH_HDR, RE_INSTRUMENT_HDR,
-                    RE_BOX_HDR, RE_AUDIO_HDR)
+                    RE_BOX_HDR, RE_AUDIO_HDR, RE_CONVERSION_HDR)
     for raw_line in lines:
         line = raw_line.strip()
         if line == "":
@@ -371,11 +379,44 @@ def read_song(text: str, name: str = "ST") -> Song:
             continue
         if not part.is_audio:
             part.clips.append(Clip(box_name, upgrade_midi_refs(body), start_beat))
+    _read_conversions(song, lines)
     for part in song.tracks:
         if part.clips:
             part.text = flatten_clips_to_text(part.clips, song.patterns, part.instrument.default_octave,
                                               meter=song.meter())
     return song
+
+
+def _read_conversions(song: Song, lines: List[str]) -> None:
+    """I blocchi 'Conversione Nome:' (2.10) sulle tracce di note: un blocco
+    che non si puo' usare si ignora con un avviso (Song.file_warnings), il
+    brano si apre lo stesso."""
+    tracks = {t.name: t for t in song.tracks}
+    for name, body, line in conversion_blocks(lines):
+        def warn(message):
+            song.file_warnings.append((line, tr("Conversione {name}: {message}", name=name, message=message)))
+        part = tracks.get(name)
+        if part is None:
+            warn(tr("la traccia non esiste, si ignora"))
+            continue
+        if part.is_audio:
+            warn(tr("e' una traccia audio, si ignora"))
+            continue
+        if part.conversion is not None:
+            warn(tr("la traccia ha gia' un blocco Conversione, si ignora"))
+            continue
+        conversion, problems = parse_conversion_body(body)
+        source = conversion["from"]
+        if source is None:
+            warn(tr("manca da=\"traccia audio\", si ignora"))
+            continue
+        source_part = tracks.get(source)
+        if source_part is None or not source_part.is_audio:
+            warn(tr("da=\"{source}\" non e' una traccia audio, si ignora", source=source))
+            continue
+        for message in problems:
+            warn(message)
+        part.conversion = conversion
 
 
 def load_song(path: str, instrument: str = "Piano") -> Song:

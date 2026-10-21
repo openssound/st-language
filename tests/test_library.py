@@ -185,6 +185,108 @@ def test_bar_starts_and_bar_at_beat():
         assert all(bar_at_beat(song, starts[k] + 0.01, starts) == k + 1 for k in range(200))
 
 
+_CONVERSION_BLOCK = 'Conversione Voce (note):\n  da="Voce" modo=melodia griglia=8 forza=80 finestra=100 swing=66'
+_CONVERSION_SONG = f'''ST: 2.10
+Tempo: 96 BPM
+
+Traccia Voce [Audio]:
+  ingresso=voce
+
+Traccia Voce (note) [Trumpet]:
+
+{_CONVERSION_BLOCK}
+
+Audio Voce "Strofa" |8:
+  file="audio/voce-1.wav"
+
+Box Voce (note) "Strofa" |8:
+  16: e g a b
+'''
+
+
+def test_conversion_block_is_read():
+    """2.10: 'Conversione Nome:' ricorda da quale traccia audio viene una traccia di note."""
+    song = st.read_song(_CONVERSION_SONG)
+    note = song.get_track("Voce (note)")
+    assert note.conversion["from"] == "Voce" and note.conversion["grid"] == 8
+    assert note.conversion["strength"] == pytest.approx(0.8) and note.conversion["swing"] == pytest.approx(0.66)
+    assert note.conversion["mode"] == "melody" and note.conversion["triplets"] is False
+    assert song.get_track("Voce").conversion is None and song.file_warnings == []
+    assert [e.letter for e in note.parsed_events(song.patterns) if e.kind == "note"] == ["e", "g", "a", "b"]
+    # senza il blocco il resto del brano e' lo stesso
+    without = st.read_song(_CONVERSION_SONG.replace(_CONVERSION_BLOCK + "\n\n", ""))
+    assert without.get_track("Voce (note)").conversion is None
+    assert [(t.name, t.text) for t in without.tracks] == [(t.name, t.text) for t in song.tracks]
+
+
+def test_conversion_body_round_trip_and_aliases():
+    from st_language.stfile import CONVERSION_DEFAULTS, conversion_body_text, parse_conversion_body
+    conversion, problems = parse_conversion_body('from="Voce 2" mode=chords grid=16 triplets strength=75 '
+                                                 'window=40 swing=60 min_note=30 merge=12.5 sevenths voice futuro=3')
+    assert problems == []
+    assert conversion == {"from": "Voce 2", "mode": "chords", "grid": 16, "triplets": True, "strength": 0.75,
+                          "window": 0.4, "swing": 0.6, "min_note_sec": 0.03, "merge_gap_sec": 0.0125,
+                          "sevenths": True, "voice": True}
+    text = conversion_body_text(conversion)
+    assert text == ('da="Voce 2" modo=accordi terzine forza=75 finestra=40 swing=60 nota_minima=30 '
+                    'unisci=12.5 settime voce')
+    assert parse_conversion_body(text) == (conversion, [])
+    # solo da= quando tutto e' predefinito
+    assert conversion_body_text(dict(CONVERSION_DEFAULTS, **{"from": "Voce"})) == 'da="Voce"'
+    assert parse_conversion_body('da="Voce"')[0] == dict(CONVERSION_DEFAULTS, **{"from": "Voce"})
+
+
+def test_conversion_invalid_values_warn_and_use_the_default():
+    from st_language.stfile import parse_conversion_body
+    conversion, problems = parse_conversion_body('da="Voce" griglia=12 modo=jazz forza=120 swing=40 '
+                                                 'nota_minima=-5 terzine=si')
+    assert conversion["grid"] == 16 and conversion["mode"] == "melody" and conversion["strength"] == 1.0
+    assert conversion["swing"] == 0.5 and conversion["min_note_sec"] == 0.0 and conversion["triplets"] is True
+    assert len(problems) == 5 and "griglia=12" in problems[0]
+    conversion, problems = parse_conversion_body('da="Voce" griglia=32 terzine')
+    assert conversion["triplets"] is False and len(problems) == 1
+
+    song = st.read_song(_CONVERSION_SONG.replace("griglia=8", "griglia=12"))
+    assert song.get_track("Voce (note)").conversion["grid"] == 16
+    assert [line for line, _ in song.file_warnings] == [9]
+
+
+@pytest.mark.parametrize("block", [
+    'Conversione Nessuna:\n  da="Voce"',                   # la traccia non esiste
+    'Conversione Voce:\n  da="Voce"',                      # e' una traccia audio
+    'Conversione Voce (note):\n  modo=accordi',            # manca da
+    'Conversione Voce (note):\n  da="Altra"',              # da non esiste
+    'Conversione Voce (note):\n  da="Voce (note)"',        # da non e' audio
+])
+def test_conversion_block_that_cannot_be_used_is_ignored_with_a_warning(block):
+    text = _CONVERSION_SONG.replace(_CONVERSION_BLOCK, block)
+    song = st.read_song(text)
+    assert song.get_track("Voce (note)").conversion is None
+    assert [line for line, _ in song.file_warnings] == [9]
+
+
+def test_conversion_second_block_and_check_command(tmp_path):
+    text = _CONVERSION_SONG + '\nConversion Voce (note):\n  from="Voce" mode=drums\n'
+    song = st.read_song(text)
+    assert song.get_track("Voce (note)").conversion["mode"] == "melody"
+    assert [line for line, _ in song.file_warnings] == [18]
+    cwd = _isolated_copy(tmp_path)
+    (cwd / "brano.st").write_text(text.replace("griglia=8", "griglia=12"), encoding="utf-8")
+    out = _run(["-m", "st_language", "check", "brano.st", "--lang", "it"], cwd)
+    assert out.returncode == 0
+    assert "brano.st:9: avviso: Conversione Voce (note): griglia=12 non valido" in out.stdout
+    assert "brano.st:18: avviso:" in out.stdout and "nessun errore" in out.stdout
+
+
+def test_conversion_header_is_unknown_to_older_readers():
+    """Un lettore 2.9 non riconosce l'intestazione: e' una riga fuori da ogni
+    blocco, e il corpo che segue una riga vuota si ignora."""
+    from st_language import stfile
+    line = "Conversione Voce (note):"
+    assert [rx for rx in stfile._TRACK_HDR_PATTERNS if rx.match(line)] == [stfile.RE_CONVERSION_HDR]
+    assert stfile.LANGUAGE_VERSION == (2, 10)
+
+
 def test_plain_notation_file_is_a_one_track_song(tmp_path):
     path = tmp_path / "solo.txt"
     path.write_text("8: c d e f", encoding="utf-8")

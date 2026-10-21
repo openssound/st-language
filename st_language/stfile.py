@@ -10,14 +10,15 @@ blocchi propri dell'applicazione (effetti, plugin, clip audio).
 import re
 from typing import List, Optional, Tuple
 
+from ._i18n import tr
 from .instruments import InstrumentProfile
 
 
-# Versione del linguaggio con cui e' scritto il file: "ST: 2.9" (riga
+# Versione del linguaggio con cui e' scritto il file: "ST: 2.10" (riga
 # facoltativa in cima; i lettori piu' vecchi la ignorano).
 RE_ST_VERSION = re.compile(r"^ST:\s*(\d+)\.(\d+)$")
 # La versione del linguaggio che questo lettore conosce (vedi la specifica).
-LANGUAGE_VERSION = (2, 9)
+LANGUAGE_VERSION = (2, 10)
 
 # "Levare: 1" (o "Pickup:"): la battuta in levare, in quarti (anche "1.5" o
 # "1/2"); la battuta 1 e' la prima intera.
@@ -30,9 +31,14 @@ def parse_pickup(raw: str) -> float:
     return float(Fraction(raw))
 
 
+def format_number(value: float) -> str:
+    """Un numero come lo scrive il file: intero o decimale ("1", "1.5")."""
+    return f"{round(value, 6):g}"
+
+
 def format_pickup(quarters: float) -> str:
     """'Levare:' come lo scrive il file: intero o decimale ("1", "1.5")."""
-    return f"{round(quarters, 6):g}"
+    return format_number(quarters)
 
 # Le parole chiave del file si scrivono in italiano o in inglese
 # (Metrica/Meter, Tonalita/Key, Traccia/Track, Strumento/Instrument...);
@@ -103,6 +109,11 @@ RE_EFFECT_ITEM = re.compile(r"(\w+):((?:\s+(?:[\w.]+=(?:\"[^\"]*\"|[^\s]+)|spent
 # p.chiave=valore e, per i VST3, stato="base64".
 RE_SYNTH_HDR = re.compile(r"^Plugin\s+(.+?):$")
 
+# 2.10: "Conversione Nome:" dice da quale traccia audio e' nata, convertendola
+# in note, la traccia di note "Nome" e con quali scelte (vedi
+# parse_conversion_body): serve a rifare la conversione (Riconverti).
+RE_CONVERSION_HDR = re.compile(r"^(?:Conversione|Conversion)\s+(.+?):$")
+
 # "Box TrackName "NomeBox" |beat:" persiste un box della vista Struttura
 # brano (core.model.Clip) sulla traccia "TrackName", posizionato a "beat"
 # (in beat/quarti) - vedi core.arrangement. Il separatore e' "|" (non "@",
@@ -171,7 +182,8 @@ RE_KV_COLON = re.compile(r"(\w+):\s*([\w.-]+)")
 
 _TRACK_HDR_PATTERNS = (RE_ST_VERSION, RE_PICKUP, RE_TEMPO, RE_METRICA, RE_MASTER, RE_KEY, RE_PATTERN_HDR, RE_TRACK_HDR,
                         RE_TRACK_HDR_EXPLICIT, RE_MIXER_HDR, RE_BOX_HDR,
-                        RE_AUDIO_HDR, RE_EFFECTS_HDR, RE_MASTER_CHAIN_HDR, RE_TITLE, RE_COMPOSER, RE_LYRICIST)
+                        RE_AUDIO_HDR, RE_EFFECTS_HDR, RE_MASTER_CHAIN_HDR, RE_TITLE, RE_COMPOSER, RE_LYRICIST,
+                        RE_CONVERSION_HDR)
 
 VOLUME_MAX = 200  # 100 = guadagno originale (unita'), fino a 200 = raddoppio percepito
 
@@ -283,20 +295,22 @@ def _notation_body_lines(text: str) -> List[str]:
     return ["  " + line for line in body] or ["  "]
 
 
-def _extract_named_blocks(lines: List[str], header_re) -> List[Tuple[str, str]]:
+def _extract_named_blocks(lines: List[str], header_re, with_line: bool = False) -> List[tuple]:
     """Pre-scansione generica: estrae tutti i blocchi che iniziano con
     header_re (es. 'Strumento Nome:' o 'Mixer Nome:'), indipendentemente
-    dalla loro posizione rispetto alle tracce che li usano."""
+    dalla loro posizione rispetto alle tracce che li usano: (nome, corpo),
+    o (nome, corpo, riga dell'intestazione da 1) con with_line."""
     blocks = []
-    current_name, buffer = None, []
+    current_name, current_line, buffer = None, 0, []
 
     def flush():
         nonlocal current_name, buffer
         if current_name:
-            blocks.append((current_name, " ".join(buffer).strip()))
+            body = " ".join(buffer).strip()
+            blocks.append((current_name, body, current_line) if with_line else (current_name, body))
         current_name, buffer = None, []
 
-    for raw_line in lines:
+    for number, raw_line in enumerate(lines, 1):
         line = raw_line.strip()
         if line == "":
             flush()
@@ -304,7 +318,7 @@ def _extract_named_blocks(lines: List[str], header_re) -> List[Tuple[str, str]]:
         m = header_re.match(line)
         if m:
             flush()
-            current_name = m.group(1)
+            current_name, current_line = m.group(1).strip(), number
             continue
         if current_name and not any(rx.match(line) for rx in _TRACK_HDR_PATTERNS):
             buffer.append(line)
@@ -323,6 +337,124 @@ def instrument_blocks(lines: List[str]) -> List[Tuple[str, str]]:
 
 
 RE_KV_EQUALS_KEYS = re.compile(r"(\w+)=")
+
+
+# ------------------------------------------------------------ Conversione (2.10)
+
+# Il corpo di "Conversione Nome:": chiave=valore (il valore anche tra
+# virgolette) e chiavi senza valore (le scelte si/no, come 'terzine').
+RE_CONVERSION_ITEM = re.compile(r'(\w+)(?:\s*=\s*("[^"]*"|[^\s"]+))?')
+
+# Chiave italiana (quella che si scrive), alias inglese e chiave normalizzata
+# del dizionario, nell'ordine in cui si scrivono.
+CONVERSION_KEYS = (
+    ("da", "from", "from"),
+    ("modo", "mode", "mode"),
+    ("griglia", "grid", "grid"),
+    ("terzine", "triplets", "triplets"),
+    ("forza", "strength", "strength"),
+    ("finestra", "window", "window"),
+    ("swing", "swing", "swing"),
+    ("nota_minima", "min_note", "min_note_sec"),
+    ("unisci", "merge", "merge_gap_sec"),
+    ("settime", "sevenths", "sevenths"),
+    ("voce", "voice", "voice"),
+)
+_CONVERSION_KEY_OF = {alias: norm for it, en, norm in CONVERSION_KEYS for alias in (it, en)}
+_CONVERSION_WRITTEN = {norm: it for it, _en, norm in CONVERSION_KEYS}
+
+# I valori predefiniti, normalizzati: forza, finestra e swing in frazioni
+# (100% = 1.0, swing 50 = 0.5), nota minima e unisci in secondi.
+CONVERSION_DEFAULTS = {
+    "from": None, "mode": "melody", "grid": 16, "triplets": False, "strength": 1.0, "window": 1.0,
+    "swing": 0.5, "min_note_sec": 0.0, "merge_gap_sec": 0.0, "sevenths": False, "voice": False,
+}
+# i valori di modo: (italiano, che si scrive; inglese, normalizzato)
+_CONVERSION_MODE_NAMES = (("melodia", "melody"), ("percussioni", "drums"), ("accordi", "chords"))
+CONVERSION_MODES = {alias: en for it, en in _CONVERSION_MODE_NAMES for alias in (it, en)}
+_CONVERSION_MODE_WRITTEN = {en: it for it, en in _CONVERSION_MODE_NAMES}
+CONVERSION_GRIDS = (4, 8, 16, 32, 64)        # 64 = quantizzazione "Off"
+_CONVERSION_FLAGS = ("triplets", "sevenths", "voice")
+# chiave numerica: (minimo, massimo o None, divisore per il valore normalizzato)
+_CONVERSION_NUMBERS = {"strength": (0, 100, 100), "window": (0, 100, 100), "swing": (50, 75, 100),
+                       "min_note_sec": (0, None, 1000), "merge_gap_sec": (0, None, 1000)}
+
+
+def parse_conversion_body(body: str) -> Tuple[dict, List[str]]:
+    """Le scelte di un blocco 'Conversione Nome:' e gli avvisi: chiavi
+    normalizzate in inglese (vedi CONVERSION_DEFAULTS), con il predefinito
+    per quelle che mancano. Un valore non valido da' un avviso e vale il
+    predefinito; le chiavi sconosciute si ignorano (le versioni successive
+    potranno aggiungerne). 'from' e' None se manca."""
+    out = dict(CONVERSION_DEFAULTS)
+    problems: List[str] = []
+
+    def invalid(key, value):
+        problems.append(tr("{key}={value} non valido, vale il predefinito", key=key, value=value))
+
+    for key, raw in RE_CONVERSION_ITEM.findall(body):
+        norm = _CONVERSION_KEY_OF.get(key.lower())
+        if norm is None:
+            continue
+        value = raw[1:-1] if raw.startswith('"') else raw
+        if norm == "from":
+            out["from"] = value.strip() or None
+        elif norm == "mode":
+            mode = CONVERSION_MODES.get(value.lower())
+            if mode:
+                out["mode"] = mode
+            else:
+                invalid(key, value)
+        elif norm == "grid":
+            if value.isdigit() and int(value) in CONVERSION_GRIDS:
+                out["grid"] = int(value)
+            else:
+                invalid(key, value)
+        elif norm in _CONVERSION_FLAGS:
+            out[norm] = True if not raw else _si(value, False)
+        else:
+            low, high, scale = _CONVERSION_NUMBERS[norm]
+            try:
+                number = float(value)
+            except ValueError:
+                number = None
+            if number is None or number != number or number < low or (high is not None and number > high):
+                invalid(key, value)
+            else:
+                out[norm] = number / scale
+    if out["triplets"] and out["grid"] not in (8, 16):
+        problems.append(tr("terzine solo con griglia=8 o griglia=16, si ignora"))
+        out["triplets"] = False
+    return out, problems
+
+
+def conversion_body_text(conversion: dict) -> str:
+    """Il corpo di 'Conversione Nome:' (senza rientro) per le scelte
+    'conversion' (chiavi normalizzate, come da parse_conversion_body):
+    chiavi italiane, da= sempre per prima, poi solo quelle diverse dal
+    predefinito."""
+    parts = [f'da="{conversion.get("from") or ""}"']
+    for _it, _en, norm in CONVERSION_KEYS[1:]:
+        value = conversion.get(norm, CONVERSION_DEFAULTS[norm])
+        if value == CONVERSION_DEFAULTS[norm]:
+            continue
+        key = _CONVERSION_WRITTEN[norm]
+        if norm in _CONVERSION_FLAGS:
+            if value:
+                parts.append(key)
+        elif norm == "mode":
+            parts.append(f"{key}={_CONVERSION_MODE_WRITTEN[value]}")
+        elif norm == "grid":
+            parts.append(f"{key}={int(value)}")
+        else:
+            parts.append(f"{key}={format_number(value * _CONVERSION_NUMBERS[norm][2])}")
+    return " ".join(parts)
+
+
+def conversion_blocks(lines: List[str]) -> List[Tuple[str, str, int]]:
+    """I blocchi 'Conversione Nome:' (o 'Conversion Nome:'): (nome della
+    traccia di note, corpo, riga dell'intestazione da 1)."""
+    return _extract_named_blocks(lines, RE_CONVERSION_HDR, with_line=True)
 
 
 def _extract_box_blocks(lines: List[str], header_re=RE_BOX_HDR) -> List[Tuple[str, str, float, str]]:

@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.9** · Implementazione di riferimento: la libreria Python
+**Versione 2.10** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -1131,7 +1131,7 @@ libero).
 
 | Riga | Significato |
 | --- | --- |
-| `ST: 2.9` | versione del linguaggio in cui e' scritto il file |
+| `ST: 2.10` | versione del linguaggio in cui e' scritto il file |
 | `Tempo: 120 BPM` | tempo (anche coi decimali: `Tempo: 101.4 BPM`) |
 | `Tempo: 1: 120, 5: 140` | tempo per battuta (battuta: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | metrica |
@@ -1165,6 +1165,7 @@ la ignorano (e' una riga fuori da ogni blocco).
 **Parole chiave.** Le parole chiave del file si possono scrivere in
 italiano o in inglese: `Metrica`/`Meter`, `Tonalita`/`Key`,
 `Levare`/`Pickup`, `Traccia`/`Track`, `Strumento`/`Instrument`,
+`Conversione`/`Conversion`,
 `Titolo`/`Title`, `Autore`/`Composer`, `Parole`/`Lyricist`; nel corpo di
 uno strumento `percussione`/`percussion`, `ottava`/`octave` e
 `trasposizione`/`transposition`; i valori
@@ -1181,14 +1182,57 @@ italiane, che ogni versione legge.
 | `Box Traccia "Nome" \|quarto:` | un box della traccia `Traccia` che comincia a `quarto` |
 | `Strumento Nome:` | definizione di strumento (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`, facoltativo `trasposizione=-2`, sezione 9.4); un blocco senza `program=` non definisce nulla |
 | `Mixer Traccia:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) di una traccia; i lettori ignorano le chiavi che non conoscono |
+| `Conversione Traccia:` | la traccia audio da cui e' stata convertita la traccia di note `Traccia`, e le scelte della conversione (2.10, sotto) |
 
 I corpi di tracce e box conservano gli **a capo** (i commenti finiscono a
-fine riga); i corpi dei pattern si dividono in token. I blocchi Strumento
-e Mixer si leggono prima delle tracce, ovunque siano nel file. Le
+fine riga); i corpi dei pattern si dividono in token. I blocchi Strumento,
+Mixer e Conversione si leggono prima delle tracce, ovunque siano nel file. Le
 applicazioni POSSONO aggiungere altri tipi di blocco (SoundText usa
 `Effetti`, `Plugin`, `Catena master`, `Audio`, `Master:` e `Ambiente:`);
 i lettori DEVONO saltare i blocchi che non conoscono. Una traccia con
 strumento `Audio` non ha notazione.
+
+**Conversione.** Una traccia di note nata convertendo in notazione una
+traccia audio (melodia, percussioni o accordi riconosciuti nella
+registrazione) PUO' avere un blocco `Conversione Traccia:` (in inglese
+`Conversion`), per rifare la conversione dopo una modifica all'audio. Il
+corpo e' fatto di coppie `chiave=valore` e di scelte si'/no (la chiave da
+sola); ogni chiave ha un alias inglese:
+
+| Chiave (alias) | Valori | Predefinito | Significato |
+| --- | --- | --- | --- |
+| `da` (`from`) | nome della traccia tra virgolette | obbligatoria | la traccia audio da cui viene la traccia di note |
+| `modo` (`mode`) | `melodia` `percussioni` `accordi` (`melody` `drums` `chords`) | `melodia` | cosa si riconosce nell'audio |
+| `griglia` (`grid`) | 4, 8, 16, 32, 64 | 16 | suddivisione della quantizzazione (64 = nessuna) |
+| `terzine` (`triplets`) | scelta | assente | griglia ternaria (solo con 8 e 16) |
+| `forza` (`strength`) | 0–100 | 100 | quanto ogni nota va verso la griglia, in % |
+| `finestra` (`window`) | 0–100 | 100 | si correggono solo le note entro questa % di mezzo passo della griglia |
+| `swing` | 50–75 | 50 | 50 = dritto, 66 = shuffle |
+| `nota_minima` (`min_note`) | millisecondi | 0 | le note piu' corte si scartano |
+| `unisci` (`merge`) | millisecondi | 0 | due note uguali piu' vicine di cosi' diventano una |
+| `settime` (`sevenths`) | scelta | assente | solo `accordi`: riconosce 7, maj7, m7 |
+| `voce` (`voice`) | scelta | assente | una melodia cantata, o il beatbox con `percussioni` |
+
+```
+Traccia Voce [Audio]:
+
+Traccia Voce (note) [Trumpet]:
+
+Conversione Voce (note):
+  da="Voce" griglia=8 forza=80 swing=66
+```
+
+Lo strumento e' quello della traccia di note. I lettori ignorano con un
+avviso, e leggono lo stesso il brano: un blocco la cui intestazione non
+nomina una traccia o nomina una traccia audio, un secondo blocco per la
+stessa traccia, un blocco senza `da` o con un `da` che nomina una traccia
+che non esiste o non e' audio. Un valore non valido (`griglia=12`) da' un
+avviso con il numero di riga e vale il predefinito; le chiavi sconosciute
+si ignorano. Chi scrive il file mette il blocco solo per le tracce nate
+da una conversione, dopo una riga vuota, con `da` per prima e poi solo le
+chiavi diverse dal predefinito; un file con almeno uno di questi blocchi
+dichiara `ST: 2.10`. I lettori prima della 2.10 ignorano il blocco (la
+sua intestazione e' una riga fuori da ogni blocco).
 
 **Clip audio (informativo).** SoundText scrive una clip di una traccia
 audio come `Audio Traccia "Nome" |quarto:`, nella stessa forma di un box,
@@ -1365,6 +1409,10 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.10** — il blocco `Conversione Traccia:` ricorda da quale traccia
+audio e' stata convertita una traccia di note e con quali scelte
+(sezione 12.2). I file che non lo hanno non cambiano.
 
 **2.9** — l'intestazione `Tempo:` accetta tempi coi decimali, anche
 nell'elenco per battuta (`Tempo: 101.4 BPM`, `Tempo: 1: 96.5, 3: 98`),

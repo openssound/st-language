@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.9** · Reference implementation: the `st_language` Python
+**Version 2.10** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -1094,7 +1094,7 @@ ignored (free text).
 
 | Line | Meaning |
 | --- | --- |
-| `ST: 2.9` | version of the language the file is written in |
+| `ST: 2.10` | version of the language the file is written in |
 | `Tempo: 120 BPM` | tempo (also with decimals: `Tempo: 101.4 BPM`) |
 | `Tempo: 1: 120, 5: 140` | tempo per bar (bar: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | meter |
@@ -1124,7 +1124,7 @@ versions before 2.6 ignore it (it is a line outside any block).
 
 **Keywords.** The keywords of the file can be written in Italian or in
 English: `Metrica`/`Meter`, `Tonalita`/`Key`, `Levare`/`Pickup`,
-`Traccia`/`Track`, `Strumento`/`Instrument`, `Titolo`/`Title`,
+`Traccia`/`Track`, `Strumento`/`Instrument`, `Conversione`/`Conversion`, `Titolo`/`Title`,
 `Autore`/`Composer`, `Parole`/`Lyricist`; in an instrument body
 `percussione`/`percussion`, `ottava`/`octave` and
 `trasposizione`/`transposition`; yes/no values as
@@ -1141,13 +1141,55 @@ version reads.
 | `Box Track "Name" \|beat:` | a box of the track `Track` starting at `beat` |
 | `Strumento Name:` | instrument definition (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`, optionally `trasposizione=-2`, section 9.4); a block without `program=` defines nothing |
 | `Mixer Track:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) of a track; readers ignore the keys they do not know |
+| `Conversione Track:` | the audio track the note track `Track` was converted from, and the conversion choices (2.10, below) |
 
 Track and box bodies keep their **line breaks** (comments end at line
-ends); pattern bodies are tokenized. Instrument and mixer blocks are
-read before the tracks, wherever they are in the file. Applications MAY
+ends); pattern bodies are tokenized. Instrument, mixer and conversion blocks
+are read before the tracks, wherever they are in the file. Applications MAY
 add other block types (SoundText uses `Effetti`, `Plugin`, `Catena
 master`, `Audio`, `Master:` and `Ambiente:`); readers MUST skip blocks
 they do not know. A track whose instrument is `Audio` has no notation.
+
+**Conversion.** A note track made by converting an audio track into
+notation (melody, drums or chords recognized in the recording) MAY have
+one `Conversione Track:` block (`Conversion` in English), so that the
+conversion can be redone after the audio changes. Its body is made of
+`key=value` pairs and of flags (a key alone); every key has an English
+alias:
+
+| Key (alias) | Values | Default | Meaning |
+| --- | --- | --- | --- |
+| `da` (`from`) | track name in quotes | required | the audio track the note track comes from |
+| `modo` (`mode`) | `melodia` `percussioni` `accordi` (`melody` `drums` `chords`) | `melodia` | what is recognized in the audio |
+| `griglia` (`grid`) | 4, 8, 16, 32, 64 | 16 | quantization grid (64 = off) |
+| `terzine` (`triplets`) | flag | absent | triplet grid (only with 8 and 16) |
+| `forza` (`strength`) | 0–100 | 100 | how far each note moves to the grid, in % |
+| `finestra` (`window`) | 0–100 | 100 | only notes within this % of half a grid step are moved |
+| `swing` | 50–75 | 50 | 50 = straight, 66 = shuffle |
+| `nota_minima` (`min_note`) | milliseconds | 0 | shorter notes are dropped |
+| `unisci` (`merge`) | milliseconds | 0 | two equal notes closer than this become one |
+| `settime` (`sevenths`) | flag | absent | `accordi` only: recognize 7, maj7, m7 |
+| `voce` (`voice`) | flag | absent | a sung melody, or beatbox for `percussioni` |
+
+```
+Traccia Voce [Audio]:
+
+Traccia Voce (note) [Trumpet]:
+
+Conversione Voce (note):
+  da="Voce" griglia=8 forza=80 swing=66
+```
+
+The instrument is the note track's own. Readers ignore with a warning,
+and still read the song: a block whose header names no track or an
+audio track, a second block for the same track, and a block whose `da`
+is missing or names a track that does not exist or is not an audio
+track. An invalid value (`griglia=12`) gives a warning with the line
+number and the default applies; unknown keys are ignored. Writers write
+the block only for tracks made by a conversion, after an empty line, with
+`da` first and then only the keys that differ from the default; a file
+with at least one such block declares `ST: 2.10`. Readers before 2.10
+ignore the block (its header is a line outside any block).
 
 **Audio clips (informative).** SoundText writes a clip of an audio track
 as `Audio Track "Name" |beat:`, the same form as a box, with
@@ -1310,6 +1352,10 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.10** — the `Conversione Track:` block records the audio track a note
+track was converted from and the conversion choices (section 12.2).
+Files without it are unchanged.
 
 **2.9** — the `Tempo:` header accepts tempos with decimals, also in the
 per-bar list (`Tempo: 101.4 BPM`, `Tempo: 1: 96.5, 3: 98`), as the
