@@ -1410,6 +1410,11 @@ caso.
 
 ## Appendice A: modifiche
 
+**2.10.1** — solo la libreria, il linguaggio non cambia: il voicing
+`spread` tiene la quinta sulle triadi (`C` da' C3, C4, E5, G5 invece di
+C3, C4, E5) e la toglie solo dagli accordi di quattro o piu' note, che
+restano come prima.
+
 **2.10** — il blocco `Conversione Traccia:` ricorda da quale traccia
 audio e' stata convertita una traccia di note e con quali scelte
 (sezione 12.2). I file che non lo hanno non cambiano.

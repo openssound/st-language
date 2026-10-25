@@ -407,3 +407,26 @@ def test_midi_grace_note_sounds_before_the_note():
     song = st.read_song("Tempo: 120 BPM\n\nPiano:\n  d'g c\n")
     ons = [(t, m[1]) for t, _o, m in sorted(song_midi_tracks(song)[0][1]) if m[0] & 0xF0 == 0x90]
     assert ons == [(0, 62), (60, 60)]
+
+
+# ------------------------------------------------------------------ voicing spread
+
+def _spread(symbol):
+    from st_language.chords import _apply_named_voicing, parse_chord_symbol
+    return _apply_named_voicing("spread", 60, parse_chord_symbol(symbol).intervals)
+
+
+@pytest.mark.parametrize("symbol, fifth", [("C", 79), ("Cm", 79), ("Cdim", 78)])
+def test_spread_triad_keeps_the_fifth(symbol, fifth):
+    notes = _spread(symbol)
+    assert fifth in notes
+    assert len(notes) == len(set(notes))
+
+
+@pytest.mark.parametrize("symbol, expected", [
+    ("C7", [48, 60, 76, 82]),
+    ("Cmaj7", [48, 60, 76, 83]),
+    ("Cm9", [48, 60, 75, 82, 86]),
+])
+def test_spread_four_note_chords_drop_the_fifth(symbol, expected):
+    assert _spread(symbol) == expected

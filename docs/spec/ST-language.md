@@ -1353,6 +1353,11 @@ version if it gives the same result for every case.
 
 ## Appendix A: changes
 
+**2.10.1** — library only, the language is unchanged: the `spread`
+voicing keeps the fifth on triads (`C` gives C3, C4, E5, G5 instead of
+C3, C4, E5) and drops it only from chords of four or more notes, which
+are unchanged.
+
 **2.10** — the `Conversione Track:` block records the audio track a note
 track was converted from and the conversion choices (section 12.2).
 Files without it are unchanged.

@@ -670,7 +670,10 @@ def _apply_named_voicing(style: str, base: int, intervals: List[int]) -> List[in
 
     if style == "spread":  # tastiera: voicing ampio a due mani
         notes = [base - 12, base]
-        notes += [base + 12 + iv for iv in intervals if iv not in (0, 7)]
+        # La quinta si toglie solo dagli accordi di quattro o piu' note:
+        # su una triade resterebbe la sola terza.
+        omitted = (0, 7) if len(intervals) > 3 else (0,)
+        notes += [base + 12 + iv for iv in intervals if iv not in omitted]
         return sorted(set(notes))
 
     # Stile non riconosciuto: fallback sicuro (non dovrebbe mai accadere,
