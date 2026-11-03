@@ -430,3 +430,19 @@ def test_spread_triad_keeps_the_fifth(symbol, fifth):
 ])
 def test_spread_four_note_chords_drop_the_fifth(symbol, expected):
     assert _spread(symbol) == expected
+
+
+# ------------------------------------------------------------------ controlli di battuta nei blocchi di voci
+
+@pytest.mark.parametrize("voices", [
+    "c d e f | g a b c ; 4C | 4G",
+    "c d e f | g a b c | c d e f ; 4C | 4G | 4C",
+    "c d e f | g a b c | c d e f | g a b c ; 4C | 4G | 4C | 4G",
+])
+def test_voice_block_with_right_bars_gives_no_warning(voices):
+    assert st.check("4: c d e f | { " + voices + " } | 4C |") == []
+
+
+def test_voice_block_still_reports_a_short_bar_in_the_second_voice():
+    issues = st.check("4: c d e f | { c d e f | g a b c | c d e f ; 4C | 2G | 4C } | 4C |")
+    assert [i.bar for i in issues] == [2]       # prima della correzione: battuta 3

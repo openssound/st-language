@@ -14,6 +14,7 @@ della traccia (vedi Visione del prodotto, livelli 1/2/3).
 """
 
 import re
+from bisect import bisect_right
 from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import List, Dict, Optional, Tuple
@@ -2379,7 +2380,9 @@ class _BarGrid:
         stanghetta chiude e' la k - 1."""
         while self._starts[-1] <= position:
             self._starts.append(next(self._gen))
-        i = len(self._starts) - 1          # prima stanghetta oltre position
+        # prima stanghetta oltre position: le posizioni possono tornare
+        # indietro (ogni voce di un blocco { ; } riparte dall'inizio del blocco)
+        i = max(bisect_right(self._starts, position), 1)
         before, after = self._starts[i - 1], self._starts[i]
         if i - 1 >= 1 and position - before <= after - position:
             return self._first_bar + i - 1, before
