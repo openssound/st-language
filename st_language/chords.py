@@ -501,8 +501,9 @@ def recognize_chord(midi_notes: List[int]) -> Optional[Tuple[int, str, int]]:
     struttura di classi di altezza e' interamente coperta dalle note MIDI
     fornite (usato per riconoscere un accordo gia' scritto in forma
     esplicita [...]). Ritorna (root_pc, quality, anchor_octave) o None se
-    nessuna qualita' nota corrisponde (es. una semplice quinta, ambigua tra
-    maggiore/minore, resta correttamente non riconosciuta).
+    nessuna qualita' nota corrisponde. Una quinta da sola e' l'accordo
+    power ('5': C e G -> C5); chi usa il simbolo controlla che riproduca le
+    note suonate.
 
     anchor_octave e' l'ottava della nota piu' grave, tra quelle fornite,
     che ha la classe di altezza scelta come fondamentale — per mantenere

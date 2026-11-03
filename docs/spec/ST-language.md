@@ -1277,7 +1277,8 @@ audible track:
   tracks go to the next **port** (a *MIDI port* meta event, FF 21, at the
   start of every track when more than one port is used), 15 melodic
   tracks per port; drum tracks share channel 10 of port 0;
-- program change = instrument GM program (drums: bank 120);
+- program change = instrument GM program (drums: bank 120); at the start
+  of the track also CC 7 = track volume (at most 127) and CC 10 = pan;
 - notes: `note` → its pitch; `chord` → its realization (section 9.2);
   `block` → all atoms; `percussion` → the drum note of section 9.5;
 - velocity = event velocity × track volume / 100;
@@ -1286,6 +1287,11 @@ audible track:
 - `slide` → the first pitch with pitch-bend ramps (bend range set to 24
   semitones via RPN 0);
 - `sustain` → CC 64; tempo markers and per-bar changes → set-tempo;
+- meter and meter changes → time signature meta event (FF 58), which only
+  has power-of-two denominators: another denominator is written as the
+  next power of two up, with the numerator that gives the closest bar
+  length (3/3 → 4/4, 6/12 → 8/16, 4/6 → 5/8); a meter with no bar (0/4,
+  4/0) is not written;
 - marks: `$accent` × 1.25 and `$marcato` × 1.4 on the velocity (at most
   127); `$tr` alternates the note and the next pitch above in the song's
   key (C if none) in 1/8-beat steps, starting and ending on the note;

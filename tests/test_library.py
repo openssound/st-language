@@ -545,3 +545,12 @@ def test_cli_file_that_is_not_utf8_is_an_error_not_a_crash(tmp_path):
     path = tmp_path / "brano.st"
     path.write_bytes(b"\xff\xfe\x00bin")
     assert main(["check", str(path)]) == 2
+
+
+@pytest.mark.parametrize("meter, written", [
+    ((4, 4), "4/4"), ((6, 8), "6/8"), ((3, 3), "4/4"), ((6, 12), "8/16"), ((4, 6), "5/8"), ((4, 0), None),
+])
+def test_midi_time_signature_keeps_the_bar_length_when_it_can(meter, written):
+    from st_language.midi import midi_time_signature
+    result = midi_time_signature(*meter)
+    assert (f"{result[0]}/{2 ** result[1]}" if result else None) == written

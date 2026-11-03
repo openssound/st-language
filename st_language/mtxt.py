@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Tuple
 
 from ._i18n import tr
 from .instruments import DRUM_MIDI_CHANNEL, PERCUSSION_MAP, gm_instrument_catalog
-from .midi import TICKS_PER_BEAT, _meta, midi_text, midi_text_bytes, song_midi_tracks, write_smf
+from .midi import TICKS_PER_BEAT, _meta, midi_text, midi_text_bytes, midi_time_signature, song_midi_tracks, write_smf
 
 MTXT_VERSION = "1.0"
 MTXT_NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
@@ -519,7 +519,9 @@ def mtxt_to_midi_tracks(text: str) -> List[List[Tuple[int, int, bytes]]]:
                                                                midi_text_bytes(value))))
             elif command == "timesig":
                 num, den = (int(x) for x in args[0].split("/"))
-                conductor.append((_tick(beat), _CTRL, _meta(0x58, bytes([num, max(0, den.bit_length() - 1), 24, 8]))))
+                signature = midi_time_signature(num, den)
+                if signature:
+                    conductor.append((_tick(beat), _CTRL, _meta(0x58, bytes([signature[0], signature[1], 24, 8]))))
             elif command == "tempo":
                 bpm = float(args[0])
                 if bpm <= 0:

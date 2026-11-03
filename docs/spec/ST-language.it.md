@@ -1326,6 +1326,8 @@ una traccia per ogni traccia udibile:
   tracce melodiche per porta; le tracce di batteria condividono il canale
   10 della porta 0;
 - program change = programma GM dello strumento (batteria: banco 120);
+  in testa alla traccia anche CC 7 = volume della traccia (al piu' 127) e
+  CC 10 = pan;
 - note: `note` → la sua altezza; `chord` → la sua realizzazione (sezione
   9.2); `block` → tutti gli atomi; `percussion` → la nota della sezione
   9.5;
@@ -1335,6 +1337,11 @@ una traccia per ogni traccia udibile:
 - `slide` → la prima altezza con rampe di pitch bend (ampiezza 24
   semitoni impostata con l'RPN 0);
 - `sustain` → CC 64; marcatori di tempo e cambi per battuta → set-tempo;
+- metrica e cambi di metrica → meta evento di metrica (FF 58), che ha
+  solo denominatori potenza di 2: con un altro denominatore si scrive la
+  potenza di 2 subito sopra, col numeratore che da' la battuta di durata
+  piu' vicina (3/3 → 4/4, 6/12 → 8/16, 4/6 → 5/8); una metrica senza
+  battuta (0/4, 4/0) non si scrive;
 - segni: `$accent` × 1,25 e `$marcato` × 1,4 sulla velocity (al piu' 127);
   `$tr` alterna la nota e l'altezza successiva sopra nella tonalita' del
   brano (C se manca) a passi di 1/8 di quarto, cominciando e finendo

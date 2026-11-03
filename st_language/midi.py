@@ -394,6 +394,21 @@ def write_smf(path: str, tracks: List[List[Tuple[int, int, bytes]]], ticks_per_b
         f.write(header + b"".join(chunks))
 
 
+def midi_time_signature(num: int, den: int) -> Optional[Tuple[int, int]]:
+    """(numeratore, esponente del denominatore) del meta evento di metrica
+    MIDI (FF 58), che scrive solo denominatori potenza di 2. Per gli altri
+    (3/3, 4/6) il denominatore e' la potenza di 2 subito sopra e il
+    numeratore quello che da' la battuta piu' vicina alla sua durata, la
+    stessa se si puo' (3/3 -> 4/4, 6/12 -> 8/16; 4/6 -> 5/8). None per
+    una metrica senza battuta (0/4, 4/0)."""
+    if num <= 0 or den <= 0:
+        return None
+    power = (den - 1).bit_length()                 # 2 ** power >= den
+    if 2 ** power != den:
+        num = max(1, round(num * 2 ** power / den))
+    return min(num, 255), power
+
+
 # priorita' a parita' di tick: prima si spegne, poi controlli e testi, poi si accende
 _OFF, _CTRL, _ON = 0, 1, 2
 
@@ -510,11 +525,11 @@ def song_midi_tracks(song, only_audible: bool = True, midi_dir: Optional[str] = 
         m = RE_METRICA_VALUE.match(sig or "")
         if not m:
             continue
-        num, den = int(m.group(1)), int(m.group(2))
-        if not num or not den:
+        signature = midi_time_signature(int(m.group(1)), int(m.group(2)))
+        if signature is None:
             continue                    # metrica non valida: le battute sono in 4/4 (bar_length)
-        power = max(0, den.bit_length() - 1)
-        conductor.append((max(0, round(beat * TICKS_PER_BEAT)), _CTRL, _meta(0x58, bytes([num, power, 24, 8]))))
+        conductor.append((max(0, round(beat * TICKS_PER_BEAT)), _CTRL,
+                          _meta(0x58, bytes([signature[0], signature[1], 24, 8]))))
     channels = _assign_channels(tracks)
     ports = midi_ports_needed(channels)
     midi_tracks = [conductor]
