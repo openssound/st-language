@@ -446,3 +446,50 @@ def test_voice_block_with_right_bars_gives_no_warning(voices):
 def test_voice_block_still_reports_a_short_bar_in_the_second_voice():
     issues = st.check("4: c d e f | { c d e f | g a b c | c d e f ; 4C | 2G | 4C } | 4C |")
     assert [i.bar for i in issues] == [2]       # prima della correzione: battuta 3
+
+
+def test_voice_block_reports_lyrics_and_anchors_inside_a_voice():
+    assert [i.kind for i in st.check('4: { c d "la la la" ; e f }')] == ["lyric"]
+    assert [(i.kind, i.bar) for i in st.check("4: c d e f | { c d bar=1 ; e f }")] == [("anchor", 1)]
+
+
+# ------------------------------------------------------------------ file .st: box, strumenti, mixer, metrica
+
+@pytest.mark.parametrize("command", ["rel:", "abs:", "reset:"])
+def test_box_keeps_a_line_with_only_a_notation_command(command):
+    song = st.read_song(f'Piano:\n  4: c\n\nBox Piano "A" |0:\n  {command}\n  4: c d e f\n')
+    assert song.tracks[0].clips[0].text == f"{command}\n4: c d e f"
+
+
+def test_invalid_numbers_in_instrument_and_mixer_blocks_use_the_default():
+    song = st.read_song("Strumento Mio:\n  program=abc ottava=x\n\nTraccia A [Mio]:\n  4: c\n\n"
+                        "Mixer A:\n  volume: alto pan=0.5\n")
+    part = song.tracks[0]
+    assert (part.instrument.gm_program, part.instrument.default_octave) == (0, 4)
+    assert (part.volume, part.pan) == (100, 96)
+
+
+def test_meter_with_a_zero_counts_bars_in_four_four(tmp_path):
+    song = st.read_song("Metrica: 4/0\nTempo: 1: 120, 3: 100\n\nPiano:\n  4: c d e f c d e f c\n")
+    from st_language.timing import build_tempo_beat_map
+    assert build_tempo_beat_map(song) == [(0.0, 120), (8.0, 100)]
+    for export, ext in ((st.to_midi, "mid"), (st.to_musicxml, "xml"), (st.to_abc, "abc"), (st.to_mtxt, "mtxt")):
+        export(song, str(tmp_path / f"brano.{ext}"))
+
+
+# ------------------------------------------------------------------ MIDI: note della stessa altezza
+
+def _note_messages(body):
+    from st_language.midi import song_midi_tracks
+    song = st.read_song("Piano:\n  " + body + "\n")
+    return [(t, m[0] & 0xF0, m[1]) for t, _o, m in sorted(song_midi_tracks(song)[0][1], key=lambda e: (e[0], e[1]))
+            if m[0] & 0xF0 in (0x80, 0x90)]
+
+
+@pytest.mark.parametrize("body", ["4: c_ c", "4: c( c d)"])
+def test_legato_note_ends_where_the_same_pitch_starts_again(body):
+    assert _note_messages(body)[:3] == [(0, 0x90, 60), (480, 0x80, 60), (480, 0x90, 60)]
+
+
+def test_unison_voices_sound_the_longer_note_once():
+    assert _note_messages("4: { 2c ; c }") == [(0, 0x90, 60), (960, 0x80, 60)]

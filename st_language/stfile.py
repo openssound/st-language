@@ -185,6 +185,16 @@ _TRACK_HDR_PATTERNS = (RE_ST_VERSION, RE_PICKUP, RE_TEMPO, RE_METRICA, RE_MASTER
                         RE_AUDIO_HDR, RE_EFFECTS_HDR, RE_MASTER_CHAIN_HDR, RE_TITLE, RE_COMPOSER, RE_LYRICIST,
                         RE_CONVERSION_HDR)
 
+# Comandi di notazione da soli su una riga ("rel:", "abs:", "reset:"): hanno
+# la forma di un'intestazione corta ("Nome:") ma stanno nel corpo di un box.
+_NOTATION_COMMAND_LINES = {"rel:", "abs:", "reset:"}
+
+
+def _ends_block(line: str) -> bool:
+    """Se la riga apre un altro blocco (e chiude quello in corso)."""
+    return line not in _NOTATION_COMMAND_LINES and any(rx.match(line) for rx in _TRACK_HDR_PATTERNS)
+
+
 VOLUME_MAX = 200  # 100 = guadagno originale (unita'), fino a 200 = raddoppio percepito
 
 def _parse_bar_value_list(raw: str, is_metrica: bool = False) -> List[tuple]:
@@ -241,15 +251,23 @@ def _convert_volume(raw: str) -> int:
     l'originale, valori minori la riducono."""
     return max(0, min(VOLUME_MAX, round(float(raw))))
 
+def _number(raw: Optional[str], default, convert=int):
+    """raw convertito con convert (int o float), default se manca o non e'
+    un numero: un valore sbagliato in un blocco non impedisce di aprire il file."""
+    if raw is None:
+        return default
+    try:
+        return convert(raw)
+    except ValueError:
+        return default
+
+
 def _parse_instrument_body(name: str, body: str) -> InstrumentProfile:
     """Lo strumento di un blocco 'Strumento Nome:' (program=40 percussione=no
     ottava=3 range=36-96 poly=si voicing=spread)."""
     kv = dict(RE_KV_EQUALS.findall(body))
     range_low, range_high = 40, 88
-    try:
-        transposition = int(kv.get("trasposizione", kv.get("transposition", 0)))
-    except ValueError:
-        transposition = 0
+    transposition = _number(kv.get("trasposizione", kv.get("transposition")), 0)
     if "range" in kv and "-" in kv["range"]:
         lo, hi = kv["range"].split("-", 1)
         try:
@@ -258,9 +276,9 @@ def _parse_instrument_body(name: str, body: str) -> InstrumentProfile:
             pass
     return InstrumentProfile(
         name=name,
-        gm_program=int(kv.get("program", 0)),
+        gm_program=_number(kv.get("program"), 0),
         is_percussion=_si(kv.get("percussione", kv.get("percussion")), False),
-        default_octave=int(kv.get("ottava", kv.get("octave", 4))),
+        default_octave=_number(kv.get("ottava", kv.get("octave")), 4),
         range_low=range_low,
         range_high=range_high,
         polyphonic=_si(kv.get("poly"), True),
@@ -273,17 +291,18 @@ def _parse_mixer_body(body: str) -> dict:
     blocco 'Mixer Nome:'."""
     kv = _parse_kv_body(body)
     out = {}
-    if "volume" in kv:
+    if _number(kv.get("volume"), None, float) is not None:
         out["volume"] = _convert_volume(kv["volume"])
-    if "pan" in kv:
+    if _number(kv.get("pan"), None, float) is not None:
         out["pan"] = _convert_pan_to_0_127(kv["pan"])
     if "mute" in kv:
         out["mute"] = _si(kv["mute"], False)
     if "solo" in kv:
         out["solo"] = _si(kv["solo"], False)
     for key, field in (("riverbero", "reverb"), ("reverb", "reverb"), ("chorus", "chorus")):
-        if key in kv:
-            out[field] = max(0, min(100, round(float(kv[key]))))
+        value = _number(kv.get(key), None, float)
+        if value is not None:
+            out[field] = max(0, min(100, round(value)))
     return out
 
 def _notation_body_lines(text: str) -> List[str]:
@@ -320,7 +339,7 @@ def _extract_named_blocks(lines: List[str], header_re, with_line: bool = False) 
             flush()
             current_name, current_line = m.group(1).strip(), number
             continue
-        if current_name and not any(rx.match(line) for rx in _TRACK_HDR_PATTERNS):
+        if current_name and not _ends_block(line):
             buffer.append(line)
         else:
             flush()
@@ -482,7 +501,7 @@ def _extract_box_blocks(lines: List[str], header_re=RE_BOX_HDR) -> List[Tuple[st
             flush()
             current = (m.group(1).strip(), m.group(2), float(m.group(3)))
             continue
-        if current and not any(rx.match(line) for rx in _TRACK_HDR_PATTERNS):
+        if current and not _ends_block(line):
             buffer.append(line)
         else:
             flush()

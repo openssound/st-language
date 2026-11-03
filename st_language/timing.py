@@ -16,7 +16,7 @@ import re
 from bisect import bisect_right
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
-from .notation import bar_starts as _bar_start_positions
+from .notation import bar_length, bar_starts as _bar_start_positions
 
 if TYPE_CHECKING:          # solo per le annotazioni (nessun import circolare)
     from .song import Part, Song  # noqa: F401
@@ -56,9 +56,7 @@ def compute_bar_beat_offsets(tempo_changes, metrica_changes, base_time_sig: str 
     while bar < max_bar:
         if bar in metrica_map:
             current_sig = metrica_map[bar]
-        num, den = current_sig.split("/")
-        bar_length_beats = int(num) * 4.0 / int(den)
-        beat_acc += bar_length_beats
+        beat_acc += float(bar_length(current_sig))      # stessa regola di bar_starts
         bar += 1
         offsets[bar] = beat_acc + (pickup or 0.0)
     return offsets
@@ -151,8 +149,7 @@ def build_metrica_beat_map(project: "Song") -> List[Tuple[float, str]]:
         points[0.0] = project.time_sig
     result = sorted(points.items())
     if pickup and result and result[0][0] == 0.0:
-        m = RE_METRICA_VALUE.match(result[0][1] or "")
-        length = int(m.group(1)) * 4.0 / int(m.group(2)) if m and int(m.group(2)) else 4.0
+        length = float(bar_length(result[0][1] or ""))
         result[0] = (pickup - length, result[0][1])
     return result
 

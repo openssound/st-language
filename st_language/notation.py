@@ -1834,12 +1834,13 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 for k, voice_text in enumerate(voices):
                     voice_tokens = expand_repeats(tokenize(voice_text), lenient=lenient)[0]
                     voice_ranges: List[Tuple[Fraction, Fraction]] = []
+                    voice_extras: Optional[dict] = {} if extras is not None else None
                     # La prima voce continua il testo cantato della traccia:
                     # un testo dentro di essa prende anche le note prima del
                     # blocco, uno dopo il blocco anche le sue note.
                     sub_events, sub_end, _ = _parse_tokens_exact(
                         voice_tokens, default_octave, grid_beats, lenient, voice_ranges,
-                        initial_velocity=velocity, voice=voice + k, extras=None,
+                        initial_velocity=velocity, voice=voice + k, extras=voice_extras,
                         pending_lyrics=lyric_targets if k == 0 else None,
                         pending_verses=(sung, verse_pos) if k == 0 else None,
                         initial_controls=controls, initial_swing=swing, initial_pitch=pitch,
@@ -1851,6 +1852,12 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     events.extend(sub_events)
                     longest = max(longest, sub_end)
                     checks.append([a for t, (a, _) in zip(voice_tokens, voice_ranges) if t == BAR_CHECK])
+                    # gli avvisi sul testo cantato e sulle ancore bar=N di una
+                    # voce si segnalano sul blocco (il primo per tipo)
+                    for kind in ("lyric_issues", "anchor_issues"):
+                        found = (voice_extras or {}).get(kind)
+                        if found:
+                            extras.setdefault(kind, {}).setdefault(index, next(iter(found.values())))
                 if extras is not None and any(checks):
                     extras.setdefault("voice_bars", {})[index] = (cursor, checks)
                 for _end, name, value in sorted(control_ends, key=lambda c: c[0]):
@@ -2302,6 +2309,17 @@ def _pickup_fraction(pickup) -> Fraction:
     return Fraction(pickup or 0).limit_denominator(1 << 16)
 
 
+def bar_length(sig: str) -> Fraction:
+    """Quarti di una battuta nella metrica 'N/D'; 4 (il 4/4) se la metrica
+    non e' valida o da' una battuta vuota (0/4, 4/0)."""
+    try:
+        num, den = (int(x) for x in sig.split("/"))
+        length = Fraction(num * 4, den)
+    except (ValueError, ZeroDivisionError):
+        return Fraction(4)
+    return length if length > 0 else Fraction(4)
+
+
 def bar_starts(time_sig: str = "4/4", metrica_changes=(), pickup=0):
     """Generatore infinito dell'inizio (in quarti, Fraction) di ogni
     battuta, dalla 1: 0, poi via via sommando la durata della battuta
@@ -2318,12 +2336,7 @@ def bar_starts(time_sig: str = "4/4", metrica_changes=(), pickup=0):
         yield start
         if bar in metrica_map:
             sig = metrica_map[bar]
-        try:
-            num, den = (int(x) for x in sig.split("/"))
-            length = Fraction(num * 4, den)
-        except (ValueError, ZeroDivisionError):
-            length = Fraction(4)
-        start += length if length > 0 else Fraction(4)
+        start += bar_length(sig)
         bar += 1
 
 

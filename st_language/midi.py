@@ -417,6 +417,7 @@ def _part_events(part, events: List[Event], slot: int, key: Optional[str] = None
     factor = max(0.0, part.volume / 100.0)
     sustain = False
     end_tick = 0
+    spans: List[Tuple[int, int, int, int]] = []     # note (inizio, fine, altezza, velocity)
 
     def tick(beats: float) -> int:
         return round(beats * TICKS_PER_BEAT)
@@ -471,8 +472,20 @@ def _part_events(part, events: List[Event], slot: int, key: Optional[str] = None
         stop = _apply_articulation(start, end, effective_articulation(ev))
         for n in notes:
             for a, b, pitch in ornament_spans(ev, n, start, stop, key, notes):
-                out.append((a, _ON, bytes([0x90 | channel, pitch, velocity])))
-                out.append((b, _OFF, bytes([0x80 | channel, pitch, 0])))
+                spans.append((a, b, pitch, velocity))
+    # Sullo stesso canale una nota non deve finire dopo l'attacco della
+    # successiva della stessa altezza (una nota legata, allungata da
+    # _apply_articulation, o due voci all'unisono): il suo note-off
+    # spegnerebbe quella nuova. Finisce dove l'altra comincia; fra due che
+    # cominciano insieme resta la piu' lunga.
+    spans.sort(key=lambda s: (s[2], s[0], s[1]))
+    for k, (a, b, pitch, velocity) in enumerate(spans):
+        if k + 1 < len(spans) and spans[k + 1][2] == pitch:
+            b = min(b, spans[k + 1][0])
+        if b <= a:
+            continue                    # unisono con la nota dopo: suona quella
+        out.append((a, _ON, bytes([0x90 | channel, pitch, velocity])))
+        out.append((b, _OFF, bytes([0x80 | channel, pitch, 0])))
     if sustain:
         out.append((end_tick, _CTRL, bytes([0xB0 | channel, 64, 0])))
     return out
@@ -498,6 +511,8 @@ def song_midi_tracks(song, only_audible: bool = True, midi_dir: Optional[str] = 
         if not m:
             continue
         num, den = int(m.group(1)), int(m.group(2))
+        if not num or not den:
+            continue                    # metrica non valida: le battute sono in 4/4 (bar_length)
         power = max(0, den.bit_length() - 1)
         conductor.append((max(0, round(beat * TICKS_PER_BEAT)), _CTRL, _meta(0x58, bytes([num, power, 24, 8]))))
     channels = _assign_channels(tracks)
