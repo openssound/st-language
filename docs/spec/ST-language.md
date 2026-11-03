@@ -1359,6 +1359,28 @@ version if it gives the same result for every case.
 
 ## Appendix A: changes
 
+**2.10.2** — library only, the language is unchanged; fixes:
+- a `{ ; }` voice block three or more bars long no longer gives a false
+  incomplete-bar warning; lyric and `bar=N` anchor warnings inside a voice
+  are reported on the block;
+- a box with a line holding only `rel:`, `abs:` or `reset:` no longer
+  loses the rest when the file is opened again;
+- MIDI: a legato note (`c_ c`, slurs) no longer cuts off the same note
+  that follows it; two voices in unison sound one note, the longer one;
+  a meter whose denominator is not a power of two is written with the
+  closest bar length (3/3 → 4/4, before 3/2);
+- transposed text keeps the octave of chords whose root crosses C
+  (`B*3` +1 → `C*4`) and also transposes `$C7` chord symbols; transposed
+  `Cb` and `B#` no longer jump an octave;
+- a non-numeric value in `Strumento` or `Mixer` uses the default instead
+  of stopping the file from opening; a meter with a zero (4/0) counts
+  bars in 4/4 instead of stopping the exports;
+- every track gets its own copy of a default instrument: changing it in
+  one song no longer changes it in the others;
+- commands: `events` with a syntax error prints the message instead of a
+  traceback, `--tempo` accepts decimals, a file that is not UTF-8 is a
+  read error.
+
 **2.10.1** — library only, the language is unchanged: the `spread`
 voicing keeps the fifth on triads (`C` gives C3, C4, E5, G5 instead of
 C3, C4, E5) and drops it only from chords of four or more notes, which

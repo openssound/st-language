@@ -1417,6 +1417,28 @@ caso.
 
 ## Appendice A: modifiche
 
+**2.10.2** — solo la libreria, il linguaggio non cambia; correzioni:
+- un blocco di voci `{ ; }` lungo tre battute o piu' non da' piu' un
+  falso avviso di battuta incompleta; gli avvisi sul testo cantato e
+  sulle ancore `bar=N` dentro una voce si segnalano sul blocco;
+- un box con una riga di solo `rel:`, `abs:` o `reset:` non perde piu'
+  il resto quando si riapre il file;
+- MIDI: una nota legata (`c_ c`, legature) non spegne piu' la nota
+  uguale che la segue; due voci all'unisono suonano una nota sola, la
+  piu' lunga; una metrica con un denominatore che non e' potenza di 2 si
+  scrive con la battuta di durata piu' vicina (3/3 → 4/4, prima 3/2);
+- il testo trasportato tiene l'ottava degli accordi quando la
+  fondamentale scavalca il Do (`B*3` +1 → `C*4`) e trasporta anche le
+  sigle `$C7`; `Cb` e `B#` trasportati non saltano piu' un'ottava;
+- un valore non numerico in `Strumento` o `Mixer` vale il predefinito
+  invece di impedire di aprire il file; una metrica con uno zero (4/0)
+  conta le battute in 4/4 invece di fermare le esportazioni;
+- ogni traccia riceve una copia dello strumento predefinito: cambiarlo
+  in un brano non lo cambia negli altri;
+- comandi: `events` con un errore di sintassi da' il messaggio invece
+  di un traceback, `--tempo` accetta i decimali, un file non UTF-8 e'
+  un errore di lettura.
+
 **2.10.1** — solo la libreria, il linguaggio non cambia: il voicing
 `spread` tiene la quinta sulle triadi (`C` da' C3, C4, E5, G5 invece di
 C3, C4, E5) e la toglie solo dagli accordi di quattro o piu' note, che
