@@ -10,7 +10,7 @@ altro nome si risolve con instrument_for() (alias come 'electric_bass',
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Dict, Optional
 
 # Mappa percussioni -> nota MIDI standard (General MIDI Drum Map, canale 10).
@@ -323,8 +323,10 @@ def instrument_for(name: str, type_name: Optional[str] = None,
                    known: Optional[Dict[str, InstrumentProfile]] = None) -> InstrumentProfile:
     """Il profilo di uno strumento per nome: quelli in known (o i
     predefiniti), altrimenti dedotto dal tipo o dal nome stesso (vedi
-    resolve_instrument_type)."""
+    resolve_instrument_type). Un predefinito si da' come copia: chi cambia
+    lo strumento di una traccia non cambia quello di tutti i brani."""
     table = known if known is not None else DEFAULT_INSTRUMENTS
     if type_name is None and name in table:
-        return table[name]
+        profile = table[name]
+        return replace(profile) if profile is DEFAULT_INSTRUMENTS.get(name) else profile
     return resolve_instrument_type(type_name or name, name)

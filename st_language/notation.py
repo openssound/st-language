@@ -823,7 +823,7 @@ class PitchRewriter:
             return tok
         if tok == RESET_TOKEN:
             self.src.set_relative(False)
-            self.src.alters = {}
+            self.src.alters, self.src.key_name = {}, ""
             # nel testo riscritto il modo e la tonalita' di destinazione
             # (se si converte) vanno ridichiarati dopo il reset
             out = [tok]
@@ -839,6 +839,7 @@ class PitchRewriter:
         m = RE_KEY_MODE.match(tok)
         if m:
             self.src.alters = key_signature_alters(m.group(1)) if m.group(1) else {}
+            self.src.key_name = m.group(1) or ""
             if self.to_key is not None:
                 return ""
             name = _transpose_key_name(m.group(1), self.semitones) if m.group(1) else None
@@ -852,6 +853,13 @@ class PitchRewriter:
             elif self._body_end:
                 self.src.ref, self.dst.ref = self._body_end[-1]
             return tok
+        m = RE_HARMONY.match(tok)
+        if m and self.semitones:
+            try:
+                symbol, bass, _octave = _transpose_chord(m.group(1), m.group(2), 4, self.semitones, self.src)
+            except ValueError:
+                return tok
+            return "$" + symbol + ("/" + bass if bass else "")
         if tok.startswith(LYRIC_QUOTE) or tok.startswith("$") or tok in (BAR_CHECK, REPEAT_START, REPEAT_END,
                                                                             DOUBLE_BAR):
             return tok
@@ -898,15 +906,16 @@ class PitchRewriter:
         self._block_refs = self._block_refs + [None]
         m = RE_CHORD.match(tok)
         if m and self.semitones:
-            from .chords import transpose_chord_root, transpose_pitch
             mult, letter, accidental, suffix, voicing, bass, octv, modifier = m.groups()
+            octave = int(octv) if octv else self.src.default_octave
             try:
-                new_symbol = transpose_chord_root(letter + accidental + suffix, self.semitones)
+                new_symbol, new_bass, new_octave = _transpose_chord(letter + accidental + suffix, bass, octave,
+                                                                    self.semitones, self.src)
             except ValueError:
                 return tok
-            bass_part = f"/{transpose_pitch(bass, 4, self.semitones)[0].upper()}" if bass else ""
-            return (f"{mult or ''}{new_symbol}{'.' + voicing if voicing else ''}{bass_part}"
-                    f"{'*' + octv if octv else ''}{modifier or ''}")
+            octave_part = f"*{new_octave}" if octv or new_octave != self.src.default_octave else ""
+            return (f"{mult or ''}{new_symbol}{'.' + voicing if voicing else ''}"
+                    f"{'/' + new_bass if new_bass else ''}{octave_part}{modifier or ''}")
         return tok
 
     def _note(self, mult, letter, accidental, mark, modifier, tok) -> str:
@@ -1394,7 +1403,7 @@ def _transpose_chord(symbol: str, bass: Optional[str], octave: int, semitones: i
     flats = (any(a == "b" for a in key_signature_alters(_transpose_key_name(pitch.key_name, semitones)).values())
              if pitch.key_name else (len(symbol) > 1 and symbol[1] in "b♭") or (bool(bass) and len(bass) > 1))
     names = [n[0].upper() + n[1:] for n in (_FLAT_NAMES if flats else _SHARP_PC_NAMES)]
-    new_total = parsed.root_pc + semitones
+    new_total = parsed.root_pc + parsed.octave_shift + semitones
     new_symbol = names[new_total % 12] + parsed.quality
     new_bass = None
     if bass:

@@ -24,11 +24,12 @@ from typing import List, Optional
 
 from . import __version__
 from ._i18n import set_language, tr
-from .notation import notation_warnings, validate_track_text
+from .notation import NotationError, notation_warnings, validate_track_text
 from .song import Song, load_song, text_to_song
+from .stfile import parse_bpm
 
 
-def _read(source: str, instrument: str, tempo: Optional[int], time_sig: Optional[str]) -> Song:
+def _read(source: str, instrument: str, tempo: Optional[float], time_sig: Optional[str]) -> Song:
     song = text_to_song(sys.stdin.read(), "stdin", instrument) if source == "-" else load_song(source, instrument)
     if tempo:
         song.tempo_bpm = tempo
@@ -37,6 +38,12 @@ def _read(source: str, instrument: str, tempo: Optional[int], time_sig: Optional
         song.time_sig = time_sig
         song.metrica_changes = []
     return song
+
+
+def tempo(raw: str):
+    """--tempo: intero o coi decimali, come Tempo: nel file (argparse ne usa
+    il nome nel messaggio d'errore: "invalid tempo value")."""
+    return parse_bpm(raw)
 
 
 def _line_col(text: str, offset: int):
@@ -68,6 +75,8 @@ def check(song: Song, source: Optional[str] = None) -> int:
 
 
 def events_json(song: Song) -> List[dict]:
+    """Gli eventi di ogni traccia; NotationError (o ValueError) se una
+    traccia ha un errore di sintassi."""
     out = []
     for part in song.tracks:
         if part.is_audio:
@@ -96,7 +105,7 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
     parser.add_argument("files", nargs="+", help=tr("file .st o di sola notazione ('-' = standard input)"))
     parser.add_argument("-o", "--output", help=tr("file di uscita (con un solo file in ingresso)"))
     parser.add_argument("--instrument", default="Piano", help=tr("strumento per i file di sola notazione"))
-    parser.add_argument("--tempo", type=int, help=tr("tempo in BPM (sostituisce quello del file)"))
+    parser.add_argument("--tempo", type=tempo, help=tr("tempo in BPM (sostituisce quello del file)"))
     parser.add_argument("--time", dest="time_sig", help=tr("metrica, es. 3/4 (sostituisce quella del file)"))
     parser.add_argument("--lang", help=tr("lingua dei messaggi: it, en, fr, es"))
     parser.add_argument("--all-tracks", action="store_true", help=tr("esporta anche le tracce in Mute"))
@@ -113,7 +122,7 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
             continue
         try:
             song = _read(source, args.instrument, args.tempo, args.time_sig)
-        except OSError as e:
+        except (OSError, UnicodeDecodeError) as e:
             print(f"{source}: {e}", file=sys.stderr)
             status = 2
             continue
@@ -122,7 +131,13 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
                 print(f"== {source}")
             status = max(status, 1 if check(song, source) else 0)
         elif command == "events":
-            json.dump(events_json(song), sys.stdout, ensure_ascii=False, indent=1)
+            try:
+                events = events_json(song)
+            except (NotationError, ValueError) as e:
+                print(f"{source}: {tr('errore')}: {e}", file=sys.stderr)
+                status = 1
+                continue
+            json.dump(events, sys.stdout, ensure_ascii=False, indent=1)
             print()
         else:
             if check_quiet(song):
@@ -157,7 +172,7 @@ def _mtxt_to_midi(source: str, path: str) -> int:
         with open(source, encoding="utf-8") as f:
             text = f.read()
         mtxt_to_midi(text, path)
-    except OSError as e:
+    except (OSError, UnicodeDecodeError) as e:
         print(f"{source}: {e}", file=sys.stderr)
         return 2
     except MtxtError as e:

@@ -493,3 +493,55 @@ def test_legato_note_ends_where_the_same_pitch_starts_again(body):
 
 def test_unison_voices_sound_the_longer_note_once():
     assert _note_messages("4: { 2c ; c }") == [(0, 0x90, 60), (960, 0x80, 60)]
+
+
+# ------------------------------------------------------------------ trasposizione del testo: accordi e sigle
+
+def _chord_roots(text):
+    from st_language.chords import parse_chord_symbol, voice_chord
+    piano = st.read_song("Piano:\n  4: c\n").tracks[0].instrument
+    return [voice_chord(parse_chord_symbol(e.symbol), e.octave, piano)[0]
+            for e in st.parse(text) if e.kind == "chord"]
+
+
+@pytest.mark.parametrize("semitones", [1, -1, 2, 12, -7])
+def test_transposed_chords_sound_the_same_interval_higher(semitones):
+    from st_language.notation import tokenize, transpose_tokens
+    text = "4: B*3 C*4 Cb B# Bb7 G/B Cmaj7.drop2 F#m*5"
+    moved = " ".join(transpose_tokens(tokenize(text), semitones, 4))
+    assert _chord_roots(moved) == [n + semitones for n in _chord_roots(text)]
+
+
+def test_transposed_text_moves_the_chord_symbols_too():
+    from st_language.notation import tokenize, transpose_tokens
+    assert transpose_tokens(tokenize("$C7 $G/B c"), 2, 4) == ["$D7", "$A/C#", "d*4"]
+
+
+def test_default_instrument_changed_in_one_song_stays_in_that_song():
+    song = st.read_song("Piano:\n  4: c\n")
+    song.tracks[0].instrument.default_octave = 2
+    assert st.read_song("Piano:\n  4: c\n").tracks[0].instrument.default_octave == 4
+
+
+# ------------------------------------------------------------------ comandi da terminale: casi d'errore
+
+def test_cli_events_reports_a_syntax_error(tmp_path, capsys):
+    from st_language.cli import main
+    path = tmp_path / "brano.st"
+    path.write_text("Piano:\n  4: c d xyz f\n", encoding="utf-8")
+    assert main(["events", str(path)]) == 1
+    assert "xyz" in capsys.readouterr().err
+
+
+def test_cli_tempo_accepts_decimals(tmp_path):
+    from st_language.cli import main
+    path = tmp_path / "brano.st"
+    path.write_text("Piano:\n  4: c d\n", encoding="utf-8")
+    assert main(["midi", "--tempo", "72.5", str(path), "-o", str(tmp_path / "x.mid")]) == 0
+
+
+def test_cli_file_that_is_not_utf8_is_an_error_not_a_crash(tmp_path):
+    from st_language.cli import main
+    path = tmp_path / "brano.st"
+    path.write_bytes(b"\xff\xfe\x00bin")
+    assert main(["check", str(path)]) == 2
