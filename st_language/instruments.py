@@ -6,12 +6,17 @@ dicono al motore di voicing come scrivere un accordo per uno strumento
 
 Gli strumenti predefiniti sono Piano, Guitar, Bass, Trumpet e Drums; ogni
 altro nome si risolve con instrument_for() (alias come 'electric_bass',
-'violin', 'drum_kit', o un nome General MIDI come 'Alto Sax').
+'violin', 'drum_kit', anche in italiano, francese e spagnolo come 'flauto',
+'violoncelle', 'batería', o un nome General MIDI come 'Alto Sax').
 """
 
+import difflib
 import re
+import unicodedata
 from dataclasses import dataclass, replace
 from typing import Dict, Optional
+
+from ._i18n import tr
 
 # Mappa percussioni -> nota MIDI standard (General MIDI Drum Map, canale 10).
 # Ordine = ordine di assegnazione ai tasti in "Suona con la tastiera" (vedi
@@ -223,6 +228,9 @@ class InstrumentProfile:
     # (tromba in Si bemolle -2: suona un tono sotto lo scritto). Vale solo
     # per la partitura; il testo si scrive in suoni reali.
     transposition: int = 0
+    # 2.11: False se il nome non e' uno strumento noto (suona come
+    # pianoforte, e chi legge il brano lo segnala: vedi suggest_instrument)
+    resolved: bool = True
 
 
 # Strumenti iniziali richiesti dall'MVP (sezione 8 delle specifiche)
@@ -279,7 +287,95 @@ INSTRUMENT_TYPE_ALIASES = {
     "sitar": 104, "banjo": 105, "steel_drums": 114,
 }
 
-PERCUSSION_TYPE_ALIASES = {"drum_kit", "drums", "percussion", "drumkit"}
+# 2.11: i nomi in italiano, francese e spagnolo, senza accenti (vedi
+# normalize_instrument_name), con i plurali e le varianti comuni. 'alto'
+# (la viola in francese) manca apposta: resta il sax contralto di prima.
+INSTRUMENT_TYPE_ALIASES.update({
+    # italiano
+    "pianoforte": 0, "chitarra_classica": 24, "chitarra": 25, "chitarra_acustica": 25,
+    "chitarra_elettrica": 27, "basso": 33, "basso_elettrico": 33, "basso_acustico": 32,
+    "violino": 40, "violini": 40, "viole": 41, "violoncello": 42, "violoncelli": 42,
+    "contrabbasso": 43, "archi": 48, "arpa": 46, "timpano": 47, "tromba": 56, "trombe": 56,
+    "tromboni": 57, "corno": 60, "corni": 60, "ottoni": 61, "sax_contralto": 65,
+    "sassofono": 65, "sax_tenore": 66, "fagotto": 70, "clarinetto": 71, "ottavino": 72,
+    "flauto": 73, "flauti": 73, "flauto_dolce": 74, "organo": 16, "organo_da_chiesa": 19,
+    "fisarmonica": 21, "armonica": 22, "vibrafono": 11, "xilofono": 13, "campanelli": 9,
+    "coro": 52, "voce": 53, "tappeto": 88,
+    # francese
+    "guitare_classique": 24, "guitare": 25, "guitare_acoustique": 25, "guitare_electrique": 27,
+    "basse": 33, "basse_electrique": 33, "basse_acoustique": 32, "violon": 40, "violons": 40,
+    "violoncelle": 42, "contrebasse": 43, "cordes": 48, "harpe": 46, "timbales": 47,
+    "trompette": 56, "cor": 60, "cuivres": 61, "saxophone_alto": 65, "saxophone_tenor": 66,
+    "hautbois": 68, "basson": 70, "clarinette": 71, "flute_a_bec": 74, "orgue": 16,
+    "orgue_d_eglise": 19, "accordeon": 21, "vibraphone": 11, "xylophone": 13, "choeur": 52,
+    "voix": 53, "nappe": 88,
+    # spagnolo
+    "guitarra_clasica": 24, "guitarra": 25, "guitarra_acustica": 25, "guitarra_electrica": 27,
+    "bajo": 33, "bajo_electrico": 33, "bajo_acustico": 32, "violines": 40, "violonchelo": 42,
+    "chelo": 42, "contrabajo": 43, "cuerdas": 48, "trompeta": 56, "trombon": 57, "trompa": 60,
+    "metales": 61, "saxo_alto": 65, "saxo_tenor": 66, "fagot": 70, "clarinete": 71,
+    "flautin": 72, "flauta": 73, "flauta_dulce": 74, "organo_de_iglesia": 19, "acordeon": 21,
+    "voz": 53, "colchon": 88,
+})
+
+PERCUSSION_TYPE_ALIASES = {"drum_kit", "drums", "percussion", "drumkit",
+                           "batteria", "percussioni", "batterie", "percussions", "bateria", "percusion"}
+
+# Le corrispondenze parziali con i nomi General MIDI ('alto' -> 'Alto Sax')
+# valgono solo da questa lunghezza: un nome corto ne trova di sbagliate
+# ('pan' e' dentro 'timpani', 'cor' dentro 'accordion').
+MIN_PARTIAL_MATCH = 4
+
+
+def normalize_instrument_name(text: str) -> str:
+    """Il nome di uno strumento come chiave degli alias: minuscole, senza
+    accenti (anche le legature: 'chœur' -> 'choeur'), ogni carattere che non
+    e' una lettera o una cifra diventa '_' ('Flûte à bec' -> 'flute_a_bec')."""
+    text = text.strip().lower().replace("œ", "oe").replace("æ", "ae")
+    text = "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+
+
+def _gm_keys():
+    return [(p, normalize_instrument_name(gm_name)) for p, gm_name, _family in gm_instrument_catalog()]
+
+
+def _gm_program_for(key: str) -> Optional[int]:
+    """Il programma General MIDI del nome: prima il nome esatto, poi il
+    primo che lo contiene, nell'ordine dei programmi (solo per le chiavi di
+    almeno MIN_PARTIAL_MATCH caratteri)."""
+    gm = _gm_keys()
+    for p, norm in gm:
+        if norm == key:
+            return p
+    if len(key) >= MIN_PARTIAL_MATCH:
+        for p, norm in gm:
+            if key in norm:
+                return p
+    return None
+
+
+def suggest_instrument(name: str) -> Optional[str]:
+    """Il nome noto piu' simile a name (alias, predefiniti, nomi General
+    MIDI), per l'avviso su uno strumento sconosciuto; None se non ce n'e'
+    uno abbastanza vicino."""
+    candidates = {normalize_instrument_name(n): n for n in DEFAULT_INSTRUMENTS}
+    candidates.update({k: k for k in INSTRUMENT_TYPE_ALIASES})
+    candidates.update({k: k for k in PERCUSSION_TYPE_ALIASES})
+    candidates.update({normalize_instrument_name(n): n for _p, n, _f in gm_instrument_catalog()})
+    found = difflib.get_close_matches(normalize_instrument_name(name), list(candidates), n=1, cutoff=0.75)
+    return candidates[found[0]] if found else None
+
+
+def unknown_instrument_message(name: str) -> str:
+    """L'avviso per uno strumento che non si conosce (InstrumentProfile.resolved
+    falso), tradotto, con il nome noto piu' simile se ce n'e' uno: lo usano
+    il lettore dei file (Song.file_warnings) e l'editor di SoundText."""
+    message = tr("«{name}» non e' uno strumento noto: suona come pianoforte", name=name)
+    suggestion = suggest_instrument(name)
+    if suggestion:
+        message += ". " + tr("Forse intendevi «{suggestion}»?", suggestion=suggestion)
+    return message
 
 
 def resolve_instrument_type(type_name: str, name: str) -> InstrumentProfile:
@@ -287,7 +383,7 @@ def resolve_instrument_type(type_name: str, name: str) -> InstrumentProfile:
     testuale (es. 'electric_bass', 'drum_kit', 'trumpet'), usato dal formato
     progetto per i blocchi 'Instrument Nome: type: ...'. Applica gli stessi
     valori suggeriti per famiglia usati dalla GUI (ottava/estensione/voicing)."""
-    key = type_name.strip().lower().replace(" ", "_").replace("-", "_")
+    key = normalize_instrument_name(type_name)
 
     if key in PERCUSSION_TYPE_ALIASES:
         return InstrumentProfile(name=name, gm_program=0, is_percussion=True,
@@ -296,14 +392,10 @@ def resolve_instrument_type(type_name: str, name: str) -> InstrumentProfile:
 
     program = INSTRUMENT_TYPE_ALIASES.get(key)
     if program is None:
-        # fallback: cerca una corrispondenza tra i nomi General MIDI ufficiali
-        for p, gm_name, _family in gm_instrument_catalog():
-            norm = re.sub(r"[^a-z0-9]+", "_", gm_name.lower()).strip("_")
-            if norm == key or norm.startswith(key) or key in norm:
-                program = p
-                break
-    if program is None:
-        program = 0  # fallback finale: pianoforte
+        program = _gm_program_for(key)
+    resolved = program is not None
+    if not resolved:
+        program = 0  # fallback finale: pianoforte (chi legge il brano lo segnala)
 
     family = gm_family_for_program(program)
     defaults = GM_FAMILY_DEFAULTS.get(family, {})
@@ -316,6 +408,7 @@ def resolve_instrument_type(type_name: str, name: str) -> InstrumentProfile:
         range_high=defaults.get("range_high", 88),
         polyphonic=defaults.get("polyphonic", True),
         voicing_style=defaults.get("voicing_style", "spread"),
+        resolved=resolved,
     )
 
 

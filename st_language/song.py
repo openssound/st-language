@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import Dict, List, Optional
 
-from .instruments import DEFAULT_INSTRUMENTS, InstrumentProfile, instrument_for
+from .instruments import DEFAULT_INSTRUMENTS, InstrumentProfile, instrument_for, unknown_instrument_message
 from ._i18n import tr
 from .notation import (Event, Meter, NotationError, Pattern, COMMENT_MARK, parse_track_text, tokenize,
                        upgrade_midi_refs)
@@ -243,6 +243,7 @@ def read_song(text: str, name: str = "ST") -> Song:
 
     mode = None
     current_name = current_instrument = None
+    current_line = 0
     buffer: List[str] = []
 
     def flush():
@@ -259,6 +260,8 @@ def read_song(text: str, name: str = "ST") -> Song:
                 song.tracks.append(part)
             else:
                 part = song.add_track(current_name, current_instrument, body)
+                if not part.instrument.resolved:
+                    song.file_warnings.append((current_line, unknown_instrument_message(current_instrument)))
             for key, value in mixers.get(current_name, {}).items():
                 if hasattr(part, key):
                     setattr(part, key, value)
@@ -266,7 +269,7 @@ def read_song(text: str, name: str = "ST") -> Song:
 
     skip_headers = (RE_MIXER_HDR, RE_EFFECTS_HDR, RE_MASTER_CHAIN_HDR, RE_SYNTH_HDR, RE_INSTRUMENT_HDR,
                     RE_BOX_HDR, RE_AUDIO_HDR, RE_CONVERSION_HDR)
-    for raw_line in lines:
+    for number, raw_line in enumerate(lines, 1):
         line = raw_line.strip()
         if line == "":
             if mode:
@@ -358,6 +361,7 @@ def read_song(text: str, name: str = "ST") -> Song:
             if mode:
                 flush()
             current_name, current_instrument, mode = m.group(1).strip(), m.group(2), "track"
+            current_line = number
             continue
         header = short_track_header(line, _instrument_names(song))
         if header:
@@ -365,7 +369,7 @@ def read_song(text: str, name: str = "ST") -> Song:
                 flush()
             instr, idx = header
             current_name = f"{instr} {idx}".strip() if idx else instr
-            current_instrument, mode = instr, "track"
+            current_instrument, mode, current_line = instr, "track", number
             continue
         if mode:
             buffer.append(line)

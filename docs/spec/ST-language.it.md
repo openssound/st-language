@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.10** · Implementazione di riferimento: la libreria Python
+**Versione 2.11** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -974,7 +974,14 @@ sono:
 
 Gli altri nomi si risolvono con una tabella di alias a scelta
 dell'implementazione (es. `violin`, `electric_bass`, `drum_kit`) e con i
-nomi General MIDI.
+nomi General MIDI. I nomi si confrontano senza maiuscole e accenti, e ogni
+carattere che non e' una lettera o una cifra vale `_` (`Flûte à bec` e'
+`flute_a_bec`). L'implementazione di riferimento conosce anche i nomi
+comuni in italiano, francese e spagnolo (`flauto`, `violoncelle`,
+`batería`, …); una corrispondenza parziale con un nome General MIDI
+(`alto` per Alto Sax) vuole almeno 4 caratteri. Un nome che non si
+risolve suona come programma 0 (pianoforte), e chi legge il file
+DOVREBBE avvisarlo, alla riga dell'intestazione della traccia.
 
 Uno strumento puo' essere **traspositore** (sezione 12.2,
 `trasposizione=N`): N e' il numero di semitoni fra quello che suona e
@@ -1131,7 +1138,7 @@ libero).
 
 | Riga | Significato |
 | --- | --- |
-| `ST: 2.10` | versione del linguaggio in cui e' scritto il file |
+| `ST: 2.11` | versione del linguaggio in cui e' scritto il file |
 | `Tempo: 120 BPM` | tempo (anche coi decimali: `Tempo: 101.4 BPM`) |
 | `Tempo: 1: 120, 5: 140` | tempo per battuta (battuta: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | metrica |
@@ -1416,6 +1423,19 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.11** — nomi degli strumenti (sezione 9.4): l'implementazione di
+riferimento conosce i nomi in italiano, francese e spagnolo e confronta i
+nomi senza accenti; un nome sconosciuto da' un avviso invece di diventare
+in silenzio un pianoforte; una corrispondenza parziale con un nome General
+MIDI vuole almeno 4 caratteri (`pan`, `tom` e gli altri nomi corti ora
+sono sconosciuti) e viene dopo i nomi esatti; i nomi General MIDI scritti
+per intero con le parentesi (`Acoustic Guitar (nylon)`) ora si
+riconoscono. I file dei brani non cambiano, ma una traccia il cui
+strumento prima non si riconosceva (`[Flauto]`, `[Basso]`, che diventava
+un fagotto) ora prende il suo strumento, e con lui l'ottava di base,
+l'estensione e lo stile degli accordi dello strumento: le note scritte
+senza ottava possono suonare in un'altra ottava.
 
 **2.10.2** — solo la libreria, il linguaggio non cambia; correzioni:
 - un blocco di voci `{ ; }` lungo tre battute o piu' non da' piu' un

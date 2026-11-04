@@ -25,6 +25,7 @@
  "File MIDI '&{name_path}' non trovato nella libreria MIDI": "Archivo MIDI '&{name_path}' no encontrado en la biblioteca MIDI",
  "File MTXT vuoto: manca la riga 'mtxt 1.0'": "Archivo MTXT vacío: falta la línea 'mtxt 1.0'",
  "Forcella ('<' o '>') dentro una rampa di espressione (expr=): chiudi prima la rampa": "Regulador ('<' o '>') dentro de una rampa de expresión (expr=): cierra antes la rampa",
+ "Forse intendevi «{suggestion}»?": "¿Quisiste decir «{suggestion}»?",
  "Gruppo '(' non chiuso": "Grupo '(' sin cerrar",
  "I riferimenti a file MIDI (&\"Nome\") non sono disponibili qui": "Las referencias a archivos MIDI (&\"Nombre\") no están disponibles aquí",
  "Il file e' scritto con ST {0}.{1}, questa libreria conosce la {2}.{3}: qualcosa potrebbe non essere letto": "El archivo está escrito en ST {0}.{1}, esta biblioteca conoce la {2}.{3}: puede que algo no se lea",
@@ -140,6 +141,7 @@
  "{n} tracce, nessun errore": "{n} pistas, ningún error",
  "{source}: errori di sintassi, niente esportazione (vedi st-language check)": "{source}: errores de sintaxis, no se exporta nada (ver st-language check)",
  "{value} quarti": "{value} negras",
+ "«{name}» non e' uno strumento noto: suona come pianoforte": "«{name}» no es un instrumento conocido: suena como un piano",
  "⚠  Avviso: {msg}": "⚠  Aviso: {msg}",
  "⚠  Avviso: {msg} (e altri {n})": "⚠  Aviso: {msg} (y {n} más)"
 }

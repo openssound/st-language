@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.10** · Reference implementation: the `st_language` Python
+**Version 2.11** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -944,6 +944,13 @@ style, and its General MIDI program. The built-in instruments are:
 
 Other names are resolved by an implementation-defined table of aliases
 (e.g. `violin`, `electric_bass`, `drum_kit`) and General MIDI names.
+Names are compared without case and accents, with every character that
+is not a letter or a digit read as `_` (`Flûte à bec` is `flute_a_bec`).
+The reference implementation also knows the common Italian, French and
+Spanish names (`flauto`, `violoncelle`, `batería`, …); a partial match
+with a General MIDI name (`alto` for Alto Sax) needs at least 4
+characters. A name that resolves to nothing plays as program 0 (piano),
+and readers SHOULD warn about it, at the line of the track header.
 
 An instrument may be **transposing** (section 12.2, `trasposizione=N`):
 N is the number of semitones between what it plays and what is written
@@ -1094,7 +1101,7 @@ ignored (free text).
 
 | Line | Meaning |
 | --- | --- |
-| `ST: 2.10` | version of the language the file is written in |
+| `ST: 2.11` | version of the language the file is written in |
 | `Tempo: 120 BPM` | tempo (also with decimals: `Tempo: 101.4 BPM`) |
 | `Tempo: 1: 120, 5: 140` | tempo per bar (bar: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | meter |
@@ -1358,6 +1365,18 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.11** — instrument names (section 9.4): the reference implementation
+knows the Italian, French and Spanish names and compares names without
+accents; an unknown name gives a warning instead of becoming a piano
+silently; a partial match with a General MIDI name needs at least 4
+characters (`pan`, `tom` and other short names are now unknown) and comes
+after the exact names; General MIDI names written in full with their
+parentheses (`Acoustic Guitar (nylon)`) are now recognized. Song files
+are unchanged, but a track whose instrument was not recognized before
+(`[Flauto]`, `[Basso]`, which became a bassoon) now gets its instrument,
+and with it the instrument's default octave, range and chord style: notes
+written without an octave can sound in a different octave.
 
 **2.10.2** — library only, the language is unchanged; fixes:
 - a `{ ; }` voice block three or more bars long no longer gives a false

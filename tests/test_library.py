@@ -284,7 +284,58 @@ def test_conversion_header_is_unknown_to_older_readers():
     from st_language import stfile
     line = "Conversione Voce (note):"
     assert [rx for rx in stfile._TRACK_HDR_PATTERNS if rx.match(line)] == [stfile.RE_CONVERSION_HDR]
-    assert stfile.LANGUAGE_VERSION == (2, 10)
+    assert stfile.LANGUAGE_VERSION >= (2, 10)
+
+
+@pytest.mark.parametrize("name, program", [
+    ("Flauto", 73), ("Violoncello", 42), ("Flûte", 73), ("Chitarra", 25), ("Basso", 33), ("Contrebasse", 43),
+    ("Violonchelo", 42), ("Trompeta", 56), ("Chœur", 52), ("Orgue d'église", 19), ("Flûte à bec", 74),
+    ("Sassofono", 65), ("Cor", 60),
+])
+def test_instrument_names_in_italian_french_and_spanish(name, program):
+    """2.11: i nomi degli strumenti in italiano, francese e spagnolo, anche con gli accenti."""
+    from st_language.instruments import instrument_for
+    profile = instrument_for(name)
+    assert profile.gm_program == program and profile.resolved and not profile.is_percussion
+
+
+def test_drum_names_and_english_names_as_before():
+    from st_language.instruments import instrument_for
+    for name in ("Batteria", "Batería", "Percussions", "drum_kit"):
+        assert instrument_for(name).is_percussion
+    # i nomi inglesi danno lo stesso programma di prima ('Alto' resta il sax contralto)
+    before = {"Alto": 65, "sax": 65, "violin": 40, "muted": 28, "steel": 25, "String": 44, "strings": 48,
+              "Horn": 60, "Synth": 38, "Marimba": 12, "Piccolo": 72, "Choir": 52, "Alto Sax": 65}
+    assert {name: instrument_for(name).gm_program for name in before} == before
+    # i nomi General MIDI con le parentesi ora si riconoscono
+    assert instrument_for("Acoustic Guitar (nylon)").gm_program == 24
+
+
+def test_unknown_instrument_warns_with_a_suggestion(tmp_path):
+    from st_language.instruments import instrument_for, suggest_instrument
+    for name in ("Xyzzy", "Pan", "Tom"):              # niente corrispondenze parziali sotto i 4 caratteri
+        profile = instrument_for(name)
+        assert profile.gm_program == 0 and profile.resolved is False
+    assert instrument_for("Piano").resolved and suggest_instrument("Flautoo") == "flauto"
+    assert suggest_instrument("Xyzzy") is None
+    from st_language.instruments import unknown_instrument_message
+    assert unknown_instrument_message("Flautoo").endswith("«flauto»?")
+    text = "Traccia Melodia [Flautoo]:\n  c d e\n\nTraccia Voci [Coro]:\n  c\n\nTraccia X [Xyzzy]:\n  c\n"
+    song = st.read_song(text)
+    assert [line for line, _ in song.file_warnings] == [1, 7]
+    assert "«flauto»" in song.file_warnings[0][1] and "«" not in song.file_warnings[1][1].split(":", 1)[1]
+    cwd = _isolated_copy(tmp_path)
+    (cwd / "brano.st").write_text(text, encoding="utf-8")
+    out = _run(["-m", "st_language", "check", "brano.st", "--lang", "it"], cwd)
+    assert out.returncode == 0
+    assert ("brano.st:1: avviso: «Flautoo» non e' uno strumento noto: suona come pianoforte. "
+            "Forse intendevi «flauto»?") in out.stdout
+
+
+def test_examples_have_known_instruments():
+    for name in os.listdir(os.path.join(ROOT, "examples")):
+        song = st.load_song(os.path.join(ROOT, "examples", name))
+        assert song.file_warnings == [] and all(t.instrument.resolved for t in song.tracks)
 
 
 def test_plain_notation_file_is_a_one_track_song(tmp_path):
