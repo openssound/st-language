@@ -1366,6 +1366,12 @@ version if it gives the same result for every case.
 
 ## Appendix A: changes
 
+**2.11.1** — library only, the language is unchanged: more instrument
+names in Italian, French and Spanish (section 9.4), such as
+`clavicembalo` and `clavecin` (harpsichord), `corno_inglese`, `cornamusa`,
+`flauto_di_pan`, `sax_soprano`, `pianoforte_elettrico`. Only names that
+were unknown in 2.11 change.
+
 **2.11** — instrument names (section 9.4): the reference implementation
 knows the Italian, French and Spanish names and compares names without
 accents; an unknown name gives a warning instead of becoming a piano

@@ -1424,6 +1424,12 @@ caso.
 
 ## Appendice A: modifiche
 
+**2.11.1** — solo la libreria, il linguaggio non cambia: altri nomi di
+strumenti in italiano, francese e spagnolo (sezione 9.4), come
+`clavicembalo` e `clavecin` (clavicembalo), `corno_inglese`,
+`cornamusa`, `flauto_di_pan`, `sax_soprano`, `pianoforte_elettrico`.
+Cambiano solo i nomi che nella 2.11 erano sconosciuti.
+
 **2.11** — nomi degli strumenti (sezione 9.4): l'implementazione di
 riferimento conosce i nomi in italiano, francese e spagnolo e confronta i
 nomi senza accenti; un nome sconosciuto da' un avviso invece di diventare

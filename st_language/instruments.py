@@ -318,6 +318,45 @@ INSTRUMENT_TYPE_ALIASES.update({
     "voz": 53, "colchon": 88,
 })
 
+# 2.11.1: altri nomi comuni che finivano nel pianoforte (clavicembalo e
+# gli strumenti General MIDI che mancavano nelle tre lingue). Non hanno un
+# programma General MIDI, e restano sconosciuti, mandolino, ukulele e il
+# generico sintetizzatore.
+INSTRUMENT_TYPE_ALIASES.update({
+    # clavicembalo
+    "clavicembalo": 6, "cembalo": 6, "clavecin": 6, "clave": 6,
+    # pianoforte elettrico
+    "pianoforte_elettrico": 4, "piano_elettrico": 4, "piano_electrique": 4, "piano_electrico": 4,
+    # carillon, campane tubolari
+    "carillon": 10, "boite_a_musique": 10, "caja_de_musica": 10,
+    "campane_tubolari": 14, "campane": 14, "cloches_tubulaires": 14, "campanas_tubulares": 14, "campanas": 14,
+    # organo Hammond, bandoneon
+    "hammond": 16, "organo_hammond": 16, "orgue_hammond": 16, "organo_hammond_b3": 16,
+    "bandoneon": 23,
+    # chitarre
+    "chitarra_jazz": 26, "guitare_jazz": 26, "guitarra_jazz": 26,
+    "chitarra_distorta": 30, "guitare_saturee": 30, "guitarra_distorsionada": 30,
+    # bassi
+    "basso_fretless": 35, "basse_fretless": 35, "bajo_fretless": 35,
+    "basso_synth": 38, "basse_synthe": 38, "bajo_sintetizado": 38,
+    # archi
+    "archi_tremolo": 44, "cordes_tremolo": 44, "cuerdas_tremolo": 44,
+    "pizzicato": 45, "archi_pizzicato": 45, "cordes_pizzicato": 45, "cuerdas_pizzicato": 45,
+    "arpa_celtica": 46, "harpe_celtique": 46,
+    # ottoni
+    "tromba_con_sordina": 59, "tromba_sordina": 59, "trompette_bouchee": 59, "trompeta_con_sordina": 59,
+    # sassofoni
+    "sax_soprano": 64, "saxophone_soprano": 64, "saxo_soprano": 64,
+    "sax_alto": 65, "sax_tenor": 66,
+    "sax_baritono": 67, "saxophone_baryton": 67, "saxo_baritono": 67,
+    # ance
+    "corno_inglese": 69, "cor_anglais": 69, "corno_ingles": 69,
+    # fiati
+    "flauto_di_pan": 75, "flute_de_pan": 75, "flauta_de_pan": 75,
+    "fischio": 78, "sifflet": 78, "silbido": 78,
+    "cornamusa": 109, "zampogna": 109, "cornemuse": 109, "gaita": 109,
+})
+
 PERCUSSION_TYPE_ALIASES = {"drum_kit", "drums", "percussion", "drumkit",
                            "batteria", "percussioni", "batterie", "percussions", "bateria", "percusion"}
 

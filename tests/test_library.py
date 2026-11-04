@@ -291,6 +291,11 @@ def test_conversion_header_is_unknown_to_older_readers():
     ("Flauto", 73), ("Violoncello", 42), ("Flûte", 73), ("Chitarra", 25), ("Basso", 33), ("Contrebasse", 43),
     ("Violonchelo", 42), ("Trompeta", 56), ("Chœur", 52), ("Orgue d'église", 19), ("Flûte à bec", 74),
     ("Sassofono", 65), ("Cor", 60),
+    # 2.11.1
+    ("Clavicembalo", 6), ("Clavecín", 6), ("Cembalo", 6), ("Pianoforte_elettrico", 4), ("Carillon", 10),
+    ("Campane_tubolari", 14), ("Hammond", 16), ("Bandoneón", 23), ("Basso_fretless", 35), ("Pizzicato", 45),
+    ("Sax_soprano", 64), ("Sax_baritono", 67), ("Corno_inglese", 69), ("Cor_anglais", 69),
+    ("Tromba_con_sordina", 59), ("Flauto_di_Pan", 75), ("Flûte_de_Pan", 75), ("Cornamusa", 109), ("Gaita", 109),
 ])
 def test_instrument_names_in_italian_french_and_spanish(name, program):
     """2.11: i nomi degli strumenti in italiano, francese e spagnolo, anche con gli accenti."""
