@@ -901,6 +901,74 @@ L'espansione inserisce eventi di durata nulla di tipo `navigation` con
 alla coda (`ds_coda`: "D.S. al Coda"); nella ripresa solo il `fine`
 finale, oppure il `tocoda` e il `coda` dove comincia la coda.
 
+### 8.12 Trasformazioni dei pattern
+
+Un riferimento puo' essere seguito da **funzioni** che trasformano il
+pattern (2.12), scritte senza spazi dopo il nome: `%Tema.invert`,
+`%Motivo.sequence(3,-1)`. Le funzioni lavorano sugli eventi del pattern
+svolto, si applicano da sinistra a destra e si possono alternare a `+N` in
+qualunque punto della catena: `%Tema.invert(e*5).retro+5` e' l'inversione,
+poi il retrogrado, poi la trasposizione. `3%Tema.retro` ripete il
+risultato di tutta la catena.
+
+```
+riferimento := [ripetizioni] "%" nome passo*
+passo       := ("+" | "-") intero | "." funzione [ "(" argomento ("," argomento)* ")" ]
+```
+
+Ogni funzione ha un nome inglese e un alias italiano, senza distinzione
+fra maiuscole e minuscole. Un argomento si puo' omettere solo se la
+tabella lo dice.
+
+| Funzione | Alias | Argomenti | Effetto | Durata |
+| --- | --- | --- | --- | --- |
+| `.octave(n)` | `.ottava(n)` | n: intero | ogni altezza si sposta di n ottave, come `+12n` | uguale |
+| `.invert(asse)` | `.inverti(asse)` | asse: una nota, facoltativa | inversione cromatica: l'altezza p diventa 2 × asse − p; senza asse, la prima altezza del pattern (di un blocco, la nota piu' bassa) | uguale |
+| `.step(n)` | `.grado(n)` | n: intero | trasposizione diatonica: n gradi nella scala della tonalita' di riferimento | uguale |
+| `.augment(k)` | `.aumenta(k)` | k: numero > 0 | ogni durata e posizione × k | × k |
+| `.diminish(k)` | `.diminuisci(k)` | k: numero > 0 | ogni durata e posizione ÷ k | ÷ k |
+| `.retro` | `.retrogrado` | | gli eventi in ordine inverso | uguale |
+| `.sequence(n,passo)` | `.progressione(n,passo)` | n: intero ≥ 1, passo: intero | il pattern n volte, la presentazione k (da 0) spostata di k × passo gradi, come con `.step` | × n |
+| `.vel(x)` | `.vel(x)` | x: `+N` o `-N` (relativa, limitata a 1-127), `1`-`127` o una dinamica (assoluta) | cambia la velocity degli eventi che suonano; le automazioni non cambiano | uguale |
+
+Una nota come argomento si scrive come nella notazione (`e*5`, `bb*3`);
+senza ottava prende l'ottava predefinita.
+
+**Tonalita' di riferimento** (`.step`, `.sequence`): il `key=` scritto nel
+pattern per ogni nota; altrimenti il `key=` in vigore nel punto del
+riferimento; altrimenti la `Tonalita:` in vigore nella sua battuta;
+altrimenti Do maggiore, con un avviso. Una trasposizione (`+N`,
+`transpose=`) sposta con se' la tonalita' di riferimento.
+
+**Note fuori scala:** conservano l'alterazione. Una nota e' il suo grado
+piu' uno scarto: il grado si sposta e lo scarto resta (`c#` in Do maggiore
+un grado sopra e' `d#`, e `c` in Re maggiore un grado sopra e' `db`).
+
+**Accordi scritti come simbolo** con `.step` e `.sequence`: la
+fondamentale si sposta nella scala, e cosi' il basso. Un accordo della
+scala (triade o settima) prende la qualita' del nuovo grado (in Do
+maggiore `C` → `Dm`, `Cmaj7` → `Dm7`, `G7` → `Am7`); gli altri conservano
+la loro, con un avviso.
+
+**Che altro si muove.** Pause e percussioni seguono le funzioni sul tempo
+e sull'ordine e non cambiano con quelle sulle altezze. `.retro` lascia
+velocity, segni e testo sul loro evento (con un avviso per il testo),
+scambia i due estremi di una legatura di portamento e tiene un abbellimento
+prima della sua nota. Un risultato a piu' voci si tratta voce per voce.
+
+**Stato.** Come per ogni riferimento (sezione 8.2), quello che un pattern
+trasformato scrive non resta in vigore dopo di lui. I controlli di battuta
+scritti nel pattern non si verificano.
+
+**Errori.** Una funzione sconosciuta (l'errore suggerisce il nome piu'
+vicino), un argomento mancante, in piu' o sbagliato, uno spazio fra le
+parentesi, un'altezza fuori da MIDI 0-127, una durata piu' breve di
+`'128`, `.invert` su un simbolo d'accordo o senza altezze e senza asse,
+una legatura che entra nel riferimento, `bar=N` e i segni di navigazione
+nel pattern, `tempo=` nel pattern con `.augment`, `.diminish`, `.retro` o
+`.sequence`, slide, automazioni e pedale nel pattern con `.retro`. Una
+funzione fuori da un riferimento a un pattern (`C.retro`) e' un errore.
+
 ---
 
 ## 9. Accordi e percussioni
@@ -1446,6 +1514,9 @@ spostamento) finisce con lui, a ogni ripetizione (sezione 8.2). Cambia il
 significato di un testo valido, la prima volta che succede di proposito; i
 file che dichiarano una versione piu' vecchia, o nessuna, conservano il
 loro suono (sezione 12.1), e `st-language upgrade` li converte.
+Trasformazioni dei pattern: `.octave`, `.invert`, `.step`, `.augment`,
+`.diminish`, `.retro`, `.sequence` e `.vel` (sezione 8.12). Un file che le
+usa dichiara `ST: 2.12`.
 
 **2.11.1** — solo la libreria, il linguaggio non cambia: altri nomi di
 strumenti in italiano, francese e spagnolo (sezione 9.4), come

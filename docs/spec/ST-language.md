@@ -874,6 +874,72 @@ The expansion inserts zero-length events of kind `navigation` with
 at the coda (`ds_coda`: "D.S. al Coda"); on the way back only the final
 `fine`, or the `tocoda` and the `coda` where the coda starts.
 
+### 8.12 Pattern transformations
+
+A reference can be followed by **functions** that transform the pattern
+(2.12), written with no spaces after its name: `%Tema.invert`,
+`%Motivo.sequence(3,-1)`. Functions work on the events of the expanded
+pattern, are applied from left to right, and may be mixed with `+N`
+anywhere in the chain: `%Tema.invert(e*5).retro+5` is the inversion, then
+the retrograde, then the transposition. `3%Tema.retro` repeats the result
+of the whole chain.
+
+```
+reference := [count] "%" name step*
+step      := ("+" | "-") integer | "." function [ "(" argument ("," argument)* ")" ]
+```
+
+Each function has an English name and an Italian alias, compared without
+regard to case. An argument may be left out only if the table says so.
+
+| Function | Alias | Arguments | Effect | Duration |
+| --- | --- | --- | --- | --- |
+| `.octave(n)` | `.ottava(n)` | n: integer | every pitch moves by n octaves, like `+12n` | same |
+| `.invert(axis)` | `.inverti(axis)` | axis: a note, optional | chromatic inversion: pitch p becomes 2 × axis − p; without an axis, the first pitch of the pattern (of a block, its lowest note) | same |
+| `.step(n)` | `.grado(n)` | n: integer | diatonic transposition: n degrees in the scale of the reference key | same |
+| `.augment(k)` | `.aumenta(k)` | k: number > 0 | every duration and position × k | × k |
+| `.diminish(k)` | `.diminuisci(k)` | k: number > 0 | every duration and position ÷ k | ÷ k |
+| `.retro` | `.retrogrado` | | the events in reverse order | same |
+| `.sequence(n,step)` | `.progressione(n,step)` | n: integer ≥ 1, step: integer | the pattern n times, presentation k (from 0) moved by k × step degrees, as with `.step` | × n |
+| `.vel(x)` | `.vel(x)` | x: `+N` or `-N` (relative, limited to 1-127), `1`-`127` or a dynamic (absolute) | changes the velocity of sounding events; automations are not touched | same |
+
+A note argument is written as in the notation (`e*5`, `bb*3`); without an
+octave it takes the default octave.
+
+**Reference key** (`.step`, `.sequence`): the `key=` written in the
+pattern for each note; otherwise the `key=` in force at the reference;
+otherwise the `Tonalita:` in force at the bar of the reference; otherwise
+C major, with a warning. A transposition (`+N`, `transpose=`) moves the
+reference key with it.
+
+**Notes outside the scale** keep their alteration: a note is its degree
+with an offset, the degree moves and the offset stays (`c#` in C major one
+degree up is `d#`, and `c` in D major one degree up is `db`).
+
+**Chord symbols** with `.step` and `.sequence`: the root moves in the
+scale, the bass too. A chord of the scale (triad or seventh) takes the
+quality of the new degree (in C major `C` → `Dm`, `Cmaj7` → `Dm7`, `G7` →
+`Am7`); any other keeps its quality, with a warning.
+
+**What else moves.** Rests and percussion follow the functions on time
+and order and are not changed by those on pitch. `.retro` keeps velocity,
+marks and lyrics on their event (with a warning for lyrics), swaps the two
+ends of a slur, and keeps a grace note before its note. A multi-part
+result is treated voice by voice.
+
+**State.** As with any reference (section 8.2), nothing a transformed
+pattern writes stays in force after it. The bar checks written in the
+pattern are not checked.
+
+**Errors.** An unknown function (the error suggests the nearest name), a
+missing, extra or wrong argument, a space inside the parentheses, a pitch
+outside MIDI 0-127, a duration shorter than `'128`, `.invert` on a chord
+symbol or with no pitch and no axis, a tie or slur that enters the
+reference, `bar=N` and navigation signs in the pattern, `tempo=` in the
+pattern with `.augment`, `.diminish`, `.retro` or `.sequence`, slides,
+automations and pedal in the pattern with `.retro`. A function outside a
+pattern reference (`C.retro`) is an error.
+
 ---
 
 ## 9. Chords and drums
@@ -1385,7 +1451,9 @@ version if it gives the same result for every case.
 with it, at each repetition (section 8.2). This is a change to the
 meaning of valid text, the first one made on purpose; files that declare
 an older version, or none, keep their sound (section 12.1), and
-`st-language upgrade` converts them.
+`st-language upgrade` converts them. Pattern transformations: `.octave`,
+`.invert`, `.step`, `.augment`, `.diminish`, `.retro`, `.sequence` and
+`.vel` (section 8.12). A file that uses them declares `ST: 2.12`.
 
 **2.11.1** — library only, the language is unchanged: more instrument
 names in Italian, French and Spanish (section 9.4), such as

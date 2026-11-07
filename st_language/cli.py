@@ -67,7 +67,8 @@ def check(song: Song, source: Optional[str] = None) -> int:
             print(f"{part.name}: {tr('errore')}: {msg}")
             continue
         for w in notation_warnings(part.text, song.patterns, song.time_sig, song.metrica_changes,
-                                   default_octave=part.instrument.default_octave, pickup=song.pickup):
+                                   default_octave=part.instrument.default_octave, pickup=song.pickup,
+                                   key=song.key, key_changes=song.key_changes):
             line, col = _line_col(part.text, w.char_start)
             print(f"{part.name}:{line}:{col}: {tr('avviso')}: {w.message}")
     if not errors:

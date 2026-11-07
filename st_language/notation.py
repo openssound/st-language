@@ -727,6 +727,9 @@ class Event:
     grace: Optional[str] = None
     # Sillabe delle strofe dopo la prima (2.7, "2: ..."): {strofa: sillaba}.
     verses: Optional[Dict[int, str]] = None
+    # La tonalita' dell'evento dentro un pattern trasformato (vedi transform):
+    # c'e' solo mentre le funzioni lavorano.
+    key: Optional[str] = None
 
 
 @dataclass
@@ -863,6 +866,14 @@ class PitchRewriter:
         if tok.startswith(LYRIC_QUOTE) or tok.startswith("$") or tok in (BAR_CHECK, REPEAT_START, REPEAT_END,
                                                                             DOUBLE_BAR):
             return tok
+        from .transform import is_transform_reference
+        if is_transform_reference(tok):
+            # dopo le funzioni: l'asse di .invert(e*5) e le altre restano come sono
+            if not self.semitones:
+                return tok
+            m = re.search(r"([+-]\d+)$", tok)
+            return ((tok[:m.start()] if m else tok)
+                    + _offset_suffix(int(m.group(1) if m else 0) + self.semitones))
         if self.semitones:
             # Pattern e file MIDI richiamati: si trasportano col suffisso +N/-N
             # (le note del pattern restano com'erano, altri lo usano).
@@ -1060,6 +1071,30 @@ def upgrade_midi_refs(text: str, midi_dir: Optional[str] = None) -> str:
     return "".join(part if k % 2 else _BARE_REF_IN_TEXT.sub(repl, part) for k, part in enumerate(parts))
 
 
+def _expand_transform(tok: str, patterns: Dict[str, Pattern], midi_dir: Optional[str], default_octave: int,
+                      depth: int) -> List[str]:
+    """Un richiamo con funzioni: il pattern svolto fra due segni, xf
+    (con la trasposizione iniziale e i passi) e xe. Lo interpreta il parser,
+    che ne applica i passi agli eventi."""
+    from .transform import parse_reference
+    reference = parse_reference(tok)
+    if reference.pattern not in patterns:
+        raise NotationError(tr("Pattern '%{name}' non definito", name=reference.pattern), tok)
+    first = next(k for k, step in enumerate(reference.steps) if step.name != "transpose")
+    semitones = sum(step.args[0] for step in reference.steps[:first])
+    if not TRANSPOSE_RANGE[0] <= semitones <= TRANSPOSE_RANGE[1]:
+        raise NotationError(tr("Trasposizione fuori range ({0}..{1} semitoni)", *TRANSPOSE_RANGE), tok)
+    body = expand_patterns(patterns[reference.pattern].tokens, patterns, midi_dir, default_octave, depth + 1)
+    if any(RE_NAVIGATION.match(t) or re.search(r"(^|\s|\{)bar=\d", t) for t in body):
+        raise NotationError(tr("bar=N e i segni di navigazione non si possono trasformare"), tok)
+    # le stanghette scritte nel pattern non valgono piu' dopo le funzioni
+    body = [t for t in body if t != BAR_CHECK]
+    push = f"{_MARK}push:{semitones}" if semitones else f"{_MARK}push"
+    once = [f"{_MARK}xf:{semitones}:{tok[reference.steps[first].start:]}", push, f"{_MARK}save", *body,
+            f"{_MARK}restore", f"{_MARK}pop", f"{_MARK}xe"]
+    return once * reference.mult
+
+
 def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
                      midi_dir: Optional[str] = None, default_octave: int = 4,
                      _depth: int = 0) -> List[str]:
@@ -1067,6 +1102,11 @@ def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
         raise NotationError(tr("Riferimento a pattern o file MIDI troppo profondo o ciclico"))
     out = []
     for t in tokens:
+        if t.startswith("%") or t[:1].isdigit():
+            from .transform import is_transform_reference
+            if is_transform_reference(t):
+                out.extend(_expand_transform(t, patterns, midi_dir, default_octave, _depth))
+                continue
         m = RE_PATTERN_REF.match(t)
         if m:
             mult_s, name, offset = m.groups()
@@ -1438,6 +1478,9 @@ def _parse_atom(tok: str, default_octave: int, pitch: Optional[_PitchState] = No
         from .chords import parse_chord_symbol, ALL_VOICINGS
         parse_chord_symbol(symbol)  # valida la qualita' (solleva NotationError-compatibile)
         if voicing and voicing not in ALL_VOICINGS:
+            from .transform import is_transform_name
+            if is_transform_name(voicing):
+                raise NotationError(tr(".{name} si usa solo sui pattern (%Nome.{name})", name=voicing), tok)
             raise NotationError(
                 tr("Stile di voicing sconosciuto: '{voicing}'. Ammessi: {0}", ', '.join(sorted(ALL_VOICINGS)), voicing=voicing),
                 tok,
@@ -1545,7 +1588,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                          initial_pitch: Optional["_PitchState"] = None,
                          initial_shift: Optional[int] = None,
                          meter: Optional["Meter"] = None,
-                         origin_beat: Fraction = Fraction(0)
+                         origin_beat: Fraction = Fraction(0),
+                         record_keys: bool = False
                          ) -> Tuple[List[Event], Fraction, Fraction]:
     """Come parse_tokens, ma ritorna anche la posizione finale esatta (in
     beat, Fraction) e la griglia attiva alla fine. Griglia e posizione sono
@@ -1659,6 +1703,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
 
     def _add(ev: Event) -> Event:
         ev.voice = voice
+        if record_keys and pitch.key_name:
+            ev.key = _transpose_key_name(pitch.key_name, pitch.semitones)
         events.append(ev)
         if _sings(ev):
             lyric_targets.append(ev)
@@ -1721,9 +1767,62 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 note.slur = "start" if n == 0 else ("stop" if n == len(slur_notes) - 1 else "continue")
             slur_notes = None
 
+    def _transformed(index: int, tok: str) -> int:
+        """Interpreta il pattern fra i segni xf e xe, ne applica i passi e
+        aggiunge gli eventi al cursore; ritorna l'indice dopo xe."""
+        nonlocal cursor
+        from .transform import Context, apply_steps, parse_reference
+        depth, end = 1, index + 1
+        while depth:
+            depth += {f"{_MARK}xe": -1}.get(tokens[end], 1 if tokens[end].startswith(f"{_MARK}xf:") else 0)
+            end += 1
+        if pending_tie is not None or slur_notes is not None:
+            raise NotationError(tr("Una legatura (~ o parentesi) non puo' entrare in un pattern trasformato: "
+                                   "chiudila prima"), tok)
+        if pending_grace is not None:
+            raise NotationError(tr("Un abbellimento (d'g, d'G) va subito prima della sua nota"), tok)
+        semitones, _, chain = tok[len(_MARK) + 3:].partition(":")
+        sub_extras: Optional[dict] = {} if extras is not None else None
+        sub_events, sub_end, _ = _parse_tokens_exact(
+            tokens[index + 1:end - 1], default_octave, grid_beats, lenient, None,
+            initial_velocity=velocity, voice=voice, extras=sub_extras, pending_lyrics=[],
+            initial_controls=controls, initial_swing=swing, initial_pitch=pitch, initial_shift=shift,
+            meter=meter, origin_beat=origin_beat + cursor, record_keys=True)
+        key = pitch.key_name or (meter.key_at(origin_beat + cursor) if meter is not None else "")
+        total = pitch.semitones + int(semitones)
+        context = Context(_transpose_key_name(key, total) if key else None, default_octave, chain, total)
+        steps = parse_reference("%x" + chain).steps
+        result, length = apply_steps(sub_events, sub_end, steps, context)
+        control_ends = []
+        for ev in result:
+            ev.start = float(Fraction(ev.start).limit_denominator(10 ** 6) + cursor)
+            if not record_keys:
+                ev.key = None
+            if ev.kind == "control":
+                control_ends.append((ev.start + ev.duration, ev.name, ev.value))
+            if _sings(ev):
+                sung.append(ev)
+                if not ev.lyric:
+                    lyric_targets.append(ev)
+        for _end, name, value in sorted(control_ends, key=lambda c: c[0]):
+            controls[name] = value
+        events.extend(result)
+        cursor += length
+        if extras is not None:
+            found = context.warnings + list((sub_extras or {}).get("transform_issues", {}).values())
+            if found:
+                extras.setdefault("transform_issues", {}).setdefault(index, found[0])
+        return end
+
+    skip_until = 0
     for index, tok in enumerate(tokens):
         before = cursor
         try:
+            if index < skip_until:
+                continue
+            if tok.startswith(f"{_MARK}xf:"):
+                skip_until = _transformed(index, tok)
+                continue
             if tok == BAR_CHECK:
                 # Controllo di battuta: non suona e non sposta il cursore;
                 # se cade davvero su una stanghetta lo verifica
@@ -1863,7 +1962,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                         pending_lyrics=lyric_targets if k == 0 else None,
                         pending_verses=(sung, verse_pos) if k == 0 else None,
                         initial_controls=controls, initial_swing=swing, initial_pitch=pitch,
-                        initial_shift=shift, meter=meter, origin_beat=origin_beat + cursor)
+                        initial_shift=shift, meter=meter, origin_beat=origin_beat + cursor,
+                        record_keys=record_keys)
                     for ev in sub_events:
                         ev.start += float(cursor)
                         if ev.kind == "control":
@@ -1873,7 +1973,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     checks.append([a for t, (a, _) in zip(voice_tokens, voice_ranges) if t == BAR_CHECK])
                     # gli avvisi sul testo cantato e sulle ancore bar=N di una
                     # voce si segnalano sul blocco (il primo per tipo)
-                    for kind in ("lyric_issues", "anchor_issues"):
+                    for kind in ("lyric_issues", "anchor_issues", "transform_issues"):
                         found = (voice_extras or {}).get(kind)
                         if found:
                             extras.setdefault(kind, {}).setdefault(index, next(iter(found.values())))
@@ -2520,15 +2620,30 @@ class Meter:
     'bar=N'. Si costruisce con la metrica del brano e gli eventuali suoi
     cambi (vedi bar_starts); senza, vale il 4/4."""
 
-    def __init__(self, time_sig: str = "4/4", metrica_changes=(), pickup=0):
+    def __init__(self, time_sig: str = "4/4", metrica_changes=(), pickup=0, key: str = "", key_changes=()):
         self._gen = bar_starts(time_sig, metrica_changes, pickup)
         self._starts: List[Fraction] = []
+        self.key = key
+        self.key_changes = sorted(key_changes)
 
     def start_of(self, bar: int) -> Fraction:
         """L'inizio della battuta 'bar' (la prima e' la 1, a 0)."""
         while len(self._starts) < bar:
             self._starts.append(next(self._gen))
         return self._starts[bar - 1]
+
+    def key_at(self, beat) -> str:
+        """La tonalita' del brano (Tonalita:) in vigore a 'beat'; '' se non
+        c'e', o se non e' una tonalita' che si possa usare."""
+        key = self.key
+        for bar, name in self.key_changes:
+            if self.start_of(bar) <= beat or bar == self.key_changes[0][0]:
+                key = name
+        try:
+            key_signature_alters(key)
+        except NotationError:
+            return ""
+        return key
 
 
 _DEFAULT_METER: Optional[Meter] = None
@@ -2617,17 +2732,20 @@ def check_bar_lines(text: str, patterns: Dict[str, Pattern], time_sig: str = "4/
 
 def notation_warnings(text: str, patterns: Dict[str, Pattern], time_sig: str = "4/4",
                       metrica_changes=(), start_beat: float = 0.0, default_octave: int = 4,
-                      midi_dir: Optional[str] = None, pickup=0) -> List[BarIssue]:
+                      midi_dir: Optional[str] = None, pickup=0, key: str = "",
+                      key_changes=()) -> List[BarIssue]:
     """Gli avvisi che non impediscono di suonare il testo, in ordine di
     posizione (vedi BarIssue.kind): controlli di battuta '|' che non tornano
     (vedi check_bar_lines), ancore bar=N gia' superate, testi cantati con
-    piu' sillabe che note.
-    'pickup': quarti della battuta in levare (intestazione Levare:)."""
+    piu' sillabe che note, avvisi delle funzioni sui pattern.
+    'pickup': quarti della battuta in levare (intestazione Levare:);
+    'key' e 'key_changes': la tonalita' del brano (Tonalita:)."""
     extras: dict = {}
     offset = Fraction(start_beat).limit_denominator(1 << 16)
     try:
         raw, expanded, origins, ranges = _expanded_ranges(text, patterns, midi_dir, default_octave, extras,
-                                                          Meter(time_sig, metrica_changes, pickup), offset)
+                                                          Meter(time_sig, metrica_changes, pickup, key, key_changes),
+                                                          offset)
     except NotationError:
         return []
     grid = _BarGrid(time_sig, metrica_changes, pickup)
@@ -2666,6 +2784,9 @@ def notation_warnings(text: str, patterns: Dict[str, Pattern], time_sig: str = "
     for index, (bar, over) in extras.get("anchor_issues", {}).items():
         _, cs, ce = raw[origins[index]]
         issues.append(BarIssue(cs, ce, bar, anchor_message(bar, over), "anchor"))
+    for index, message in extras.get("transform_issues", {}).items():
+        _, cs, ce = raw[origins[index]]
+        issues.append(BarIssue(cs, ce, 0, message, "transform"))
     issues.sort(key=lambda i: i.char_start)
     return issues
 

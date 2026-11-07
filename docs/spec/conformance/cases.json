@@ -4793,6 +4793,1007 @@
    }
   },
   {
+   "id": "transform-octave",
+   "input": "%T.octave(-1) %T.ottava(1) %T.octave(1)+2",
+   "patterns": {
+    "T": "c e g"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 3
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 3
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 3
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 5
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 5
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 5
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 5
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-invert",
+   "input": "%T.invert %T.invert(e*4) %T.inverti(e)",
+   "patterns": {
+    "T": "c*4 e*4 g*4"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g#",
+      "octave": 3
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 3
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g#",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c#",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g#",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c#",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-step",
+   "input": "%T.step(2) %T.grado(-1) %T.step(7)",
+   "patterns": {
+    "T": "key=C c*4 e*4 g*4 c*5"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 5
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 3
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 5
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 5
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 6
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-step-out-of-scale",
+   "input": "%T.step(1)",
+   "patterns": {
+    "T": "key=C c#*4 f*4"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d#",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-step-chords",
+   "input": "%T.step(1)",
+   "patterns": {
+    "T": "key=C 2C 2G Cmaj7 G7 C/E"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Dm",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 2.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Am",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Dm7",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Am7",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "Dm",
+      "bass": "F",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-step-key-of-the-reference",
+   "input": "key=G %T.step(1) %T+2.step(1)",
+   "patterns": {
+    "T": "g b"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-augment-diminish",
+   "input": "%T.augment(2) %T.aumenta(1.5) %T.diminish(2)",
+   "patterns": {
+    "T": "c'8 d'8 e'4 g'2"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 4.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 0.75,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 8.75,
+      "duration": 0.75,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 9.5,
+      "duration": 1.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 11.0,
+      "duration": 3.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 14.0,
+      "duration": 0.25,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 14.25,
+      "duration": 0.25,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 14.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 15.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-retro",
+   "input": "%T.retro %T.retrogrado.retro",
+   "patterns": {
+    "T": "c( d) e'2 r kick"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "kick"
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 2.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "slur": "start"
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slur": "stop"
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "slur": "start"
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "slur": "stop"
+     },
+     {
+      "start": 8.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "kick"
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-retro-grace",
+   "input": "%T.retro",
+   "patterns": {
+    "T": "d'g c e"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "grace": "acciaccatura"
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-sequence",
+   "input": "%T.sequence(3,-1) %T.progressione(2,0)",
+   "patterns": {
+    "T": "key=C 8: c*5 d*5 e*5 c*5"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 5
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 2.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 2.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 3.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5
+     },
+     {
+      "start": 3.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 4.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 5.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 6.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5
+     },
+     {
+      "start": 7.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 5
+     },
+     {
+      "start": 7.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 8.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     },
+     {
+      "start": 8.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5
+     },
+     {
+      "start": 9.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 5
+     },
+     {
+      "start": 9.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-vel",
+   "input": "%T.vel(-30) %T.vel(p) %T.vel(90) %T.vel(+40)",
+   "patterns": {
+    "T": "100@ c d"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 70,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 70,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 49,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 49,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 90,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 90,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 127,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 127,
+      "letter": "d",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-repeat-and-state",
+   "input": "60@ 8: 2%T.retro c",
+   "patterns": {
+    "T": "4: 100@ d e"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 60,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "error-transform-unknown",
+   "input": "%T.invertt",
+   "patterns": {
+    "T": "c"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transform-space",
+   "input": "%T.sequence(3, -1)",
+   "patterns": {
+    "T": "c"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transform-argument",
+   "input": "%T.octave(x)",
+   "patterns": {
+    "T": "c"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transform-invert-chord",
+   "input": "%T.invert",
+   "patterns": {
+    "T": "C"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transform-outside-a-pattern",
+   "input": "C.retro",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transform-tempo",
+   "input": "%T.retro",
+   "patterns": {
+    "T": "tempo=90 c"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transform-slide",
+   "input": "%T.retro",
+   "patterns": {
+    "T": "c>d"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transform-bar",
+   "input": "%T.octave(1)",
+   "patterns": {
+    "T": "bar=2 c"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
    "id": "voices",
    "input": "4: { 8: c d e f ; 2g*3 } a",
    "expect": {

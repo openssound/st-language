@@ -99,7 +99,7 @@ class Song:
 
     def meter(self) -> Meter:
         """Dove cominciano le battute del brano (per le ancore bar=N)."""
-        return Meter(self.time_sig, self.metrica_changes, self.pickup)
+        return Meter(self.time_sig, self.metrica_changes, self.pickup, self.key, self.key_changes)
 
     def add_track(self, name: str, instrument="Piano", text: str = "") -> Part:
         profile = instrument if isinstance(instrument, InstrumentProfile) else self.instrument(instrument)

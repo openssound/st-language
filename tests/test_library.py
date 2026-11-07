@@ -434,6 +434,235 @@ def test_upgrade_command(tmp_path):
     assert out.returncode == 0 and "already up to date" in out.stdout
 
 
+_TRANSFORM_PATTERNS = {
+    "Tema": "4: c*4 e*4 g*4", "Scala": "key=C 4: c*4 e*4 g*4 c*5", "Ritmo": "c*4'8 d*4'8 e*4'4 g*4'2",
+    "Motivo": "key=C 8: c*5 d*5 e*5 c*5", "Giro": "key=C 4: 2C 2G", "Forte": "100@ 4: c*4 d*4 e*4 c*4",
+    "Fuori": "key=C c#*4 f*4", "Sol": "key=G f*4 g*4", "Accordi": "key=C Cmaj7 G7 C/E", "Alieno": "key=Am E7",
+    "Blocco": "key=C [c*4 e*4] d*4", "Vuoto": "r", "Slide": "c*4>d*4", "Vol": "vol=40 c", "Tempo": "tempo=90 c",
+    "Bar": "bar=2 c", "Dc": "c $dc", "Mista": "4: c*4 kick r e*4",
+}
+
+
+def _song_with(patterns=_TRANSFORM_PATTERNS):
+    song = st.Song()
+    for name, body in patterns.items():
+        song.add_pattern(name, body)
+    return song
+
+
+def _pitched(text, song=None):
+    song = song or _song_with()
+    out = []
+    for ev in st.parse(text, song.patterns):
+        if ev.kind == "note":
+            out.append(f"{ev.letter}*{ev.octave}")
+        elif ev.kind == "chord":
+            out.append(ev.symbol + (f"/{ev.bass}" if ev.bass else ""))
+    return " ".join(out)
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("%Tema.octave(-1)", "c*3 e*3 g*3"),
+    ("%Tema.ottava(1)", "c*5 e*5 g*5"),
+    ("%Tema.OCTAVE(1)", "c*5 e*5 g*5"),
+    ("%Tema.invert", "c*4 g#*3 f*3"),
+    ("%Tema.invert(e*4)", "g#*4 e*4 c#*4"),
+    ("%Tema.inverti(e)", "g#*4 e*4 c#*4"),
+    ("%Tema.invert.invert", "c*4 e*4 g*4"),
+    ("%Scala.step(2)", "e*4 g*4 b*4 e*5"),
+    ("%Scala.grado(-1)", "b*3 d*4 f*4 b*4"),
+    ("%Scala.step(7)", "c*5 e*5 g*5 c*6"),
+    ("%Fuori.step(1)", "d#*4 g*4"),
+    ("%Sol.step(1)", "g*4 a*4"),
+    ("%Giro.step(1)", "Dm Am"),
+    ("%Accordi.step(1)", "Dm7 Am7 Dm/F"),
+    ("%Alieno.step(1)", "F7"),
+    ("%Blocco.step(1)", "e*4"),
+    ("%Motivo.sequence(3,-1)", "c*5 d*5 e*5 c*5 b*4 c*5 d*5 b*4 a*4 b*4 c*5 a*4"),
+    ("%Motivo.progressione(1,5)", "c*5 d*5 e*5 c*5"),
+    ("%Giro.sequence(2,1)", "C G Dm Am"),
+    ("%Ritmo.retro", "g*4 e*4 d*4 c*4"),
+    ("%Ritmo.retrogrado.retro", "c*4 d*4 e*4 g*4"),
+    ("%Tema.octave(1)+2", "d*5 f#*5 a*5"),
+    ("%Tema+2.octave(1)", "d*5 f#*5 a*5"),
+    ("2%Tema.retro", "g*4 e*4 c*4 g*4 e*4 c*4"),
+])
+def test_transforms_change_the_pitches_as_specified(text, expected):
+    assert _pitched(text) == expected
+
+
+def test_transforms_durations_and_state():
+    song = _song_with()
+
+    def durations(text):
+        return [e.duration for e in st.parse(text, song.patterns) if e.kind == "note"]
+
+    assert durations("%Ritmo.augment(2)") == [1, 1, 2, 4]
+    assert durations("%Ritmo.aumenta(1.5)") == [0.75, 0.75, 1.5, 3]
+    assert durations("%Ritmo.diminish(2)") == [0.25, 0.25, 0.5, 1]
+    assert durations("%Ritmo.augment(2).diminuisci(2)") == durations("%Ritmo")
+    assert durations("%Ritmo.retro") == [2, 1, 0.5, 0.5]
+    # il cursore segue la durata del risultato, e lo stato resta quello di prima
+    ev = [e for e in st.parse("60@ 8: %Ritmo.augment(2) %Tema.retro c", song.patterns) if e.kind == "note"]
+    assert ev[4].start == 8 and ev[-1].start == 11 and ev[-1].duration == 0.5 and ev[-1].velocity == 60
+    assert [(e.kind, e.start) for e in st.parse("%Mista.retro", song.patterns)] == [
+        ("note", 0.0), ("rest", 1.0), ("percussion", 2.0), ("note", 3.0)]
+    assert {e.velocity for e in st.parse("%Forte.vel(-30)", song.patterns)} == {70}
+    assert {e.velocity for e in st.parse("%Forte.vel(p)", song.patterns)} == {49}
+    assert {e.velocity for e in st.parse("%Forte.vel(+40)", song.patterns)} == {127}
+    assert {e.velocity for e in st.parse("%Forte.vel(90)", song.patterns)} == {90}
+
+
+def test_retro_keeps_slurs_and_grace_notes():
+    song = _song_with({"L": "c( d e) f", "G": "d'g c e"})
+    assert [(e.letter, e.slur) for e in st.parse("%L.retro", song.patterns)] == [
+        ("f", None), ("e", "start"), ("d", "continue"), ("c", "stop")]
+    assert [(e.letter, e.grace, e.start) for e in st.parse("%G.retro", song.patterns)] == [
+        ("e", None, 0.0), ("d", "acciaccatura", 1.0), ("c", None, 1.0)]
+
+
+def test_transforms_use_the_key_of_the_song():
+    def notes(text):
+        song = st.read_song(f"ST: 2.12\n{text}\n\nPattern %M:\n  c d\n\nTraccia T [Piano]:\n  %M.step(1) %M.step(1)\n")
+        return [e.letter for e in song.tracks[0].parsed_events(song.patterns, meter=song.meter())
+                if e.kind == "note"]
+
+    assert notes("Tonalita: G") == ["d", "e", "d", "e"]
+    assert notes("Tonalita: D") == ["db", "e", "db", "e"]       # c e' fuori scala: resta alterata
+    assert notes("Tonalita: Eb") == ["d", "eb", "d", "eb"]
+    # il key= del punto del richiamo viene prima della tonalita' del brano
+    assert _pitched("key=A %M.step(1)", _song_with({"M": "c# d"})) == "d*4 e*4"
+    assert _pitched("key=Bb %M.step(2)", _song_with({"M": "c d"})) == "eb*4 f*4"
+    # la trasposizione nella catena sposta anche la scala: si resta nella tonalita'
+    assert _pitched("key=C %M+2.step(1)", _song_with({"M": "c e"})) == "e*4 g*4"
+    assert _pitched("%M+2.step(1)", _song_with({"M": "c e"})) == "e*4 g*4"
+
+
+@pytest.mark.parametrize("text, message", [
+    ("%Tema.invertt", ".invertt non esiste: forse .invert?"),
+    ("%Tema.xyzzyq", ".xyzzyq non esiste"),
+    ("%Nessuno.retro", "non definito"),
+    ("%Tema.sequence(3, -1)", "Niente spazi"),
+    ("%Tema.octave", ".octave: manca n"),
+    ("%Tema.octave(1,2)", "troppi argomenti"),
+    ("%Tema.octave(1.5)", "numero intero"),
+    ("%Tema.augment(0)", "maggiore di 0"),
+    ("%Tema.invert(h)", "deve essere una nota"),
+    ("%Tema.vel(200)", "dinamica"),
+    ("%Tema.sequence(0,1)", "da 1 in su"),
+    ("%Tema.octave(9)", "estensione MIDI"),
+    ("%Giro.invert", "non si puo' invertire"),
+    ("%Vuoto.invert", "indica l'asse"),
+    ("%Ritmo.diminish(32)", "'128"),
+    ("%Slide.retro", "slide"),
+    ("%Vol.retro", "Automazioni"),
+    ("%Tempo.retro", "tempo="),
+    ("%Tempo.augment(2)", "tempo="),
+    ("%Bar.octave(1)", "bar=N"),
+    ("%Dc.octave(1)", "navigazione"),
+    ("C.retro", "solo sui pattern"),
+    ("c~ %Tema.retro", "legatura"),
+])
+def test_transform_errors(text, message):
+    st.set_language("it")
+    try:
+        ok, error = st.validate(text, _song_with().patterns)
+    finally:
+        st.set_language(None)
+    assert not ok and message in error
+
+
+def test_transforms_warnings():
+    st.set_language("it")
+    try:
+        song = _song_with({"M": "c d", "V": "100@ c 60@ d", "L": 'c "la"', "A": "key=Am E7"})
+        messages = {t: [w.message for w in st.check(t, song.patterns)]
+                    for t in ("%M.step(1)", "%V.vel(80)", "%L.retro", "%A.step(1)", "%M.retro")}
+    finally:
+        st.set_language(None)
+    assert "Do maggiore" in messages["%M.step(1)"][0]
+    assert "velocity" in messages["%V.vel(80)"][0]
+    assert "al contrario" in messages["%L.retro"][0]
+    assert "E7" in messages["%A.step(1)"][0]
+    assert messages["%M.retro"] == []
+    assert st.check("%M.step(1)", song.patterns) and not [
+        w for w in st.check("key=C %M.step(1)", song.patterns)]
+
+
+def test_transforms_properties():
+    import random
+    from fractions import Fraction
+    from st_language.chords import pitch_to_midi
+    from st_language.transform import TRANSFORMS, duration_after, parse_reference
+    rng = random.Random(12)
+
+    def sound(text, song):
+        return sorted((e.start, e.duration, pitch_to_midi(e.letter, e.octave) if e.letter else 0, e.velocity, e.kind)
+                      for e in st.parse(text, song.patterns) if e.kind in ("note", "rest"))
+
+    for _ in range(60):
+        notes = [rng.choice("cdefgab") + rng.choice(["", "#"] if _ % 2 else [""]) + f"*{rng.randint(3, 6)}"
+                 + rng.choice(["'8", "'4", "'4.", "'2", "'8T"]) for _ in range(rng.randint(1, 8))]
+        body = "key=C " + " ".join(notes)
+        song = _song_with({"P": body, "Q": f"key=C {rng.choice(['8:', '4:'])} 90@ {body}"})
+        same = sound("%P", song)
+        assert sound("%P.retro.retro", song) == same
+        assert sound("%P.invert(c*4).invert(c*4)", song) == same
+        assert sound("%P.augment(2).diminish(2)", song) == same
+        assert sound("%P.augment(1.5).diminish(1.5)", song) == same
+        assert sound("%P.octave(1)", song) == sound("%P+12", song)
+        assert sound("%P.sequence(1,3)", song) == same
+        assert sound("%P.sequence(3,0)", song) == sound("3%P", song)
+        assert sound("%P.step(2).step(-2)", song) == same
+        assert sound("%P.step(7)", song) == sound("%P.octave(1)", song)
+        assert sound("%P.sequence(2,1)", song) == sound("%P %P.step(1)", song)
+        assert sound("%Q.vel(+7).vel(-7)", song) == sound("%Q", song)
+        # la durata dichiarata dal registro e' quella del risultato
+        for chain in ("%P.augment(1.5)", "%P.diminish(2)", "%P.sequence(3,1)", "%P.retro", "%P.vel(10)"):
+            step = parse_reference(chain).steps[0]
+            events = st.parse("%P", song.patterns)
+            length = Fraction(max(e.start + e.duration for e in events)).limit_denominator(10 ** 6)
+            after = st.parse(chain, song.patterns)
+            assert float(duration_after(step, length)) == pytest.approx(max(e.start + e.duration for e in after))
+    assert set(TRANSFORMS) == {"octave", "invert", "step", "augment", "diminish", "retro", "sequence", "vel"}
+
+
+def test_transforms_syntax_next_to_other_tokens():
+    song = _song_with()
+    assert _pitched("%Tema+5", song) == "f*4 a*4 c*5"
+    assert _pitched("c( d e) 2( %Tema.octave(1) ) { %Tema.retro ; c } e", song).startswith("c*4 d*4 e*4 c*5")
+    assert _pitched("Cmaj7.drop2", song) == "Cmaj7"
+    # un richiamo dentro un pattern, e una trasformazione del risultato
+    nested = _song_with({"A": "c*4 d*4", "B": "%A.octave(1) e*4"})
+    assert _pitched("%B.retro", nested) == "e*4 d*5 c*5"
+    # niente tracce della tonalita' negli eventi
+    assert all(e.key is None for e in st.parse("%Scala.step(1)", song.patterns))
+    # la trasposizione del testo va in fondo alla catena
+    assert st.transpose_tokens(["%Tema.invert(e*5)"], 2, 4) == ["%Tema.invert(e*5)+2"]
+    assert st.transpose_tokens(["3%Tema.retro+2"], -2, 4) == ["3%Tema.retro"]
+
+
+def test_transforms_reach_the_exports(tmp_path):
+    song = st.read_song("ST: 2.12\nTonalita: C\n\nPattern %T:\n  c e g\n\nTraccia A [Piano]:\n  %T.step(1).retro\n")
+    assert os.path.exists(st.to_midi(song, str(tmp_path / "t.mid")))
+    assert os.path.exists(st.to_musicxml(song, str(tmp_path / "t.musicxml")))
+    assert os.path.exists(st.to_abc(song, str(tmp_path / "t.abc")))
+    assert "a" in (tmp_path / "t.abc").read_text(encoding="utf-8").lower()
+
+
+def test_transforms_api_for_soundtext():
+    from st_language.transform import format_reference, list_transforms, parse_reference
+    reference = parse_reference("3%Tema.inverti(e*5).RETRO+5.vel(+10)")
+    assert (reference.pattern, reference.mult) == ("Tema", 3)
+    assert [s.name for s in reference.steps] == ["invert", "retro", "transpose", "vel"]
+    assert reference.steps[0].start == len("3%Tema") and reference.steps[0].end == len("3%Tema.inverti(e*5)")
+    assert format_reference(reference) == "3%Tema.invert(e*5).retro+5.vel(+10)"
+    assert format_reference(reference, italian=True) == "3%Tema.inverti(e*5).retrogrado+5.vel(+10)"
+    assert format_reference(parse_reference("%T.augment(1.5)")) == "%T.augment(1.5)"
+    names = {t["name"]: t for t in list_transforms()}
+    assert names["sequence"]["alias"] == "progressione" and names["invert"]["arguments"][0]["required"] is False
+
+
 def test_plain_notation_file_is_a_one_track_song(tmp_path):
     path = tmp_path / "solo.txt"
     path.write_text("8: c d e f", encoding="utf-8")
