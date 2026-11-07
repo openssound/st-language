@@ -83,6 +83,11 @@ def _resolve_event_notes(ev: Event, instrument: InstrumentProfile) -> Tuple[List
     return [], velocity
 
 
+def resolve_event_notes(ev: Event, instrument: InstrumentProfile) -> Tuple[List[int], int]:
+    """Le note MIDI e la velocity di un evento: quelle che suona lo strumento."""
+    return _resolve_event_notes(ev, instrument)
+
+
 # Automazioni (eventi "control") -> numero del control change MIDI
 CONTROL_CC = {"vol": 7, "expr": 11, "pan": 10, "mod": 1, "rev": 91, "cho": 93}
 # Una rampa diventa al piu' tanti punti, uno ogni CONTROL_STEP_TICKS almeno

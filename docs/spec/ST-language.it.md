@@ -1581,6 +1581,11 @@ caso.
 
 ## Appendice A: modifiche
 
+**2.12.1** — solo la libreria, il linguaggio non cambia: `expand_to_text` e
+`events_to_text` (richiami ed eventi scritti come testo),
+`find_references`, piu' dettagli in `list_transforms`, e lo stato di un
+punto porta anche swing, spostamento e `arp=`.
+
 **2.12** — quello che un pattern scrive (griglia, velocity, swing,
 spostamento) finisce con lui, a ogni ripetizione (sezione 8.2). Cambia il
 significato di un testo valido, la prima volta che succede di proposito; i

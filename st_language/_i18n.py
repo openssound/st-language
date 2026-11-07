@@ -7,8 +7,9 @@ traduzione}) danno l'inglese, il francese e lo spagnolo. La lingua si
 sceglie con set_language() o con la variabile d'ambiente ST_LANGUAGE
 (altrimenti LANG); senza indicazioni, l'inglese.
 
-Un programma che ha gia' le sue traduzioni (SoundText) puo' sostituire
-tr con set_translator(): tutti i messaggi passano allora da li'.
+Un programma che ha gia' le sue traduzioni (SoundText) puo' aggiungerle con
+set_translator(): tutti i messaggi passano allora da li', e quelli che non
+traduce (restano com'erano in italiano) vengono dai cataloghi della libreria.
 """
 
 import json
@@ -25,7 +26,7 @@ _catalog: Dict[str, str] = {}
 
 
 def set_translator(fn: Optional[Callable]) -> None:
-    """fn(testo_italiano, *args, **kwargs) -> testo; None torna ai cataloghi."""
+    """fn(testo_italiano, *args, **kwargs) -> testo; None torna ai soli cataloghi."""
     global _translator
     _translator = fn
 
@@ -63,9 +64,18 @@ def language() -> str:
     return _language
 
 
+def _formatted(text: str, args: tuple, kwargs: dict) -> str:
+    try:
+        return text.format(*args, **kwargs) if args or kwargs else text
+    except (IndexError, KeyError, ValueError):
+        return text
+
+
 def tr(text: str, *args, **kwargs) -> str:
     if _translator is not None:
-        return _translator(text, *args, **kwargs)
+        out = _translator(text, *args, **kwargs)
+        if out != _formatted(text, args, kwargs):
+            return out
     if _language is None:
         set_language()
     out = _catalog.get(text, text)

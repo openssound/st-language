@@ -1516,6 +1516,11 @@ version if it gives the same result for every case.
 
 ## Appendix A: changes
 
+**2.12.1** — library only, the language is unchanged: `expand_to_text` and
+`events_to_text` (references and events written as text),
+`find_references`, more details in `list_transforms`, and the state at a
+point also carries swing, shift and `arp=`.
+
 **2.12** — what a pattern writes (grid unit, velocity, swing, shift) ends
 with it, at each repetition (section 8.2). This is a change to the
 meaning of valid text, the first one made on purpose; files that declare

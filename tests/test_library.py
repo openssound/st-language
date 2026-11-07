@@ -992,6 +992,126 @@ def test_arpeggio_state_and_pattern_give_the_same_midi(tmp_path):
     assert a.read_bytes() == b.read_bytes()
 
 
+_TEXT_PATTERNS = {"A": "8: 100@ d e", "S": "swing=66 shift=5 arp=up,8 c", "R": "rel: c e g key=G f",
+                  "T": "transpose=2 c", "Z": "reset: c", "B": "c 8: d", "N": "%A f", "M": "key=C c e"}
+
+
+@pytest.mark.parametrize("text", [
+    "%A c", "2%A c", "%S [c e]'4", "%R c", "%T c", "%Z c", "rel: c %A g", "key=G %A f", "key=G %R f",
+    "transpose=3 %A c", "transpose=3 %Z c", "transpose=3 %T c", "2%B c", "3%B c", "%N c", "%A+2 c", "%R+3 c",
+    "2( %A c )", "2( %A c 16: d )", "{ %A c ; %A }", "|: %A c :| d", "%A >> c 120@ d", "%M.step(1) c",
+    "key=G %M.retro c", "2%A.retro c", "%A.canon('2,12) c", "%A | c |", "rel: c %A.octave(1) g", "c // commento\n%A d",
+    "arp=up,8 %M.retro [c e]'4", "%S.octave(1) [c e]'4",
+])
+def test_expand_to_text_keeps_the_sound(text):
+    from st_language.totext import _sound
+    song = _song_with(_TEXT_PATTERNS)
+    result = st.expand_to_text(text, song.patterns)
+    assert "%" not in result and "\x00" not in result
+    assert _sound(result, {}, 4, None) == _sound(text, song.patterns, 4, None)
+    assert st.expand_to_text(result, {}) == result
+
+
+def test_expand_to_text_details():
+    song = _song_with(_TEXT_PATTERNS)
+    assert st.expand_to_text("%A c", song.patterns) == "8: 100@ d e 4: 80@ c"
+    assert st.expand_to_text("c // resta\n%A", song.patterns) == "c // resta\n8: 100@ d e"
+    # lo stato del punto in cui comincia il testo
+    assert st.expand_to_text("%A c", song.patterns, state="16: 60@ ") == "8: 100@ d e 16: 60@ c"
+    assert st.expand_to_text("c d", {}) == "c d"
+    with pytest.raises(st.NotationError):
+        st.expand_to_text("%Nessuno", {})
+
+
+def test_events_to_text_round_trip():
+    from st_language.totext import _sound
+    texts = ["4: c d 8: e f 2g", "100@ c 60@ d", "8T: c d e 4: f", "swing=66 8: c d swing=50 e", "shift=-10 c shift=0 d",
+             "c! dx e_", "C Am7.drop2 F/A G*5", "[c e g] 2[d f]", "kick snare 2hihat", "c>d 2e>3f c>d>c", "c r 3r d",
+             "c( d e) f", "d'g c e'G f", "c$accent d$fermata", "vol=40 >> c d vol=100 e", "vol=0 >>exp c cho=20 d vol=90",
+             "SON c SOFF d", "tempo=90 c tempo=60'4. d", "$\"rit.\" c $C/E d", "c<  d>", "{ c d ; e f g }",
+             "{ 8: c d ; r e ; 2g }", "100@ >> c d 40@ e", "c'4. d'8", "c~ c d", "5c 7d"]
+    for text in texts:
+        written = st.events_to_text(st.parse(text))
+        assert _sound(written, {}, 4, None) == _sound(text, {}, 4, None), (text, written)
+    # una nota senza sillaba prima di una che ce l'ha (dopo .retro): ognuna resta la sua
+    reversed_lyrics = st.parse("%L.retro", _song_with({"L": 'c "la" d'}).patterns)
+    lyrics = [(e.letter, e.lyric) for e in st.parse(st.events_to_text(reversed_lyrics)) if e.kind == "note"]
+    assert lyrics == [("d", None), ("c", "la")]
+    assert [e.decorations for e in st.parse(st.events_to_text(st.parse("c$accent$tenuto"))) if e.kind == "note"] == [
+        ["accent", "tenuto"]]
+
+
+def test_events_to_text_after_the_functions():
+    from st_language.totext import _sound
+    song = _song_with({"T": "key=C 4: c*4 d*4 e*4 c*4", "G": "key=C 2C 2G", "D": "c'4. d'8 e'2"})
+    for text in ("%T.canon('2,12)", "%T.thirds", "%D.augment(1.5)", "%D.augment(1.3)", "%D.diminish(3)", "%G.step(1)",
+                 "%G.arpeggio(alberti,8)", "%T.canon('4.,7,3).retro", "%T.sequence(3,-1)"):
+        written = st.events_to_text(st.parse(text, song.patterns))
+        assert _sound(written, {}, 4, None) == _sound(text, song.patterns, 4, None), (text, written)
+    assert st.events_to_text(st.parse("%T.thirds", song.patterns)).startswith("{ ")
+    # le alterazioni seguono la tonalita' in vigore; griglia e velocity gia' in vigore non si riscrivono
+    assert st.events_to_text(st.parse("key=G f g fn"), key="G") == "80@ 4: f*4 g*4 fn*4"
+    assert st.events_to_text(st.parse("c d"), grid=1, velocity=80) == "c*4 d*4"
+    assert st.events_to_text(st.parse("8: c d"), grid=0.5, velocity=80) == "c*4 d*4"
+
+
+def test_find_references():
+    text = 'c %A+2.retro 2( %B ) { d ; &"x"+1 } C.arpeggio(up)$fermata "%no" // %commento\n%Tema.seq'
+    found = st.find_references(text)
+    assert [(r.kind, r.token) for r in found] == [("pattern", "%A+2.retro"), ("pattern", "%B"), ("midi", '&"x"+1'),
+                                                  ("arpeggio", ".arpeggio(up)"), ("pattern", "%Tema.seq")]
+    assert all(text[r.start:r.end] == r.token for r in found)
+    # un testo che si sta scrivendo
+    assert [r.token for r in st.find_references("2( %A %B.")] == ["%A", "%B."]
+    assert [r.token for r in st.find_references("%T.sequence(3,")] == ["%T.sequence(3,"]
+
+
+def test_list_transforms_arguments():
+    from st_language.transform import list_transforms
+    names = {t["name"]: t for t in list_transforms()}
+    voices = names["canon"]["arguments"][2]
+    assert (voices["min"], voices["max"], voices["default"], voices["type"]) == (2, 4, 2, "integer")
+    assert names["canon"]["arguments"][0]["type"] == "note_value" and names["canon"]["group"] == "voices"
+    assert names["arpeggio"]["arguments"][0]["choices"] == ["up", "down", "updown", "alberti"]
+    assert {t["group"] for t in names.values()} == {"pitch", "rhythm", "order", "voices", "chords"}
+    assert all(t["group_label"] for t in names.values())
+
+
+def test_state_at_the_point_of_a_reference():
+    from st_language.notation import context_prefix_before
+    from st_language.transform import expand_reference
+    text = "8: 100@ swing=66 shift=5 arp=up reset: 16: arp=alberti,8 swing16=60 c %T"
+    prefix = context_prefix_before(text, text.index("%T"))
+    assert prefix == "16: swing16=60 arp=alberti,8 "
+    song = _song_with({"T": "[c e g]'1 d"})
+    found = expand_reference("%T.octave(1)", song.patterns, prefix=prefix)
+    assert [e.letter for e in found.events[:4]] == ["c", "g", "e", "g"] and found.events[0].swing
+    assert found.events[-1].duration == 0.25
+
+
+def test_public_names_for_soundtext():
+    from st_language.midi import resolve_event_notes
+    from st_language.notation import pattern_state_effect, pattern_writes_state, resolve_midi_ref
+    patterns = _song_with({"A": "8: c", "B": "c"}).patterns
+    assert pattern_writes_state(patterns["A"].tokens, patterns) and not pattern_writes_state(patterns["B"].tokens, patterns)
+    assert pattern_state_effect(patterns["A"].tokens, patterns) == ({"velocity", "swing", "shift", "arp"}, {"grid": "8:"})
+    assert resolve_event_notes(st.parse("c")[0], st.Song().instrument("Piano")) == ([60], 80)
+    assert callable(resolve_midi_ref)
+
+
+def test_translator_falls_back_on_the_catalogs():
+    from st_language._i18n import set_translator, tr
+    st.set_language("en")
+    try:
+        set_translator(lambda text, *a, **k: "mio" if text == "errore" else text.format(*a, **k))
+        assert tr("errore") == "mio"
+        assert tr("avviso") == "warning"
+        assert tr("{n} tracce, nessun errore", n=2) == "2 tracks, no errors"
+    finally:
+        set_translator(None)
+        st.set_language(None)
+
+
 def test_plain_notation_file_is_a_one_track_song(tmp_path):
     path = tmp_path / "solo.txt"
     path.write_text("8: c d e f", encoding="utf-8")

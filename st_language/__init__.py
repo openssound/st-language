@@ -31,14 +31,16 @@ from .notation import (  # noqa: F401
 from .song import (  # noqa: F401
     Clip, Part, Song, load_song, read_song, song_from_notation, text_to_song, upgrade_song_text,
 )
+from .notation import find_references  # noqa: F401
 
-__version__ = "2.12.0"
+__version__ = "2.12.1"
 
 __all__ = [
     "BarIssue", "Clip", "Event", "Meter", "NotationError", "Part", "Pattern", "Song", "check", "check_bar_lines",
     "language", "load_song", "notation_warnings", "parse", "parse_track_text", "read_song",
     "mtxt_to_midi", "set_language", "set_translator", "song_from_notation", "text_to_song", "to_abc",
     "to_midi", "to_musicxml", "to_mtxt", "tokenize", "transpose_tokens", "upgrade_song_text", "validate",
+    "expand_to_text", "events_to_text", "find_references",
     "validate_track_text",
 ]
 
@@ -58,6 +60,18 @@ def check(text: str, patterns: Optional[Dict[str, Pattern]] = None, time_sig: st
     """Gli avvisi che non impediscono di suonare: controlli di battuta e
     testo cantato con troppe sillabe. 'pickup': quarti del levare."""
     return notation_warnings(text, patterns or {}, time_sig, metrica_changes, pickup=pickup)
+
+
+def expand_to_text(*args, **kwargs) -> str:
+    """Vedi st_language.totext.expand_to_text."""
+    from .totext import expand_to_text as expand
+    return expand(*args, **kwargs)
+
+
+def events_to_text(*args, **kwargs) -> str:
+    """Vedi st_language.totext.events_to_text."""
+    from .totext import events_to_text as write
+    return write(*args, **kwargs)
 
 
 def to_midi(song: Song, path: str, only_audible: bool = True) -> str:

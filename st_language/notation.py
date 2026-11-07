@@ -17,7 +17,7 @@ import re
 from bisect import bisect_right
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, NamedTuple, Optional, Tuple
 
 from .instruments import PERCUSSION_MAP
 from ._i18n import tr
@@ -834,6 +834,7 @@ class PitchRewriter:
         if to_key is not None:
             self.dst.alters = key_signature_alters(to_key) if to_key else {}
         self._body_end: List[Tuple[Tuple[str, int], Tuple[str, int]]] = []
+        self.keep_reference_key = False      # expand_to_text: la tonalita' tolta serve ancora alle funzioni
 
     def __call__(self, tok: str) -> str:
         m = RE_VOICES.match(tok)
@@ -901,6 +902,8 @@ class PitchRewriter:
         from .transform import is_transform_reference
         if is_transform_reference(tok):
             # dopo le funzioni: l'asse di .invert(e*5) e le altre restano come sono
+            if self.keep_reference_key and self.src.key_name:
+                return f"{tok}\x01{self.src.key_name}"
             if not self.semitones:
                 return tok
             m = re.search(r"([+-]\d+)$", tok)
@@ -1052,6 +1055,11 @@ def _resolve_midi_ref(name_path: str, midi_dir: Optional[str], tok: str) -> List
             tr("File MIDI '&{name_path}' non trovato nella libreria MIDI", name_path=f'"{name_path}"'), tok)
     except Exception as e:          # es. riferimento ambiguo
         raise NotationError(str(e), tok)
+
+
+def resolve_midi_ref(name_path: str, midi_dir: Optional[str] = None) -> List[str]:
+    """I token del file MIDI '&"percorso"'; NotationError se non si trova."""
+    return _resolve_midi_ref(name_path, midi_dir, name_path)
 
 
 def midi_ref_text(name_path: str, semitones: int = 0, mult: str = "") -> str:
@@ -2333,6 +2341,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
         anchor = "tempo=N" if pending_ramp["kind"] == "tempo" else "N@"
         raise NotationError(tr("Rampa '>>' o '<<' aperta ma mai chiusa da un valore finale ({anchor})", anchor=anchor))
 
+    if extras is not None:
+        extras["end_grid"] = grid_beats
     return events, cursor, grid_beats
 
 
@@ -2504,6 +2514,18 @@ def _upgrade_tokens(text: str, patterns: Dict[str, Pattern], known: dict, close:
     return "".join(out)
 
 
+def pattern_state_effect(tokens: List[str], patterns: Dict[str, Pattern]) -> Tuple[set, dict]:
+    """Quello che dei token dipende dallo stato: (stati che usano prima di
+    scriverli, ultimo token che scrive ogni stato); gli stati sono 'grid',
+    'velocity', 'swing', 'shift' e 'arp'."""
+    return _state_effect(tokens, patterns)
+
+
+def pattern_writes_state(tokens: List[str], patterns: Dict[str, Pattern]) -> bool:
+    """Se i token scrivono griglia, velocity, swing, spostamento o arp=."""
+    return bool(_state_effect(tokens, patterns)[1])
+
+
 def upgrade_pattern_state(text: str, patterns: Dict[str, Pattern]) -> str:
     """Il testo di una traccia, di un box o di un pattern scritto prima
     della 2.12, riscritto perche' suoni come prima con la regola nuova.
@@ -2615,26 +2637,74 @@ def all_token_spans(text: str) -> List[Tuple[int, int]]:
 
 
 def context_prefix_before(text: str, char_start: int) -> str:
-    """Ricostruisce l'ultimo comando di griglia e di velocity attivi prima
-    di char_start, cosi' un frammento di testo estratto da quel punto (per
+    """Ricostruisce gli ultimi comandi di griglia, velocity, swing,
+    spostamento e arp= attivi prima di char_start, cosi' un frammento di
+    testo estratto da quel punto (per
     esempio l'anteprima 'Play' di una selezione, vedi
     gui.selection_actions._play_selection, o un box ottenuto dividendo una
     traccia, vedi core.arrangement.split_text_into_box_segments) suona/si
     interpreta con lo stesso Stato Corrente che avrebbe nel punto originale,
     invece di ripartire sempre da 1/4 e velocity di default."""
-    last_grid = last_vel = None
+    last: Dict[str, str] = {}
     for cs, ce in all_token_spans(text):
         if cs >= char_start:
             break
         tok = text[cs:ce]
-        if RE_GRID.match(tok):
-            last_grid = tok
-        elif RE_VELOCITY.match(tok):
-            last_vel = tok
+        slot = _state_slot(tok)
+        if slot:
+            last[slot] = tok
         elif tok == RESET_TOKEN:
-            last_grid = last_vel = None
-    parts = [t for t in (last_grid, last_vel) if t]
+            last.clear()
+    parts = [last[slot] for slot in _STATE_SLOTS if slot in last]
     return (" ".join(parts) + " ") if parts else ""
+
+
+class ReferenceSpan(NamedTuple):
+    """Un richiamo trovato in un testo: 'kind' e' 'pattern' (%Nome, con o
+    senza funzioni), 'midi' (&"file") o 'arpeggio' (il suffisso .arpeggio di
+    un accordo o di un blocco); start ed end la sua posizione nel testo."""
+    kind: str
+    token: str
+    start: int
+    end: int
+
+
+_RE_REFERENCE_START = re.compile(r"^\d*%\w*")
+_RE_LOOSE_REFERENCE = re.compile(r"(?<![\w%&])\d*%\w*[^\s|]*")
+
+
+def find_references(text: str) -> List[ReferenceSpan]:
+    """Tutti i richiami del testo, anche dentro gruppi e voci, nell'ordine.
+    Vale anche per un testo che si sta scrivendo (un gruppo non chiuso, un
+    richiamo a meta'), per l'evidenziazione e il completamento."""
+    found: List[ReferenceSpan] = []
+
+    def scan(start: int, end: int) -> None:
+        part = text[start:end]
+        try:
+            spans = tokenize_spans(part)
+        except NotationError:
+            found.extend(ReferenceSpan("pattern", m.group(), start + m.start(), start + m.end())
+                         for m in _RE_LOOSE_REFERENCE.finditer(strip_comments(part)))
+            return
+        for tok, cs, ce in spans:
+            cs, ce = cs + start, ce + start
+            if tok.startswith("{") and tok.endswith("}"):
+                scan(cs + 1, ce - 1)
+            elif RE_REPEAT_GROUP.match(tok):
+                scan(cs + tok.index("(") + 1, ce - 1)
+            elif _RE_REFERENCE_START.match(tok):
+                found.append(ReferenceSpan("pattern", tok, cs, ce))
+            elif RE_MIDI_REF.match(tok):
+                found.append(ReferenceSpan("midi", tok, cs, ce))
+            elif not is_lyric(tok) and not tok.startswith('$"'):
+                m = RE_ARPEGGIO_SUFFIX.match(tok)
+                if m:
+                    found.append(ReferenceSpan("arpeggio", tok[m.end(1):len(tok) - len(m.group(3))],
+                                               cs + m.end(1), ce - len(m.group(3))))
+
+    scan(0, len(text))
+    return sorted(found, key=lambda span: span.start)
 
 
 # ---------------------------------------------------------------------------

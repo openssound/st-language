@@ -17,10 +17,14 @@ from ._i18n import tr
 from .chords import PITCH_CLASS, _canonical_quality, midi_to_pitch, pitch_to_midi
 from .notation import (DYNAMICS_TO_VELOCITY, Event, NotationError, Pattern, TRANSPOSE_RANGE, _PitchState,
                        _parse_tokens_exact, _transpose_chord, _transpose_key_name, arpeggio_choice,
-                       expand_patterns, grid_value_beats, key_signature_alters, note_value_beats, spell_midi)
+                       expand_patterns, grid_value_beats, key_signature_alters, note_value_beats, spell_midi,
+                       tokenize)
 
 SCALE_LETTERS = "cdefgab"
 MIN_DURATION = Fraction(1, 32)        # '128, la figura piu' breve
+CANON_VOICES = (2, 4)
+GROUPS = {"pitch": "Altezze", "rhythm": "Ritmo", "order": "Ordine", "voices": "Piu' voci",
+          "chords": "Accordi e dinamica"}
 _ACCIDENTALS = {"": 0, "#": 1, "b": -1, "♭": -1}
 
 RE_TRANSFORM_REFERENCE = re.compile(r"^(\d*)%(\w+?)(?=[.+-])")
@@ -344,7 +348,7 @@ def _do_sequence(events, end, ctx, n, passo):
 
 def _do_canon(events, end, ctx, delay, interval=0, voices=2):
     _reject_tempo(events, ctx, "canon")
-    if not 2 <= voices <= 4:
+    if not CANON_VOICES[0] <= voices <= CANON_VOICES[1]:
         raise NotationError(tr(".canon: le voci vanno da 2 a 4"), ctx.token)
     if interval and any(ev.kind == "percussion" for ev in events):
         raise NotationError(tr(".canon: le percussioni non si possono trasporre: usa un intervallo 0"), ctx.token)
@@ -565,6 +569,11 @@ class Argument:
     name: str
     parse: Callable
     required: bool = True
+    type: str = "integer"                 # integer, factor, note, note_value, word, grid, velocity
+    default: object = None                # il valore iniziale nella finestra Trasforma
+    low: Optional[int] = None
+    high: Optional[int] = None
+    choices: Tuple[str, ...] = ()
 
 
 @dataclass
@@ -578,6 +587,7 @@ class Transform:
     example: str = ""
     single_voice: bool = False            # con un ingresso a piu' voci e' un errore
     makes_voices: bool = False            # il risultato ha piu' voci
+    group: str = "pitch"                  # pitch, rhythm, order, voices, chords
 
 
 def _same(duration, *_args):
@@ -585,32 +595,38 @@ def _same(duration, *_args):
 
 
 TRANSFORMS: Dict[str, Transform] = {t.name: t for t in (
-    Transform("octave", "ottava", (Argument("n", _integer),), _do_octave, _same,
+    Transform("octave", "ottava", (Argument("n", _integer, default=1, low=-10, high=10),), _do_octave, _same,
               "Sposta di n ottave", "%Tema.octave(-1)"),
-    Transform("invert", "inverti", (Argument("asse", _note, required=False),), _do_invert, _same,
+    Transform("invert", "inverti", (Argument("asse", _note, required=False, type="note"),), _do_invert, _same,
               "Inversione cromatica intorno a una nota", "%Tema.invert(e*4)"),
-    Transform("step", "grado", (Argument("n", _integer),), _do_step, _same,
+    Transform("step", "grado", (Argument("n", _integer, default=1, low=-14, high=14),), _do_step, _same,
               "Trasposizione diatonica: n gradi nella scala", "%Tema.step(2)"),
-    Transform("augment", "aumenta", (Argument("k", _factor),), _do_augment, lambda d, k: d * k,
-              "Durate per k", "%Tema.augment(2)"),
-    Transform("diminish", "diminuisci", (Argument("k", _factor),), _do_diminish, lambda d, k: d / k,
-              "Durate diviso k", "%Tema.diminish(2)"),
+    Transform("augment", "aumenta", (Argument("k", _factor, type="factor", default=2),), _do_augment,
+              lambda d, k: d * k, "Durate per k", "%Tema.augment(2)", group="rhythm"),
+    Transform("diminish", "diminuisci", (Argument("k", _factor, type="factor", default=2),), _do_diminish,
+              lambda d, k: d / k, "Durate diviso k", "%Tema.diminish(2)", group="rhythm"),
     Transform("retro", "retrogrado", (), _do_retro, _same,
-              "Dalla fine all'inizio", "%Tema.retro"),
-    Transform("sequence", "progressione", (Argument("n", _integer), Argument("passo", _integer)), _do_sequence,
+              "Dalla fine all'inizio", "%Tema.retro", group="order"),
+    Transform("sequence", "progressione", (Argument("n", _integer, default=3, low=1, high=32),
+                                           Argument("passo", _integer, default=-1, low=-14, high=14)), _do_sequence,
               lambda d, n, _passo: d * n, "Il motivo n volte, ogni volta spostato di passo gradi",
-              "%Motivo.sequence(3,-1)"),
-    Transform("vel", "vel", (Argument("x", _velocity),), _do_vel, _same,
-              "Velocity relativa (+10) o assoluta (80, mf)", "%Tema.vel(-20)"),
-    Transform("canon", "canone", (Argument("ritardo", _note_value), Argument("int", _integer, required=False),
-                                  Argument("voci", _integer, required=False)), _do_canon,
+              "%Motivo.sequence(3,-1)", group="order"),
+    Transform("vel", "vel", (Argument("x", _velocity, type="velocity", default="-10"),), _do_vel, _same,
+              "Velocity relativa (+10) o assoluta (80, mf)", "%Tema.vel(-20)", group="chords"),
+    Transform("canon", "canone", (Argument("ritardo", _note_value, type="note_value", default="'2"),
+                                  Argument("int", _integer, required=False, default=0, low=-60, high=60),
+                                  Argument("voci", _integer, required=False, default=2, low=CANON_VOICES[0],
+                                           high=CANON_VOICES[1])), _do_canon,
               lambda d, delay, _interval=0, voices=2: d + (voices - 1) * delay.beats,
-              "Canone: copie sfasate e trasposte", "%Tema.canon('2,12)", single_voice=True, makes_voices=True),
+              "Canone: copie sfasate e trasposte", "%Tema.canon('2,12)", single_voice=True, makes_voices=True,
+              group="voices"),
     Transform("thirds", "terze", (), _do_thirds, _same,
-              "Aggiunge la terza sotto, nella scala", "%Tema.thirds", single_voice=True, makes_voices=True),
-    Transform("arpeggio", "arpeggio", (Argument("tipo", _arpeggio_kind, required=False),
-                                       Argument("griglia", _arpeggio_kind, required=False)), None, _same,
-              "Gli accordi diventano arpeggi", "%Giro.arpeggio(alberti,8)", single_voice=True),
+              "Aggiunge la terza sotto, nella scala", "%Tema.thirds", single_voice=True, makes_voices=True,
+              group="voices"),
+    Transform("arpeggio", "arpeggio", (Argument("tipo", _arpeggio_kind, required=False, type="word", default="up",
+                                                choices=("up", "down", "updown", "alberti")),
+                                       Argument("griglia", _arpeggio_kind, required=False, type="grid")), None, _same,
+              "Gli accordi diventano arpeggi", "%Giro.arpeggio(alberti,8)", single_voice=True, group="chords"),
 )}
 _BY_NAME = {alias: t for t in TRANSFORMS.values() for alias in (t.name, t.alias)}
 
@@ -703,11 +719,13 @@ def duration_after(step: Step, duration: Fraction) -> Fraction:
 # ------------------------------------------------------------------ API per SoundText
 
 def list_transforms() -> List[dict]:
-    """Le funzioni: nome inglese, alias italiano, argomenti e aiuto breve
-    tradotto, per il completamento e la finestra Trasforma."""
+    """Le funzioni: nome inglese, alias italiano, gruppo, aiuto breve
+    tradotto e argomenti (tipo, valore iniziale, limiti, scelte), per il
+    completamento e la finestra Trasforma."""
     return [{"name": t.name, "alias": t.alias, "help": tr(t.help), "single_voice": t.single_voice,
-             "makes_voices": t.makes_voices,
-             "arguments": [{"name": a.name, "required": a.required} for a in t.arguments]}
+             "makes_voices": t.makes_voices, "group": t.group, "group_label": tr(GROUPS[t.group]),
+             "arguments": [{"name": a.name, "required": a.required, "type": a.type, "default": a.default,
+                            "min": a.low, "max": a.high, "choices": list(a.choices)} for a in t.arguments]}
             for t in TRANSFORMS.values()]
 
 
@@ -737,23 +755,27 @@ class Expansion:
 
 def expand_reference(tok: str, patterns: Dict[str, Pattern], default_octave: int = 4, meter=None,
                      position: float = 0.0, key: str = "", grid: float = 1.0, velocity: int = 80,
-                     instrument=None) -> Expansion:
+                     instrument=None, prefix: str = "") -> Expansion:
     """Gli eventi di un richiamo, con o senza funzioni, e quelli dopo ogni
     passo, per l'anteprima delle note e la finestra Trasforma. 'grid'
     (in quarti) e 'velocity' sono quelli del punto del richiamo; la
     tonalita' di riferimento e' 'key' (il key= in vigore in quel punto) o,
     con 'meter', la Tonalita: del brano a 'position' (in quarti).
-    'instrument' sceglie le note degli accordi arpeggiati. Solleva
-    NotationError come il parser."""
+    'instrument' sceglie le note degli accordi arpeggiati. 'prefix': i
+    comandi di stato del punto del richiamo (context_prefix_before), che
+    valgono al posto di 'grid' e 'velocity' e portano anche swing,
+    spostamento e arp=. Solleva NotationError come il parser."""
     reference = parse_reference(tok)
     if reference.pattern not in patterns:
         raise NotationError(tr("Pattern '%{name}' non definito", name=reference.pattern), tok)
     origin = _exact(position)
-    tokens = expand_patterns(["%" + reference.pattern], patterns, default_octave=default_octave)
+    tokens = tokenize(prefix) + expand_patterns(["%" + reference.pattern], patterns, default_octave=default_octave)
+    extras: dict = {}
     events, end, _ = _parse_tokens_exact(tokens, default_octave, _exact(grid), initial_velocity=velocity,
-                                         meter=meter, origin_beat=origin, record_keys=True, instrument=instrument)
+                                         meter=meter, origin_beat=origin, record_keys=True, instrument=instrument,
+                                         extras=extras)
     ctx = Context(key or (meter.key_at(origin) if meter is not None else "") or None, default_octave, tok,
-                  instrument=instrument, grid=_exact(grid))
+                  instrument=instrument, grid=extras["end_grid"])
     events = [ev for ev in expand_arpeggios(events, instrument, keep_keys=True) if ev.kind != "repeat"]
     stages = [(None, _without_keys(events))]
     for step in reference.steps:

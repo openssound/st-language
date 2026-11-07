@@ -454,6 +454,8 @@ def _upgrade_bodies(lines: List[str]) -> List[str]:
 def upgrade_song_text(text: str) -> str:
     """Il testo di un file .st scritto prima della 2.12, riscritto per la
     regola dei pattern della 2.12 e dichiarato 'ST: 2.12': suona come prima.
+    I corpi dei blocchi non cambiano di numero di righe, ma un file senza
+    riga 'ST:' ne riceve una in cima: i numeri di riga scendono di uno.
     Un file gia' 2.12 o piu' recente resta com'e'. Chi legge i file con un
     lettore suo (SoundText) lo chiama prima di leggerli."""
     lines = text.split("\n")
