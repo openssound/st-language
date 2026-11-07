@@ -8,6 +8,7 @@ Comandi da terminale della libreria ST-language.
     st-language mtxt brano.st           esporta in MTXT (formato di esecuzione)
     st-language mtxt brano.mtxt         converte un file MTXT in MIDI
     st-language events brano.st         gli eventi (JSON), per verifiche
+    st-language upgrade brano.st        converte un file di prima della 2.12
 
 Un file senza tracce (solo notazione, anche '-' = standard input) e' un
 brano di una traccia: --instrument ne sceglie lo strumento, --tempo e
@@ -25,7 +26,7 @@ from typing import List, Optional
 from . import __version__
 from ._i18n import set_language, tr
 from .notation import NotationError, notation_warnings, validate_track_text
-from .song import Song, load_song, text_to_song
+from .song import Song, load_song, text_to_song, upgrade_song_text
 from .stfile import parse_bpm
 
 
@@ -101,7 +102,7 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
     parser = argparse.ArgumentParser(prog="st-language" if command is None else None,
                                      description="ST-language " + __version__)
     if command is None:
-        parser.add_argument("command", choices=["check", "midi", "musicxml", "abc", "mtxt", "events"])
+        parser.add_argument("command", choices=["check", "midi", "musicxml", "abc", "mtxt", "events", "upgrade"])
     parser.add_argument("files", nargs="+", help=tr("file .st o di sola notazione ('-' = standard input)"))
     parser.add_argument("-o", "--output", help=tr("file di uscita (con un solo file in ingresso)"))
     parser.add_argument("--instrument", default="Piano", help=tr("strumento per i file di sola notazione"))
@@ -119,6 +120,9 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
     for source in args.files:
         if command == "mtxt" and source.lower().endswith(".mtxt"):
             status = max(status, _mtxt_to_midi(source, _output(source, args.output, ".mid")))
+            continue
+        if command == "upgrade":
+            status = max(status, _upgrade(source, args.output))
             continue
         try:
             song = _read(source, args.instrument, args.tempo, args.time_sig)
@@ -163,6 +167,34 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
                                                   only_audible=not args.all_tracks)
             print(path)
     return status
+
+
+def _upgrade(source: str, out: Optional[str]) -> int:
+    """st-language upgrade file.st: il file per la regola dei pattern della
+    2.12, stesso suono. Senza -o lo riscrive, tenendo l'originale in .bak."""
+    try:
+        if source == "-":
+            text = sys.stdin.read()
+        else:
+            with open(source, encoding="utf-8", newline="") as f:
+                text = f.read()
+        upgraded = upgrade_song_text(text)
+        if source == "-" and not out:
+            sys.stdout.write(upgraded)
+            return 0
+        if upgraded == text and not out:
+            print(tr("{source}: gia' aggiornato", source=source))
+            return 0
+        if not out:
+            os.replace(source, source + ".bak")
+        path = out or source
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(upgraded)
+    except OSError as e:
+        print(f"{source}: {e}", file=sys.stderr)
+        return 2
+    print(path)
+    return 0
 
 
 def _mtxt_to_midi(source: str, path: str) -> int:

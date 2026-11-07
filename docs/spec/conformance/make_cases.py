@@ -94,6 +94,9 @@ CASES = [
     # --- struttura
     ("repeat-groups", "2(c d) 3(e) 2(f 2(g))", {}),
     ("patterns", "%Riff 2%Riff c", {"patterns": {"Riff": "8: c d"}}),
+    ("patterns-state-ends-with-the-reference", "60@ %A c 3%B d",
+     {"patterns": {"A": "8: 100@ swing=66 shift=5 e", "B": "c 8: 90@ d"}}),
+    ("patterns-inherit-the-state", "8: 100@ %A %A", {"patterns": {"A": "c d"}}),
     ("voices", "4: { 8: c d e f ; 2g*3 } a", {}),
     ("voices-state-is-local", "8: 100@ { c 4: 30@ d ; e } f", {}),
     ("voices-nested", "{ c ; { d ; e } ; f }", {}),
@@ -314,7 +317,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "2.11", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.12", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 

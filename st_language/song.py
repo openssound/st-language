@@ -25,12 +25,12 @@ from typing import Dict, List, Optional
 from .instruments import DEFAULT_INSTRUMENTS, InstrumentProfile, instrument_for, unknown_instrument_message
 from ._i18n import tr
 from .notation import (Event, Meter, NotationError, Pattern, COMMENT_MARK, parse_track_text, tokenize,
-                       upgrade_midi_refs)
+                       upgrade_midi_refs, upgrade_pattern_state)
 from .stfile import (
     RE_AMBIENTE, RE_AUDIO_HDR, RE_BOX_HDR, RE_EFFECTS_HDR, RE_INSTRUMENT_HDR, RE_KEY, RE_MASTER,
     RE_MASTER_CHAIN_HDR, RE_METRICA, RE_METRICA_LIST_HDR, RE_MIXER_HDR, RE_PATTERN_HDR, RE_SYNTH_HDR,
     RE_TEMPO, RE_TEMPO_LIST_HDR, RE_TRACK_HDR, RE_TRACK_HDR_EXPLICIT, short_track_header,
-    RE_CONVERSION_HDR, conversion_blocks, parse_conversion_body,
+    RE_CONVERSION_HDR, conversion_blocks, parse_conversion_body, is_block_header,
     RE_PICKUP, RE_ST_VERSION, LANGUAGE_VERSION, parse_bpm, parse_pickup, instrument_blocks,
     _extract_box_blocks, _extract_named_blocks, _parse_bar_value_list, _parse_instrument_body,
     _parse_mixer_body, RE_KEY_LIST_HDR, RE_TITLE, RE_COMPOSER, RE_LYRICIST, parse_key_list,
@@ -236,6 +236,8 @@ def _instrument_names(song: Song) -> set:
 def read_song(text: str, name: str = "ST") -> Song:
     """Il brano descritto da un file di progetto .st (vedi la specifica)."""
     lines = text.splitlines()
+    if _before_pattern_scope(lines):
+        lines = _upgrade_bodies(lines)
     song = Song(name=name)
     for inst_name, body in instrument_blocks(lines):
         song.instruments[inst_name] = _parse_instrument_body(inst_name, body)
@@ -389,6 +391,83 @@ def read_song(text: str, name: str = "ST") -> Song:
             part.text = flatten_clips_to_text(part.clips, song.patterns, part.instrument.default_octave,
                                               meter=song.meter())
     return song
+
+
+# Dalla 2.12 quello che un pattern scrive (griglia, velocity, swing,
+# spostamento) finisce con lui.
+PATTERN_SCOPE_VERSION = (2, 12)
+
+
+def _before_pattern_scope(lines: List[str]) -> bool:
+    """Se il file segue la regola di prima della 2.12: dichiara una versione
+    piu' vecchia, o nessuna."""
+    version = next((RE_ST_VERSION.match(line.strip()) for line in lines if RE_ST_VERSION.match(line.strip())), None)
+    return version is None or (int(version.group(1)), int(version.group(2))) < PATTERN_SCOPE_VERSION
+
+
+def _notation_blocks(lines: List[str]) -> List[tuple]:
+    """(tipo, nome, prima riga del corpo, fine) dei blocchi in notazione:
+    "pattern", "track" e "box"."""
+    names = set(DEFAULT_INSTRUMENTS) | {name for name, _body in instrument_blocks(lines)}
+    blocks = []
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        pattern, track = RE_PATTERN_HDR.match(line), RE_TRACK_HDR_EXPLICIT.match(line)
+        if pattern:
+            kind, name = "pattern", pattern.group(1)
+        elif track:
+            kind, name = ("track", track.group(1)) if track.group(2) != AUDIO_INSTRUMENT_NAME else (None, None)
+        elif RE_BOX_HDR.match(line):
+            kind, name = "box", None
+        else:
+            kind, name = ("track", line) if short_track_header(line, names) else (None, None)
+        i += 1
+        if kind:
+            start = i
+            while i < len(lines) and lines[i].strip() and not is_block_header(lines[i].strip()):
+                i += 1
+            blocks.append((kind, name, start, i))
+    return blocks
+
+
+def _upgrade_bodies(lines: List[str]) -> List[str]:
+    """Le righe del file con i corpi dei blocchi riscritti per la regola
+    della 2.12 (vedi upgrade_pattern_state); stesso numero di righe."""
+    blocks = _notation_blocks(lines)
+    patterns = {}
+    for kind, name, start, end in blocks:
+        if kind == "pattern":
+            try:
+                patterns[name] = Pattern(name=name, tokens=tokenize("\n".join(lines[start:end])))
+            except NotationError:
+                pass
+    if not patterns:
+        return lines
+    lines = list(lines)
+    for _kind, _name, start, end in blocks:
+        if end > start:
+            lines[start:end] = upgrade_pattern_state("\n".join(lines[start:end]), patterns).split("\n")
+    return lines
+
+
+def upgrade_song_text(text: str) -> str:
+    """Il testo di un file .st scritto prima della 2.12, riscritto per la
+    regola dei pattern della 2.12 e dichiarato 'ST: 2.12': suona come prima.
+    Un file gia' 2.12 o piu' recente resta com'e'. Chi legge i file con un
+    lettore suo (SoundText) lo chiama prima di leggerli."""
+    lines = text.split("\n")
+    if not _before_pattern_scope(lines):
+        return text
+    lines = _upgrade_bodies(lines)
+    header = "ST: {0}.{1}".format(*PATTERN_SCOPE_VERSION)
+    for i, line in enumerate(lines):
+        if RE_ST_VERSION.match(line.strip()):
+            lines[i] = header
+            break
+    else:
+        lines.insert(0, header)
+    return "\n".join(lines)
 
 
 def _read_conversions(song: Song, lines: List[str]) -> None:

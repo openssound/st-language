@@ -1081,7 +1081,9 @@ def expand_patterns(tokens: List[str], patterns: Dict[str, Pattern],
             # tonalita'), qualunque sia il modo della traccia che lo usa; la
             # trasposizione in vigore, invece, lo accompagna (piu' la sua)
             push = f"{_MARK}push:{semitones}" if semitones else f"{_MARK}push"
-            out.extend([push] + body * mult + [f"{_MARK}pop"])
+            # 2.12: griglia, velocity, swing e spostamento del pattern finiscono
+            # con lui (a ogni ripetizione), come quelli di una voce
+            out.extend([push] + ([f"{_MARK}save"] + body + [f"{_MARK}restore"]) * mult + [f"{_MARK}pop"])
             continue
 
         m = RE_MIDI_REF.match(t)
@@ -1599,6 +1601,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
     shift = initial_shift
     pitch = initial_pitch.copy() if initial_pitch is not None else _PitchState(default_octave)
     saved_pitch: List[_PitchState] = []      # modo delle altezze fuori dai pattern
+    saved_state: List[tuple] = []            # griglia, velocity, swing e spostamento fuori dai pattern
     # Automazioni: valore corrente di ogni controllo e rampe aperte
     # ({nome: (inizio, valore di partenza, curva)}), indipendenti fra loro.
     controls: Dict[str, float] = dict(initial_controls or CONTROL_DEFAULTS)
@@ -1736,6 +1739,13 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             if tok == f"{_MARK}pop":
                 if saved_pitch:
                     pitch = saved_pitch.pop()
+                continue
+            if tok == f"{_MARK}save":
+                saved_state.append((grid_beats, velocity, swing, shift))
+                continue
+            if tok == f"{_MARK}restore":
+                if saved_state:
+                    grid_beats, velocity, swing, shift = saved_state.pop()
                 continue
 
             if tok.startswith(_MARK):
@@ -2159,6 +2169,162 @@ def validate_track_text(text: str, patterns: Dict[str, Pattern], default_octave:
         return True, ""
     except (NotationError, ValueError) as e:
         return False, str(e)
+
+
+# ---------------------------------------------------------------------------
+# File prima della 2.12: griglia, velocity, swing e spostamento scritti in un
+# pattern valevano anche dopo il richiamo. Il parser conosce solo la regola
+# nuova: chi legge un file vecchio ne riscrive prima il testo (vedi
+# song.upgrade_song_text), aggiungendo quello che prima usciva dal pattern.
+# ---------------------------------------------------------------------------
+
+_STATE_SLOTS = ("grid", "velocity", "swing", "shift")
+_STATE_DEFAULTS = {"grid": "4:", "velocity": "80@", "swing": "swing=50", "shift": "shift=0"}
+_STATE_RES = (("grid", RE_GRID), ("velocity", RE_VELOCITY), ("swing", RE_SWING), ("shift", RE_SHIFT))
+def _is_rest(tok: str) -> bool:
+    return bool(RE_REST.match(tok.partition("'")[0]))
+
+
+# i token che non usano nessuno dei quattro stati
+_STATELESS_RES = (RE_PITCH_MODE, RE_KEY_MODE, RE_TRANSPOSE, RE_TEMPO_SET, RE_TEXT, RE_HARMONY, RE_CONTROL)
+
+
+def _state_slot(tok: str) -> Optional[str]:
+    return next((slot for slot, rx in _STATE_RES if rx.match(tok)), None)
+
+
+def _is_stateless(tok: str) -> bool:
+    return tok in (BAR_CHECK, "SON", "SOFF") or is_lyric(tok) or any(rx.match(tok) for rx in _STATELESS_RES)
+
+
+def _state_effect(tokens: List[str], patterns: Dict[str, Pattern], seen: Tuple[str, ...] = ()) -> Tuple[set, dict]:
+    """(stati che i token usano prima di scriverli, ultimo token che scrive
+    ogni stato) con la regola di prima della 2.12."""
+    reads: set = set()
+    sets: dict = {}
+
+    def read(slots) -> None:
+        reads.update(slot for slot in slots if slot not in sets)
+
+    for tok in tokens:
+        slot = _state_slot(tok)
+        ref = RE_PATTERN_REF.match(tok)
+        voices = RE_VOICES.match(tok)
+        group = RE_REPEAT_GROUP.match(tok)
+        if slot:
+            sets[slot] = tok
+        elif tok == RESET_TOKEN:
+            sets.update(_STATE_DEFAULTS)
+        elif ref and ref.group(2) in patterns:
+            if ref.group(2) not in seen:
+                inner_reads, inner_sets = _state_effect(patterns[ref.group(2)].tokens, patterns,
+                                                        seen + (ref.group(2),))
+                read(inner_reads)
+                sets.update(inner_sets)
+        elif voices:
+            for voice in split_voices(voices.group(1)):
+                read(_state_effect(tokenize(voice), patterns, seen)[0])
+        elif group:
+            inner_reads, inner_sets = _state_effect(tokenize(group.group(2)), patterns, seen)
+            read(inner_reads)
+            sets.update(inner_sets)
+        elif _is_rest(tok):
+            read(("grid",))                # una pausa non suona: conta solo quanto dura
+        elif not _is_stateless(tok):
+            read(_STATE_SLOTS)
+    return reads, sets
+
+
+def _upgrade_tokens(text: str, patterns: Dict[str, Pattern], known: dict, close: bool = False) -> str:
+    """Il testo con la regola nuova che suona come con quella vecchia.
+    'known': il token in vigore per ogni stato, quando si sa; quello lasciato
+    da un pattern aspetta in 'pending' il primo token che lo usa, cosi' non
+    si scrive niente se il testo finisce o se lo stato viene riscritto prima.
+    'close': il testo si ripete, quindi lo stato va scritto anche alla fine."""
+    out: List[str] = []
+    pending: dict = {}
+    pos = 0
+    after_reference = False
+
+    def flush(slots=_STATE_SLOTS) -> None:
+        ready = [slot for slot in _STATE_SLOTS if slot in slots and slot in pending]
+        if ready:
+            out.append(" ".join(pending[slot] for slot in ready) + " ")
+        for slot in ready:
+            known[slot] = pending.pop(slot)
+
+    for tok, start, end in tokenize_spans(text):
+        out.append(text[pos:start])
+        raw = new = text[start:end]
+        pos = end
+        slot = _state_slot(tok)
+        ref = RE_PATTERN_REF.match(tok)
+        voices = RE_VOICES.match(raw)
+        group = RE_REPEAT_GROUP.match(raw)
+        if slot:
+            known[slot] = tok
+            pending.pop(slot, None)
+        elif tok == RESET_TOKEN:
+            known.update(_STATE_DEFAULTS)
+            pending.clear()
+        elif ref and ref.group(2) in patterns:
+            reads, sets = _state_effect([tok[len(ref.group(1)):]], patterns)
+            flush(reads)
+            mult = int(ref.group(1) or 1)
+            between = [slot for slot in _STATE_SLOTS if slot in reads and slot in sets
+                       and known.get(slot) != sets[slot]]
+            if mult > 1 and between:
+                # dalla seconda ripetizione il pattern partiva dallo stato lasciato dalla prima
+                once = tok[len(ref.group(1)):]
+                state = " ".join(sets[slot] for slot in between)
+                new = f"{once} {state} {'' if mult == 2 else mult - 1}{once}"
+                known.update({slot: sets[slot] for slot in between})
+            for slot, value in sets.items():
+                if known.get(slot) == value:
+                    pending.pop(slot, None)
+                else:
+                    pending[slot] = value
+        elif voices:
+            flush()
+            new = "{" + ";".join(_upgrade_tokens(voice, patterns, dict(known))
+                                 for voice in split_voices(voices.group(1))) + "}"
+        elif group:
+            sets = _state_effect(tokenize(group.group(2)), patterns)[1]
+            flush()
+            new = f"{group.group(1)}({_upgrade_tokens(group.group(2), patterns, {}, close=True)})"
+            known.update(sets)
+        elif _is_repeat_token(tok) or RE_NAVIGATION.match(tok) or RE_MIDI_REF.match(tok):
+            flush()
+            known.clear()
+        elif RE_RAMP_UP.match(tok) or RE_RAMP_DOWN.match(tok):
+            # una rampa segue subito il suo comando: dopo un richiamo, la velocity lasciata dal pattern
+            if after_reference:
+                flush(("velocity",))
+        elif RE_TEMPO_SET.match(tok):
+            flush(("velocity",))           # dentro una rampa di tempo la velocity non si puo' scrivere
+        elif _is_rest(tok):
+            flush(("grid",))
+        elif not _is_stateless(tok):
+            flush()
+        out.append(new)
+        after_reference = bool(ref)
+    if close and pending:
+        out.append(" " + " ".join(pending[slot] for slot in _STATE_SLOTS if slot in pending))
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def upgrade_pattern_state(text: str, patterns: Dict[str, Pattern]) -> str:
+    """Il testo di una traccia, di un box o di un pattern scritto prima
+    della 2.12, riscritto perche' suoni come prima con la regola nuova.
+    'patterns': i pattern com'erano scritti. Chi e' gia' a posto resta
+    com'e', e un testo non valido anche (l'errore lo dira' chi lo legge)."""
+    if "%" not in text:
+        return text
+    try:
+        return _upgrade_tokens(text, patterns, {})
+    except (NotationError, ValueError):
+        return text
 
 
 def _expanded_ranges(text: str, patterns: Dict[str, Pattern], midi_dir: Optional[str],

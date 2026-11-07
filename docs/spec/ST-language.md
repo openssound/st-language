@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.11** · Reference implementation: the `st_language` Python
+**Version 2.12** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -668,6 +668,13 @@ the initial pitch state (`abs:`, no key) whatever the track's mode is,
 and after the reference the track's mode, key and previous note are the
 ones before it, so a pattern sounds the same in every track.
 
+A pattern starts with the grid unit, velocity, swing and shift in force
+at the reference, and **what it writes ends with it** (2.12): after the
+reference, and at each repetition of `N%Name`, they are the ones before
+it, as in a voice (section 8.4). In `4: %A c`, with `%A` = `8: 100@ d e`,
+the `c` is a quarter note at the velocity it had before. Automation
+values belong to the whole track and stay as the pattern leaves them.
+
 The **transposition** (section 7.8) is the exception: a pattern is read
 at the transposition in force at the reference, plus the number written
 after the name (`%Riff+7`, `3%Riff-12`). A `transpose=` inside the
@@ -1101,7 +1108,7 @@ ignored (free text).
 
 | Line | Meaning |
 | --- | --- |
-| `ST: 2.11` | version of the language the file is written in |
+| `ST: 2.12` | version of the language the file is written in |
 | `Tempo: 120 BPM` | tempo (also with decimals: `Tempo: 101.4 BPM`) |
 | `Tempo: 1: 120, 5: 140` | tempo per bar (bar: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | meter |
@@ -1128,6 +1135,14 @@ to the end of the line; without a title, a score uses the file name.
 reader that meets a version newer than the one it knows SHOULD warn that
 parts of the file may not be read; writers SHOULD write it. Readers of
 versions before 2.6 ignore it (it is a line outside any block).
+
+**Files before 2.12.** A file that declares a version before 2.12, or
+none, was written when the grid unit, velocity, swing and shift of a
+pattern stayed in force after the reference. Readers MUST keep its sound:
+they read it as if each reference were followed by what the pattern left
+in force (the reference implementation rewrites the text this way, and
+`st-language upgrade` saves it as a 2.12 file). A file with no patterns
+reads the same under both rules.
 
 **Keywords.** The keywords of the file can be written in Italian or in
 English: `Metrica`/`Meter`, `Tonalita`/`Key`, `Levare`/`Pickup`,
@@ -1365,6 +1380,12 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.12** — what a pattern writes (grid unit, velocity, swing, shift) ends
+with it, at each repetition (section 8.2). This is a change to the
+meaning of valid text, the first one made on purpose; files that declare
+an older version, or none, keep their sound (section 12.1), and
+`st-language upgrade` converts them.
 
 **2.11.1** — library only, the language is unchanged: more instrument
 names in Italian, French and Spanish (section 9.4), such as

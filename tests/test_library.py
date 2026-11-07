@@ -343,6 +343,97 @@ def test_examples_have_known_instruments():
         assert song.file_warnings == [] and all(t.instrument.resolved for t in song.tracks)
 
 
+def _notes(text, patterns):
+    song = st.Song()
+    for name, body in patterns.items():
+        song.add_pattern(name, body)
+    return [(e.letter, e.start, e.duration, e.velocity, bool(e.swing), e.shift)
+            for e in st.parse(text, song.patterns) if e.kind == "note"]
+
+
+def test_what_a_pattern_writes_ends_with_it():
+    """2.12: griglia, velocity, swing e spostamento di un pattern finiscono con lui."""
+    assert _notes("60@ %A c", {"A": "8: 100@ swing=66 shift=5 e"}) == [
+        ("e", 0.0, 0.5, 100, True, 5), ("c", 0.5, 1.0, 60, False, None)]
+    # a ogni ripetizione, e il pattern eredita lo stato del punto in cui e' richiamato
+    assert [n[2] for n in _notes("3%A", {"A": "c 8: d"})] == [1.0, 0.5] * 3
+    assert _notes("8: 100@ %A", {"A": "c"}) == [("c", 0.0, 0.5, 100, False, None)]
+    # un pattern dentro un pattern
+    assert [n[2] for n in _notes("%A c", {"A": "%B d", "B": "8: e"})] == [0.5, 1.0, 1.0]
+
+
+def _as_before(body, patterns):
+    """Il brano di una traccia e questi pattern, in un file senza versione."""
+    blocks = "".join(f"Pattern %{name}:\n  {text}\n\n" for name, text in patterns.items())
+    song = st.read_song(f"{blocks}Traccia T [Piano]:\n  {body}\n")
+    track = song.get_track("T")
+    return track.text, [(e.letter, e.start, e.duration, e.velocity) for e in track.parsed_events(song.patterns)
+                        if e.kind == "note"]
+
+
+@pytest.mark.parametrize("body, patterns, text, durations", [
+    ("%A c", {"A": "8: 100@ d"}, "%A 8: 100@ c", [0.5, 0.5]),
+    ("%A | c", {"A": "8: d"}, "%A | 8: c", [0.5, 0.5]),
+    ("8: %A c", {"A": "8: d"}, "8: %A c", [0.5, 0.5]),                 # lo stato era gia' quello
+    ("%A %A", {"A": "8: d"}, "%A %A", [0.5, 0.5]),                     # il pattern lo riscrive da se'
+    ("%A", {"A": "8: d"}, "%A", [0.5]),                                # il testo finisce
+    ("3%A", {"A": "c 8: d"}, "%A 8: 2%A", [1.0, 0.5, 0.5, 0.5, 0.5, 0.5]),
+    ("2%A+2", {"A": "c 8: d"}, "%A+2 8: %A+2", [1.0, 0.5, 0.5, 0.5]),
+    ("%A c // fine", {"A": "8: d"}, "%A 8: c // fine", [0.5, 0.5]),
+    ("2( %A c )", {"A": "8: d"}, "2( %A 8: c )", [0.5, 0.5, 0.5, 0.5]),
+    ("|: %A :| c", {"A": "8: d"}, "|: %A 8: :| c", [0.5, 0.5, 0.5]),
+    ("{ %A c ; e }", {"A": "8: d"}, "{ %A 8: c ; e }", [0.5, 0.5, 1.0]),
+    ("%A { c ; e }", {"A": "8: d"}, "%A 8: { c ; e }", [0.5, 0.5, 0.5]),
+    ("%A >> c 100@ d", {"A": "60@ e"}, "%A 60@ >> c 100@ d", [1.0, 1.0, 1.0]),
+    ("%A tempo=60 >> c tempo=80 d", {"A": "60@ e"}, "%A 60@ tempo=60 >> c tempo=80 d", [1.0, 1.0, 1.0]),
+    ("%A 2r c", {"A": "8: 60@ d"}, "%A 8: 2r 60@ c", [0.5, 0.5]),      # una pausa usa solo la griglia
+    ("%S c", {"S": "swing=66 8:"}, "%S 8: swing=66 c", [0.5]),         # un pattern di sole impostazioni
+    ("%A c", {"A": "reset: d", "B": "c"}, "%A 4: 80@ swing=50 shift=0 c", [1.0, 1.0]),
+])
+def test_a_file_before_2_12_keeps_its_sound(body, patterns, text, durations):
+    written, notes = _as_before(body, patterns)
+    assert written == text and [n[2] for n in notes] == durations
+
+
+def test_nested_patterns_are_upgraded_too():
+    assert [n[2] for n in _as_before("%A", {"A": "%B c", "B": "8: d"})[1]] == [0.5, 0.5]
+    assert [n[2] for n in _as_before("%A c", {"A": "%B", "B": "8: d"})[1]] == [0.5, 0.5]
+
+
+def test_upgrade_song_text():
+    old = 'ST: 2.7\n\nPattern %A:\n  8: 100@ d\n\nTraccia T [Piano]:\n\nTraccia U [Piano]:\n  %A c // resta\n'
+    new = st.upgrade_song_text(old)
+    assert new == old.replace("ST: 2.7", "ST: 2.12").replace("%A c", "%A 8: 100@ c")
+    assert st.upgrade_song_text(new) == new
+    assert st.read_song(new).st_version == (2, 12)
+    # un file che dichiara la 2.12 segue gia' la regola nuova
+    assert st.read_song("ST: 2.12\n\nPattern %A:\n  8: d\n\nPiano:\n  %A c\n").tracks[0].text == "%A c"
+    assert st.upgrade_song_text("Piano:\n  c\n") == "ST: 2.12\nPiano:\n  c\n"
+    # il testo gia' riscritto, letto come vecchio, non cambia piu'
+    assert st.read_song(new.replace("ST: 2.12", "ST: 2.11")).get_track("U").text == "%A 8: 100@ c // resta"
+
+
+def test_upgrade_keeps_blocks_and_warnings_lines():
+    text = ('Traccia Vuota [Flautoo]:\n\nBox Vuota "B" |0:\n  %A c\n\n'
+            'Pattern %A:\n  8: d\n\nTraccia Audio1 [Audio]:\n  ingresso=voce\n\nTraccia X [Xyzzy]:\n  %A\n')
+    song = st.read_song(text)
+    assert [line for line, _ in song.file_warnings] == [1, 12]
+    assert song.get_track("Vuota").clips[0].text == "%A 8: c"
+
+
+def test_upgrade_command(tmp_path):
+    cwd = _isolated_copy(tmp_path)
+    old = "Pattern %A:\n  8: d\n\nTraccia T [Piano]:\n  %A c\n"
+    (cwd / "brano.st").write_text(old, encoding="utf-8")
+    out = _run(["-m", "st_language", "upgrade", "brano.st"], cwd)
+    assert out.returncode == 0 and "brano.st" in out.stdout
+    assert (cwd / "brano.st.bak").read_text(encoding="utf-8") == old
+    assert (cwd / "brano.st").read_text(encoding="utf-8").startswith("ST: 2.12\n")
+    assert "%A 8: c" in (cwd / "brano.st").read_text(encoding="utf-8")
+    out = _run(["-m", "st_language", "upgrade", "brano.st"], cwd)
+    assert out.returncode == 0 and "already up to date" in out.stdout
+
+
 def test_plain_notation_file_is_a_one_track_song(tmp_path):
     path = tmp_path / "solo.txt"
     path.write_text("8: c d e f", encoding="utf-8")

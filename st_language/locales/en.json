@@ -140,6 +140,7 @@
  "{key}={value} non valido, vale il predefinito": "{key}={value} is not valid, the default applies",
  "{n} tracce, nessun errore": "{n} tracks, no errors",
  "{source}: errori di sintassi, niente esportazione (vedi st-language check)": "{source}: syntax errors, nothing exported (see st-language check)",
+ "{source}: gia' aggiornato": "{source}: already up to date",
  "{value} quarti": "{value} quarter notes",
  "«{name}» non e' uno strumento noto: suona come pianoforte": "«{name}» is not a known instrument: it plays as a piano",
  "⚠  Avviso: {msg}": "⚠  Warning: {msg}",

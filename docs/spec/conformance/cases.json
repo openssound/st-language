@@ -1,5 +1,5 @@
 {
- "spec_version": "2.11",
+ "spec_version": "2.12",
  "cases": [
   {
    "id": "notes-basic",
@@ -4651,10 +4651,142 @@
      },
      {
       "start": 3.0,
-      "duration": 0.5,
+      "duration": 1.0,
       "kind": "note",
       "velocity": 80,
       "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "patterns-state-ends-with-the-reference",
+   "input": "60@ %A c 3%B d",
+   "patterns": {
+    "A": "8: 100@ swing=66 shift=5 e",
+    "B": "c 8: 90@ d"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "e",
+      "octave": 4,
+      "swing": [
+       1.0,
+       0.66
+      ],
+      "shift": 5
+     },
+     {
+      "start": 0.5,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 60,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.5,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 60,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 90,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 60,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 90,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 4.5,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 60,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 5.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 90,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 60,
+      "letter": "d",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "patterns-inherit-the-state",
+   "input": "8: 100@ %A %A",
+   "patterns": {
+    "A": "c d"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "d",
       "octave": 4
      }
     ]

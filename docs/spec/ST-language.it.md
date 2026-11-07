@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.11** · Implementazione di riferimento: la libreria Python
+**Versione 2.12** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -685,6 +685,14 @@ sia il modo della traccia, e dopo il riferimento modo, tonalita' e nota
 precedente della traccia sono quelli di prima: un pattern suona uguale
 in ogni traccia.
 
+Un pattern parte con la griglia, la velocity, lo swing e lo spostamento in
+vigore nel punto del riferimento, e **quello che scrive finisce con lui**
+(2.12): dopo il riferimento, e a ogni ripetizione di `N%Nome`, sono quelli
+di prima, come in una voce (sezione 8.4). In `4: %A c`, con `%A` =
+`8: 100@ d e`, la `c` e' un quarto con la velocity di prima. I valori delle
+automazioni valgono per tutta la traccia e restano come li lascia il
+pattern.
+
 Fa eccezione la **trasposizione** (sezione 7.8): un pattern si legge alla
 trasposizione in vigore nel punto del riferimento, piu' il numero scritto
 dopo il nome (`%Riff+7`, `3%Riff-12`). Un `transpose=` dentro il pattern
@@ -1138,7 +1146,7 @@ libero).
 
 | Riga | Significato |
 | --- | --- |
-| `ST: 2.11` | versione del linguaggio in cui e' scritto il file |
+| `ST: 2.12` | versione del linguaggio in cui e' scritto il file |
 | `Tempo: 120 BPM` | tempo (anche coi decimali: `Tempo: 101.4 BPM`) |
 | `Tempo: 1: 120, 5: 140` | tempo per battuta (battuta: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | metrica |
@@ -1168,6 +1176,15 @@ lettore che trova una versione piu' recente di quella che conosce
 DOVREBBE avvisare che parti del file potrebbero non essere lette; chi
 scrive il file DOVREBBE metterla. I lettori delle versioni prima della 2.6
 la ignorano (e' una riga fuori da ogni blocco).
+
+**File prima della 2.12.** Un file che dichiara una versione prima della
+2.12, o nessuna, e' stato scritto quando griglia, velocity, swing e
+spostamento di un pattern restavano in vigore dopo il riferimento. I
+lettori DEVONO conservarne il suono: lo leggono come se dopo ogni
+riferimento ci fosse quello che il pattern lasciava in vigore
+(l'implementazione di riferimento riscrive cosi' il testo, e
+`st-language upgrade` lo salva come file 2.12). Un file senza pattern si
+legge uguale con le due regole.
 
 **Parole chiave.** Le parole chiave del file si possono scrivere in
 italiano o in inglese: `Metrica`/`Meter`, `Tonalita`/`Key`,
@@ -1423,6 +1440,12 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.12** — quello che un pattern scrive (griglia, velocity, swing,
+spostamento) finisce con lui, a ogni ripetizione (sezione 8.2). Cambia il
+significato di un testo valido, la prima volta che succede di proposito; i
+file che dichiarano una versione piu' vecchia, o nessuna, conservano il
+loro suono (sezione 12.1), e `st-language upgrade` li converte.
 
 **2.11.1** — solo la libreria, il linguaggio non cambia: altri nomi di
 strumenti in italiano, francese e spagnolo (sezione 9.4), come

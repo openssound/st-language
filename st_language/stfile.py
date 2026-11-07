@@ -14,11 +14,11 @@ from ._i18n import tr
 from .instruments import InstrumentProfile
 
 
-# Versione del linguaggio con cui e' scritto il file: "ST: 2.11" (riga
+# Versione del linguaggio con cui e' scritto il file: "ST: 2.12" (riga
 # facoltativa in cima; i lettori piu' vecchi la ignorano).
 RE_ST_VERSION = re.compile(r"^ST:\s*(\d+)\.(\d+)$")
 # La versione del linguaggio che questo lettore conosce (vedi la specifica).
-LANGUAGE_VERSION = (2, 11)
+LANGUAGE_VERSION = (2, 12)
 
 # "Levare: 1" (o "Pickup:"): la battuta in levare, in quarti (anche "1.5" o
 # "1/2"); la battuta 1 e' la prima intera.
@@ -193,6 +193,12 @@ _NOTATION_COMMAND_LINES = {"rel:", "abs:", "reset:"}
 def _ends_block(line: str) -> bool:
     """Se la riga apre un altro blocco (e chiude quello in corso)."""
     return line not in _NOTATION_COMMAND_LINES and any(rx.match(line) for rx in _TRACK_HDR_PATTERNS)
+
+
+def is_block_header(line: str) -> bool:
+    """Se la riga (senza spazi ai lati) chiude il blocco che la precede."""
+    return any(rx.match(line) for rx in _TRACK_HDR_PATTERNS) or bool(
+        RE_SYNTH_HDR.match(line) or RE_INSTRUMENT_HDR.match(line) or RE_AMBIENTE.match(line))
 
 
 VOLUME_MAX = 200  # 100 = guadagno originale (unita'), fino a 200 = raddoppio percepito
