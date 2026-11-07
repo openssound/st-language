@@ -1505,6 +1505,11 @@ def _parse_atom(tok: str, default_octave: int, pitch: Optional[_PitchState] = No
                 tok,
             )
         return {"kind": "percussion", "name": name, "mult": int(mult) if mult else 1}
+    function = re.search(r"\.(\w+)", tok)
+    if function:
+        from .transform import is_transform_name
+        if is_transform_name(function.group(1)):
+            raise NotationError(tr(".{name} si usa solo sui pattern (%Nome.{name})", name=function.group(1)), tok)
     raise NotationError(tr("Token non riconosciuto dalla grammatica"), tok)
 
 

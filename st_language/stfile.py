@@ -14,11 +14,11 @@ from ._i18n import tr
 from .instruments import InstrumentProfile
 
 
-# Versione del linguaggio con cui e' scritto il file: "ST: 2.12" (riga
+# Versione del linguaggio con cui e' scritto il file: "ST: 2.13" (riga
 # facoltativa in cima; i lettori piu' vecchi la ignorano).
 RE_ST_VERSION = re.compile(r"^ST:\s*(\d+)\.(\d+)$")
 # La versione del linguaggio che questo lettore conosce (vedi la specifica).
-LANGUAGE_VERSION = (2, 12)
+LANGUAGE_VERSION = (2, 13)
 
 # "Levare: 1" (o "Pickup:"): la battuta in levare, in quarti (anche "1.5" o
 # "1/2"); la battuta 1 e' la prima intera.

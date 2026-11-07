@@ -32,7 +32,7 @@ from .song import (  # noqa: F401
     Clip, Part, Song, load_song, read_song, song_from_notation, text_to_song, upgrade_song_text,
 )
 
-__version__ = "2.12.0"
+__version__ = "2.13.0"
 
 __all__ = [
     "BarIssue", "Clip", "Event", "Meter", "NotationError", "Part", "Pattern", "Song", "check", "check_bar_lines",

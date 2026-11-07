@@ -624,7 +624,8 @@ def test_transforms_properties():
             length = Fraction(max(e.start + e.duration for e in events)).limit_denominator(10 ** 6)
             after = st.parse(chain, song.patterns)
             assert float(duration_after(step, length)) == pytest.approx(max(e.start + e.duration for e in after))
-    assert set(TRANSFORMS) == {"octave", "invert", "step", "augment", "diminish", "retro", "sequence", "vel"}
+    assert set(TRANSFORMS) == {"octave", "invert", "step", "augment", "diminish", "retro", "sequence", "vel",
+                               "canon", "thirds"}
 
 
 def test_transforms_syntax_next_to_other_tokens():
@@ -698,6 +699,139 @@ def test_expand_reference_for_the_preview():
     assert describe_transform("retro")["signature"] == ".retro"
     with pytest.raises(st.NotationError):
         describe_transform("xyzzy")
+
+
+def _voices_of(text, song):
+    by_voice = {}
+    for ev in st.parse(text, song.patterns):
+        name = ({"rest": "r"}.get(ev.kind) or (f"{ev.letter}*{ev.octave}" if ev.letter else ev.symbol or ev.name))
+        by_voice.setdefault(ev.voice, []).append((name, ev.start, ev.duration))
+    return by_voice
+
+
+def test_canon():
+    song = _song_with({"T": "4: c*4 d*4 e*4 c*4", "K": "4: kick snare", "C": "4: C G"})
+    voices = _voices_of("%T.canon('2,12)", song)
+    assert [n for n, _s, _d in voices[1]] == ["c*4", "d*4", "e*4", "c*4"]
+    assert voices[2] == [("r", 0.0, 2.0), ("c*5", 2.0, 1.0), ("d*5", 3.0, 1.0), ("e*5", 4.0, 1.0), ("c*5", 5.0, 1.0)]
+    voices = _voices_of("%T.canone('4,7,3)", song)
+    assert [n for n, _s, _d in voices[2]] == ["r", "g*4", "a*4", "b*4", "g*4"]
+    assert [n for n, _s, _d in voices[3]] == ["r", "d*5", "e*5", "f#*5", "d*5"]
+    assert voices[3][0] == ("r", 0.0, 2.0)
+    assert [n for n, _s, _d in _voices_of("%T.canon('1)", song)[2]][1:] == ["c*4", "d*4", "e*4", "c*4"]
+    # il cursore va avanti della durata del canone, e le durate con il punto e le terzine valgono
+    assert st.parse("%T.canon('2,12) f", song.patterns)[-1].start == 6
+    assert st.parse("%T.canon('4.) f", song.patterns)[-1].start == 5.5
+    assert st.parse("%T.canon('8T) f", song.patterns)[-1].start == pytest.approx(4 + 1 / 3)
+    # percussioni solo all'unisono, accordi trasposti come con +N
+    assert [n for n, _s, _d in _voices_of("%K.canon('4)", song)[2]] == ["r", "kick", "snare"]
+    assert [n for n, _s, _d in _voices_of("%C.canon('4,2)", song)[2]] == ["r", "D", "A"]
+    # la velocity si puo' cambiare dopo, su tutte le voci
+    assert {e.velocity for e in st.parse("%T.canon('2,12).vel(-10)", song.patterns) if e.kind == "note"} == {70}
+
+
+def test_thirds():
+    song = _song_with({"M": "key=C 4: e*5 f*5 g*5 e*5", "G": "key=G 4: b*4 c*5 d*5 b*4", "F": "key=C c#*5 r",
+                       "S": "key=C e*5>g*5", "L": 'key=C e*5 "la"'})
+    voices = _voices_of("%M.thirds", song)
+    assert [n for n, _s, _d in voices[1]] == ["e*5", "f*5", "g*5", "e*5"]
+    assert [n for n, _s, _d in voices[2]] == ["c*5", "d*5", "e*5", "c*5"]
+    assert [n for n, _s, _d in _voices_of("%G.terze", song)[2]] == ["g*4", "a*4", "b*4", "g*4"]
+    assert [n for n, _s, _d in _voices_of("%F.thirds", song)[2]] == ["a#*4", "r"]
+    second = [e for e in st.parse("%S.thirds", song.patterns) if e.voice == 2][0]
+    assert (second.letter, second.slide_points) == ("c", [("e", 5)])
+    assert [e.lyric for e in st.parse("%L.thirds", song.patterns) if e.kind == "note"] == ["la", None]
+
+
+def test_functions_after_a_result_with_more_voices():
+    song = _song_with({"T": "key=C 4: c*4 d*4 e*4 c*4"})
+
+    def notes(text, voice):
+        return [n for n, _s, _d in _voices_of(text, song)[voice] if n != "r"]
+
+    assert notes("%T.canon('2,12).octave(-1)", 2) == ["c*4", "d*4", "e*4", "c*4"]
+    assert notes("%T.thirds.step(1)", 2) == ["b*3", "c*4", "d*4", "b*3"]
+    assert notes("%T.thirds+2", 2) == ["b*3", "c#*4", "d*4", "b*3"]
+    # senza asse ogni voce si inverte intorno alla sua prima nota
+    assert notes("%T.thirds.invert", 2) == ["a*3", "g*3", "f#*3", "a*3"]
+    # .retro rovescia il blocco intero: la voce che entrava dopo finisce prima
+    voices = _voices_of("%T.canon('2).retro", song)
+    assert voices[1][0] == ("r", 0.0, 2.0) and voices[1][1][0] == "c*4"
+    assert voices[2][0][:2] == ("c*4", 0.0) and voices[2][-1][0] == "r"
+    assert [e.start for e in st.parse("%T.canon('2).augment(2)", song.patterns)
+            if e.voice == 2 and e.kind == "note"] == [4, 6, 8, 10]
+    assert st.parse("%T.canon('2).sequence(2,1) f", song.patterns)[-1].start == 12
+    for text in ("%T.canon('2).canon('2)", "%T.thirds.thirds", "%T.canon('2).thirds", "%T.thirds.canon('2)"):
+        ok, error = st.validate(text, song.patterns)
+        assert not ok and "voice" in error or "voce" in error
+
+
+@pytest.mark.parametrize("text, message", [
+    ("%T.canon", "manca ritardo"),
+    ("%T.canon(2)", "durata"),
+    ("%T.canon('3)", "Valore di nota"),
+    ("%T.canon('2,x)", "numero intero"),
+    ("%T.canon('2,12,5)", "da 2 a 4"),
+    ("%T.canon('2,12,1)", "da 2 a 4"),
+    ("%T.canon('2,0,2,1)", "troppi argomenti"),
+    ("%K.canon('2,12)", "percussioni"),
+    ("%V.canon('2)", "una voce sola"),
+    ("%V.thirds", "una voce sola"),
+    ("%C.thirds", "melodie"),
+    ("%B.thirds", "melodie"),
+    ("%K.thirds", "melodie"),
+    ("%Tempo.canon('2)", "tempo="),
+    ("%T.canon('2,120,2)", "fuori range"),
+    ("%A.canon('2,60)", "estensione MIDI"),
+    ("C.canon('2)", "solo sui pattern"),
+    ("c.octave(1)", "solo sui pattern"),
+])
+def test_canon_and_thirds_errors(text, message):
+    song = _song_with({"T": "c*4 d*4", "K": "kick", "V": "{ c ; e }", "C": "C", "B": "[c e]", "Tempo": "tempo=90 c",
+                       "A": "c*6"})
+    st.set_language("it")
+    try:
+        ok, error = st.validate(text, song.patterns)
+    finally:
+        st.set_language(None)
+    assert not ok and message.lower() in error.lower()
+
+
+def test_canon_and_thirds_properties():
+    import random
+    from st_language.chords import pitch_to_midi
+    from st_language.notation import key_signature_alters
+    from st_language.transform import parse_reference
+    rng = random.Random(21)
+    for _ in range(60):
+        key = rng.choice(["C", "G", "F", "D", "Bb", "Am", "Em"])
+        alters = key_signature_alters(key)
+        letters = [c + alters.get(c, "") for c in "cdefgab"]
+        notes = [rng.choice(letters) + f"*{rng.randint(4, 6)}" + rng.choice(["'8", "'4", "'4.", "'2"])
+                 for _ in range(rng.randint(1, 8))]
+        song = _song_with({"P": f"key={key} " + " ".join(notes)})
+        interval, delay = rng.randint(-12, 12), rng.choice(["'1", "'2", "'4", "'4."])
+
+        def pitched(text, voice=1):
+            return [(e.start, e.duration, pitch_to_midi(e.letter, e.octave))
+                    for e in st.parse(text, song.patterns) if e.kind == "note" and e.voice == voice]
+
+        shift = float(parse_reference(f"%P.canon({delay})").steps[0].args[0].beats)
+        canon = pitched(f"%P.canon({delay},{interval})", 2)
+        assert canon == [(s + shift, d, m + interval) for s, d, m in pitched("%P")]
+        assert pitched(f"%P.canon({delay},{interval})") == pitched("%P")
+        pairs = list(zip(pitched("%P.thirds"), pitched("%P.thirds", 2)))
+        assert pairs and all(a[:2] == b[:2] and a[2] - b[2] in (3, 4) for a, b in pairs)
+        assert sum(1 for e in st.parse("%P.thirds", song.patterns) if e.voice == 2) == len(notes)
+
+
+def test_canon_and_thirds_reach_the_exports(tmp_path):
+    song = st.read_song("ST: 2.13\nTonalita: C\n\nPattern %T:\n  c e g c\n\nTraccia A [Piano]:\n"
+                        "  %T.canon('2,12) | %T.thirds |\n")
+    midi = st.to_midi(song, str(tmp_path / "t.mid"))
+    xml = st.to_musicxml(song, str(tmp_path / "t.musicxml"))
+    assert os.path.getsize(midi) > 0 and "<voice>2</voice>" in open(xml, encoding="utf-8").read()
+    assert os.path.exists(st.to_abc(song, str(tmp_path / "t.abc")))
 
 
 def test_plain_notation_file_is_a_one_track_song(tmp_path):

@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.12** · Reference implementation: the `st_language` Python
+**Version 2.13** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -902,11 +902,13 @@ regard to case. An argument may be left out only if the table says so.
 | `.retro` | `.retrogrado` | | the events in reverse order | same |
 | `.sequence(n,step)` | `.progressione(n,step)` | n: integer ≥ 1, step: integer | the pattern n times, presentation k (from 0) moved by k × step degrees, as with `.step` | × n |
 | `.vel(x)` | `.vel(x)` | x: `+N` or `-N` (relative, limited to 1-127), `1`-`127` or a dynamic (absolute) | changes the velocity of sounding events; automations are not touched | same |
+| `.canon(delay,int,voices)` | `.canone(delay,int,voices)` | delay: a note value (`'2`, `'4.`, `'8T`); int: semitones, optional, 0; voices: 2 to 4, optional, 2 | voice k (from 0) is the pattern transposed by k × int semitones, after a rest of k × delay (2.13) | + (voices − 1) × delay |
+| `.thirds` | `.terze` | | adds a second voice with the same durations, a diatonic third below each note (2.13) | same |
 
 A note argument is written as in the notation (`e*5`, `bb*3`); without an
 octave it takes the default octave.
 
-**Reference key** (`.step`, `.sequence`): the `key=` written in the
+**Reference key** (`.step`, `.sequence`, `.thirds`): the `key=` written in the
 pattern for each note; otherwise the `key=` in force at the reference;
 otherwise the `Tonalita:` in force at the bar of the reference; otherwise
 C major, with a warning. A transposition (`+N`, `transpose=`) moves the
@@ -914,7 +916,8 @@ reference key with it.
 
 **Notes outside the scale** keep their alteration: a note is its degree
 with an offset, the degree moves and the offset stays (`c#` in C major one
-degree up is `d#`, and `c` in D major one degree up is `db`).
+degree up is `d#`, and `c` in D major one degree up is `db`; the third
+below `c#` in C major is `a#`).
 
 **Chord symbols** with `.step` and `.sequence`: the root moves in the
 scale, the bass too. A chord of the scale (triad or seventh) takes the
@@ -924,8 +927,19 @@ quality of the new degree (in C major `C` → `Dm`, `Cmaj7` → `Dm7`, `G7` →
 **What else moves.** Rests and percussion follow the functions on time
 and order and are not changed by those on pitch. `.retro` keeps velocity,
 marks and lyrics on their event (with a warning for lyrics), swaps the two
-ends of a slur, and keeps a grace note before its note. A multi-part
-result is treated voice by voice.
+ends of a slur, and keeps a grace note before its note.
+
+**More voices** (2.13). `.canon` and `.thirds` give several voices, on the
+same track, numbered from the voice of the reference, as a voice block
+(section 8.4). Automations, pedal, text and chord names stay in the first
+voice of a canon; lyrics stay in the first voice of `.thirds`. The other
+functions and `+N` then apply to every voice, and `.invert` without an
+axis takes the first pitch of each voice. `.retro` reverses the whole
+block: a voice that ends early gets a closing rest first, so it starts
+late after the reversal. `.canon` and `.thirds` need a single voice as
+input. `.canon` transposes chromatically, as `+N` does, so chord symbols
+and blocks are allowed; percussion only with int 0. `.thirds` takes
+melodies only.
 
 **State.** As with any reference (section 8.2), nothing a transformed
 pattern writes stays in force after it. The bar checks written in the
@@ -936,9 +950,11 @@ missing, extra or wrong argument, a space inside the parentheses, a pitch
 outside MIDI 0-127, a duration shorter than `'128`, `.invert` on a chord
 symbol or with no pitch and no axis, a tie or slur that enters the
 reference, `bar=N` and navigation signs in the pattern, `tempo=` in the
-pattern with `.augment`, `.diminish`, `.retro` or `.sequence`, slides,
-automations and pedal in the pattern with `.retro`. A function outside a
-pattern reference (`C.retro`) is an error.
+pattern with `.augment`, `.diminish`, `.retro`, `.sequence` or `.canon`,
+slides, automations and pedal in the pattern with `.retro`, a delay that is
+not a note value, voices outside 2-4, a transposed canon on percussion,
+`.thirds` on chords, blocks or percussion, `.canon` or `.thirds` on several
+voices. A function outside a pattern reference (`C.retro`) is an error.
 
 ---
 
@@ -1174,7 +1190,7 @@ ignored (free text).
 
 | Line | Meaning |
 | --- | --- |
-| `ST: 2.12` | version of the language the file is written in |
+| `ST: 2.13` | version of the language the file is written in |
 | `Tempo: 120 BPM` | tempo (also with decimals: `Tempo: 101.4 BPM`) |
 | `Tempo: 1: 120, 5: 140` | tempo per bar (bar: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | meter |
@@ -1446,6 +1462,9 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.13** — pattern transformations with several voices: `.canon` and
+`.thirds` (section 8.12). A file that uses them declares `ST: 2.13`.
 
 **2.12** — what a pattern writes (grid unit, velocity, swing, shift) ends
 with it, at each repetition (section 8.2). This is a change to the

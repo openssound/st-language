@@ -1,5 +1,5 @@
 {
- "spec_version": "2.12",
+ "spec_version": "2.13",
  "cases": [
   {
    "id": "notes-basic",
@@ -5714,6 +5714,516 @@
       "octave": 4
      }
     ]
+   }
+  },
+  {
+   "id": "transform-canon",
+   "input": "%T.canon('2,12) %T.canone('4,7,3)",
+   "patterns": {
+    "T": "4: c*4 d*4 e*4 c*4"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "rest",
+      "velocity": 80,
+      "voice": 2
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5,
+      "voice": 2
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5,
+      "voice": 2
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 5,
+      "voice": 2
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5,
+      "voice": 2
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "rest",
+      "velocity": 80,
+      "voice": 2
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "b",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 6.0,
+      "duration": 2.0,
+      "kind": "rest",
+      "velocity": 80,
+      "voice": 3
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5,
+      "voice": 3
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 5,
+      "voice": 3
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 5,
+      "voice": 3
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5,
+      "voice": 3
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-canon-then-function",
+   "input": "%T.canon('2,12).octave(-1).vel(-10)",
+   "patterns": {
+    "T": "c*4 d*4"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 70,
+      "letter": "c",
+      "octave": 3
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 70,
+      "letter": "d",
+      "octave": 3
+     },
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "rest",
+      "velocity": 80,
+      "voice": 2
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 70,
+      "letter": "c",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 70,
+      "letter": "d",
+      "octave": 4,
+      "voice": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-canon-retro",
+   "input": "%T.canon('2).retro",
+   "patterns": {
+    "T": "c d e"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 0.0,
+      "duration": 2.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 2.0,
+      "kind": "rest",
+      "velocity": 80,
+      "voice": 2
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-thirds",
+   "input": "%T.thirds %T.terze+2",
+   "patterns": {
+    "T": "key=C 4: e*5 f*5 r c#*5"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 5
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f",
+      "octave": 5
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c#",
+      "octave": 5
+     },
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5,
+      "voice": 2
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5,
+      "voice": 2
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "rest",
+      "velocity": 80,
+      "voice": 2
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "a#",
+      "octave": 4,
+      "voice": 2
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 5
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 5
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "rest",
+      "velocity": 80
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d#",
+      "octave": 5
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d",
+      "octave": 5,
+      "voice": 2
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 5,
+      "voice": 2
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "rest",
+      "velocity": 80,
+      "voice": 2
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 5,
+      "voice": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "error-transform-canon-voices",
+   "input": "%T.canon('2,0,5)",
+   "patterns": {
+    "T": "c"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transform-canon-percussion",
+   "input": "%T.canon('2,12)",
+   "patterns": {
+    "T": "kick"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transform-thirds-chord",
+   "input": "%T.thirds",
+   "patterns": {
+    "T": "C"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-transform-two-voices",
+   "input": "%T.thirds.canon('2)",
+   "patterns": {
+    "T": "c"
+   },
+   "expect": {
+    "error": true
    }
   },
   {

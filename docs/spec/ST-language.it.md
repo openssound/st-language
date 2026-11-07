@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.12** · Implementazione di riferimento: la libreria Python
+**Versione 2.13** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -930,11 +930,13 @@ tabella lo dice.
 | `.retro` | `.retrogrado` | | gli eventi in ordine inverso | uguale |
 | `.sequence(n,passo)` | `.progressione(n,passo)` | n: intero ≥ 1, passo: intero | il pattern n volte, la presentazione k (da 0) spostata di k × passo gradi, come con `.step` | × n |
 | `.vel(x)` | `.vel(x)` | x: `+N` o `-N` (relativa, limitata a 1-127), `1`-`127` o una dinamica (assoluta) | cambia la velocity degli eventi che suonano; le automazioni non cambiano | uguale |
+| `.canon(ritardo,int,voci)` | `.canone(ritardo,int,voci)` | ritardo: un valore di nota (`'2`, `'4.`, `'8T`); int: semitoni, facoltativo, 0; voci: da 2 a 4, facoltativo, 2 | la voce k (da 0) e' il pattern trasposto di k × int semitoni, dopo una pausa di k × ritardo (2.13) | + (voci − 1) × ritardo |
+| `.thirds` | `.terze` | | aggiunge una seconda voce con le stesse durate, una terza diatonica sotto ogni nota (2.13) | uguale |
 
 Una nota come argomento si scrive come nella notazione (`e*5`, `bb*3`);
 senza ottava prende l'ottava predefinita.
 
-**Tonalita' di riferimento** (`.step`, `.sequence`): il `key=` scritto nel
+**Tonalita' di riferimento** (`.step`, `.sequence`, `.thirds`): il `key=` scritto nel
 pattern per ogni nota; altrimenti il `key=` in vigore nel punto del
 riferimento; altrimenti la `Tonalita:` in vigore nella sua battuta;
 altrimenti Do maggiore, con un avviso. Una trasposizione (`+N`,
@@ -942,7 +944,8 @@ altrimenti Do maggiore, con un avviso. Una trasposizione (`+N`,
 
 **Note fuori scala:** conservano l'alterazione. Una nota e' il suo grado
 piu' uno scarto: il grado si sposta e lo scarto resta (`c#` in Do maggiore
-un grado sopra e' `d#`, e `c` in Re maggiore un grado sopra e' `db`).
+un grado sopra e' `d#`, e `c` in Re maggiore un grado sopra e' `db`; la
+terza sotto `c#` in Do maggiore e' `a#`).
 
 **Accordi scritti come simbolo** con `.step` e `.sequence`: la
 fondamentale si sposta nella scala, e cosi' il basso. Un accordo della
@@ -954,7 +957,19 @@ la loro, con un avviso.
 e sull'ordine e non cambiano con quelle sulle altezze. `.retro` lascia
 velocity, segni e testo sul loro evento (con un avviso per il testo),
 scambia i due estremi di una legatura di portamento e tiene un abbellimento
-prima della sua nota. Un risultato a piu' voci si tratta voce per voce.
+prima della sua nota.
+
+**Piu' voci** (2.13). `.canon` e `.thirds` danno piu' voci, sulla stessa
+traccia, numerate dalla voce del riferimento, come un blocco di voci
+(sezione 8.4). Automazioni, pedale, indicazioni e sigle restano nella prima
+voce di un canone; il testo cantato resta nella prima voce di `.thirds`. Le
+altre funzioni e `+N` valgono poi per ogni voce, e `.invert` senza asse
+prende la prima altezza di ogni voce. `.retro` rovescia il blocco intero:
+una voce che finisce prima riceve una pausa in fondo, cosi' dopo il
+rovesciamento entra dopo. `.canon` e `.thirds` vogliono in ingresso una
+voce sola. `.canon` traspone in modo cromatico, come `+N`, quindi ammette
+simboli d'accordo e blocchi, e le percussioni solo con int 0. `.thirds`
+vale solo per le melodie.
 
 **Stato.** Come per ogni riferimento (sezione 8.2), quello che un pattern
 trasformato scrive non resta in vigore dopo di lui. I controlli di battuta
@@ -965,9 +980,12 @@ vicino), un argomento mancante, in piu' o sbagliato, uno spazio fra le
 parentesi, un'altezza fuori da MIDI 0-127, una durata piu' breve di
 `'128`, `.invert` su un simbolo d'accordo o senza altezze e senza asse,
 una legatura che entra nel riferimento, `bar=N` e i segni di navigazione
-nel pattern, `tempo=` nel pattern con `.augment`, `.diminish`, `.retro` o
-`.sequence`, slide, automazioni e pedale nel pattern con `.retro`. Una
-funzione fuori da un riferimento a un pattern (`C.retro`) e' un errore.
+nel pattern, `tempo=` nel pattern con `.augment`, `.diminish`, `.retro`,
+`.sequence` o `.canon`, slide, automazioni e pedale nel pattern con
+`.retro`, un ritardo che non e' un valore di nota, voci fuori da 2-4, un
+canone trasposto sulle percussioni, `.thirds` su accordi, blocchi o
+percussioni, `.canon` o `.thirds` su piu' voci. Una funzione fuori da un
+riferimento a un pattern (`C.retro`) e' un errore.
 
 ---
 
@@ -1214,7 +1232,7 @@ libero).
 
 | Riga | Significato |
 | --- | --- |
-| `ST: 2.12` | versione del linguaggio in cui e' scritto il file |
+| `ST: 2.13` | versione del linguaggio in cui e' scritto il file |
 | `Tempo: 120 BPM` | tempo (anche coi decimali: `Tempo: 101.4 BPM`) |
 | `Tempo: 1: 120, 5: 140` | tempo per battuta (battuta: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | metrica |
@@ -1508,6 +1526,9 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.13** — trasformazioni dei pattern a piu' voci: `.canon` e `.thirds`
+(sezione 8.12). Un file che le usa dichiara `ST: 2.13`.
 
 **2.12** — quello che un pattern scrive (griglia, velocity, swing,
 spostamento) finisce con lui, a ogni ripetizione (sezione 8.2). Cambia il

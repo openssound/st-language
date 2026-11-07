@@ -11,13 +11,13 @@ import difflib
 import re
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, NamedTuple, Optional, Tuple
 
 from ._i18n import tr
 from .chords import PITCH_CLASS, _canonical_quality, midi_to_pitch, pitch_to_midi
 from .notation import (DYNAMICS_TO_VELOCITY, Event, NotationError, Pattern, TRANSPOSE_RANGE, _PitchState,
                        _parse_tokens_exact, _transpose_chord, _transpose_key_name, expand_patterns,
-                       key_signature_alters, spell_midi)
+                       key_signature_alters, note_value_beats, spell_midi)
 
 SCALE_LETTERS = "cdefgab"
 MIN_DURATION = Fraction(1, 32)        # '128, la figura piu' breve
@@ -217,13 +217,17 @@ def _do_invert(events, end, ctx, axis=None):
            (ev.kind == "block" and any(i.get("kind") == "chord" for i in ev.items or ())) for ev in events):
         raise NotationError(tr("Un accordo scritto come simbolo non si puo' invertire: usa un blocco [...]"),
                             ctx.token)
-    axis = _first_pitch(events) if axis is None else axis
-    if axis is None:
+    for voice in sorted({ev.voice for ev in events}):       # senza asse, ogni voce ha il suo
+        part = [ev for ev in events if ev.voice == voice]
+        center = _first_pitch(part) if axis is None else axis
+        if center is None and any(ev.kind in _PITCHED_KINDS for ev in part):
+            raise NotationError(tr("Nessuna nota nel pattern: indica l'asse dell'inversione"), ctx.token)
+        for ev in part:
+            key = ev.key or ctx.key or ""
+            _map_pitches(ev, lambda name, octave: _spell(
+                _check_midi(2 * center - pitch_to_midi(name, octave), ctx), key), None)
+    if axis is None and _first_pitch(events) is None:
         raise NotationError(tr("Nessuna nota nel pattern: indica l'asse dell'inversione"), ctx.token)
-    for ev in events:
-        key = ev.key or ctx.key or ""
-        _map_pitches(ev, lambda name, octave: _spell(_check_midi(2 * axis - pitch_to_midi(name, octave), ctx), key),
-                     None)
     return events, end
 
 
@@ -266,6 +270,28 @@ def _attached(ev: Event) -> bool:
     return bool(ev.grace) or ev.kind in ("harmony", "text")
 
 
+_VOICE_KINDS = ("note", "chord", "block", "percussion", "slide", "rest")
+
+
+def _voices(events: List[Event]) -> List[int]:
+    return sorted({ev.voice for ev in events if ev.kind in _VOICE_KINDS})
+
+
+def _with_closing_rests(events: List[Event], end: Fraction) -> List[Event]:
+    """Con piu' voci, una pausa in fondo a quelle che finiscono prima: una
+    voce rovesciata comincia cosi' dove deve."""
+    voices = _voices(events)
+    if len(voices) < 2:
+        return events
+    closing = []
+    for voice in voices:
+        last = max(_exact(ev.start) + _exact(ev.duration) for ev in events
+                   if ev.voice == voice and ev.kind in _VOICE_KINDS)
+        if last < end:
+            closing.append(Event(start=float(last), duration=float(end - last), kind="rest", voice=voice))
+    return events + closing
+
+
 def _do_retro(events, end, ctx):
     _reject_tempo(events, ctx, "retro")
     if any(ev.kind == "slide" for ev in events):
@@ -274,6 +300,7 @@ def _do_retro(events, end, ctx):
         raise NotationError(tr("Automazioni e pedale nel pattern non si possono rovesciare con .retro"), ctx.token)
     if any(ev.lyric for ev in events):
         _warn(ctx, tr("con .retro il testo cantato si legge al contrario"))
+    events = _with_closing_rests(events, end)
     units: List[List[Event]] = []
     waiting: List[Event] = []
     for ev in sorted(events, key=lambda e: (e.voice, e.start)):
@@ -309,6 +336,49 @@ def _do_sequence(events, end, ctx, n, passo):
             ev.start = float(_exact(ev.start) + k * end)
         out.extend(part)
     return out, end * n
+
+
+# ------------------------------------------------------------------ piu' voci
+
+def _do_canon(events, end, ctx, delay, interval=0, voices=2):
+    _reject_tempo(events, ctx, "canon")
+    if not 2 <= voices <= 4:
+        raise NotationError(tr(".canon: le voci vanno da 2 a 4"), ctx.token)
+    if interval and any(ev.kind == "percussion" for ev in events):
+        raise NotationError(tr(".canon: le percussioni non si possono trasporre: usa un intervallo 0"), ctx.token)
+    first = _voices(events)[0] if _voices(events) else 1
+    out = list(events)
+    for k in range(1, voices):
+        # automazioni, pedale e indicazioni restano una volta sola, nella prima voce
+        part = [copy.deepcopy(ev) for ev in events if ev.kind in _VOICE_KINDS]
+        if k * interval:
+            _transpose(part, end, Context(ctx.key, ctx.default_octave, ctx.token, ctx.semitones, ctx.warnings),
+                       k * interval)
+        for ev in part:
+            ev.start = float(_exact(ev.start) + k * delay.beats)
+            ev.voice = first + k
+        out.append(Event(start=0.0, duration=float(k * delay.beats), kind="rest", voice=first + k))
+        out.extend(part)
+    return out, end + (voices - 1) * delay.beats
+
+
+def _parallel(events: List[Event], steps: int, ctx: Context) -> List[Event]:
+    """Le note di una melodia e, in piu', una voce a 'steps' gradi di
+    distanza nella scala, con le stesse durate."""
+    if any(ev.kind in ("chord", "block", "percussion") for ev in events):
+        raise NotationError(tr(".thirds si applica a melodie a una voce: niente accordi, blocchi o percussioni"),
+                            ctx.token)
+    first = _voices(events)[0] if _voices(events) else 1
+    second = [copy.deepcopy(ev) for ev in events if ev.kind in ("note", "slide", "rest")]
+    _step_events(second, steps, ctx)
+    for ev in second:
+        ev.voice = first + 1
+        ev.lyric = ev.verses = None
+    return events + second
+
+
+def _do_thirds(events, end, ctx):
+    return _parallel(events, -2, ctx), end
 
 
 # ------------------------------------------------------------------ dinamica
@@ -366,6 +436,19 @@ def _note(text: str, ctx_name: str, label: str):
     return m.group(1) + m.group(2), int(m.group(3)) if m.group(3) else None
 
 
+class NoteValue(NamedTuple):
+    """Una durata scritta come valore di nota: '2, '4., '8T."""
+    text: str
+    beats: Fraction
+
+
+def _note_value(text: str, ctx_name: str, label: str) -> NoteValue:
+    if not re.match(r"^'\d+[TQSD]?\.{0,2}$", text):
+        raise NotationError(tr(".{name}: {label} deve essere una durata, come '2 o '4.", name=ctx_name, label=label),
+                            text)
+    return NoteValue(text, note_value_beats(text))
+
+
 def _velocity(text: str, ctx_name: str, label: str) -> Tuple[bool, int]:
     """(relativa, numero): +10 e -20 sono relative, 80 e mf assolute."""
     if text in DYNAMICS_TO_VELOCITY:
@@ -394,6 +477,8 @@ class Transform:
     duration: Callable                    # (durata in ingresso, argomenti) -> durata
     help: str
     example: str = ""
+    single_voice: bool = False            # con un ingresso a piu' voci e' un errore
+    makes_voices: bool = False            # il risultato ha piu' voci
 
 
 def _same(duration, *_args):
@@ -418,6 +503,12 @@ TRANSFORMS: Dict[str, Transform] = {t.name: t for t in (
               "%Motivo.sequence(3,-1)"),
     Transform("vel", "vel", (Argument("x", _velocity),), _do_vel, _same,
               "Velocity relativa (+10) o assoluta (80, mf)", "%Tema.vel(-20)"),
+    Transform("canon", "canone", (Argument("ritardo", _note_value), Argument("int", _integer, required=False),
+                                  Argument("voci", _integer, required=False)), _do_canon,
+              lambda d, delay, _interval=0, voices=2: d + (voices - 1) * delay.beats,
+              "Canone: copie sfasate e trasposte", "%Tema.canon('2,12)", single_voice=True, makes_voices=True),
+    Transform("thirds", "terze", (), _do_thirds, _same,
+              "Aggiunge la terza sotto, nella scala", "%Tema.thirds", single_voice=True, makes_voices=True),
 )}
 _BY_NAME = {alias: t for t in TRANSFORMS.values() for alias in (t.name, t.alias)}
 
@@ -483,7 +574,10 @@ def apply_steps(events: List[Event], end: Fraction, steps: List[Step], ctx: Cont
     for step in steps:
         if step.name == "transpose":
             events, end = _transpose(events, end, ctx, *step.args)
-        elif step.name == "invert" and step.args:
+            continue
+        if TRANSFORMS[step.name].single_voice and len(_voices(events)) > 1:
+            raise NotationError(tr(".{name} si applica a una voce sola", name=step.name), ctx.token)
+        if step.name == "invert" and step.args:
             name, octave = step.args[0]
             axis = pitch_to_midi(name, ctx.default_octave if octave is None else octave)
             events, end = _do_invert(events, end, ctx, axis)
@@ -504,7 +598,8 @@ def duration_after(step: Step, duration: Fraction) -> Fraction:
 def list_transforms() -> List[dict]:
     """Le funzioni: nome inglese, alias italiano, argomenti e aiuto breve
     tradotto, per il completamento e la finestra Trasforma."""
-    return [{"name": t.name, "alias": t.alias, "help": tr(t.help),
+    return [{"name": t.name, "alias": t.alias, "help": tr(t.help), "single_voice": t.single_voice,
+             "makes_voices": t.makes_voices,
              "arguments": [{"name": a.name, "required": a.required} for a in t.arguments]}
             for t in TRANSFORMS.values()]
 
@@ -571,6 +666,8 @@ def _without_keys(events: List[Event]) -> List[Event]:
 
 
 def _argument_text(value) -> str:
+    if isinstance(value, NoteValue):
+        return value.text
     if isinstance(value, tuple) and len(value) == 2 and isinstance(value[0], bool):
         relative, number = value
         return f"{number:+d}" if relative else str(number)

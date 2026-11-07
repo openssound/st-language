@@ -110,6 +110,14 @@ CASES = [
     ("transform-sequence", "%T.sequence(3,-1) %T.progressione(2,0)", {"patterns": {"T": "key=C 8: c*5 d*5 e*5 c*5"}}),
     ("transform-vel", "%T.vel(-30) %T.vel(p) %T.vel(90) %T.vel(+40)", {"patterns": {"T": "100@ c d"}}),
     ("transform-repeat-and-state", "60@ 8: 2%T.retro c", {"patterns": {"T": "4: 100@ d e"}}),
+    ("transform-canon", "%T.canon('2,12) %T.canone('4,7,3)", {"patterns": {"T": "4: c*4 d*4 e*4 c*4"}}),
+    ("transform-canon-then-function", "%T.canon('2,12).octave(-1).vel(-10)", {"patterns": {"T": "c*4 d*4"}}),
+    ("transform-canon-retro", "%T.canon('2).retro", {"patterns": {"T": "c d e"}}),
+    ("transform-thirds", "%T.thirds %T.terze+2", {"patterns": {"T": "key=C 4: e*5 f*5 r c#*5"}}),
+    ("error-transform-canon-voices", "%T.canon('2,0,5)", {"patterns": {"T": "c"}}),
+    ("error-transform-canon-percussion", "%T.canon('2,12)", {"patterns": {"T": "kick"}}),
+    ("error-transform-thirds-chord", "%T.thirds", {"patterns": {"T": "C"}}),
+    ("error-transform-two-voices", "%T.thirds.canon('2)", {"patterns": {"T": "c"}}),
     ("error-transform-unknown", "%T.invertt", {"patterns": {"T": "c"}}),
     ("error-transform-space", "%T.sequence(3, -1)", {"patterns": {"T": "c"}}),
     ("error-transform-argument", "%T.octave(x)", {"patterns": {"T": "c"}}),
@@ -338,7 +346,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "2.12", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.13", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 
