@@ -663,6 +663,43 @@ def test_transforms_api_for_soundtext():
     assert names["sequence"]["alias"] == "progressione" and names["invert"]["arguments"][0]["required"] is False
 
 
+def test_expand_reference_for_the_preview():
+    from st_language.transform import describe_transform, expand_reference
+    song = _song_with()
+
+    def letters(events):
+        return [e.letter for e in events if e.kind == "note"]
+
+    found = expand_reference("%Tema.invert(e*4).retro+2", song.patterns)
+    assert letters(found.events) == [e.letter for e in st.parse("%Tema.invert(e*4).retro+2", song.patterns)]
+    assert found.duration == 3 and found.warnings == []
+    assert [step.name if step else None for step, _ in found.stages] == [None, "invert", "retro", "transpose"]
+    assert letters(found.stages[0][1]) == ["c", "e", "g"]
+    assert letters(found.stages[1][1]) == ["g#", "e", "c#"]
+    assert letters(found.stages[2][1]) == ["c#", "e", "g#"]
+    # le ripetizioni, un richiamo senza funzioni, la griglia del punto del richiamo
+    repeated = expand_reference("2%Tema.retro", song.patterns)
+    assert [e.start for e in repeated.events] == [0, 1, 2, 3, 4, 5] and repeated.duration == 6
+    assert expand_reference("%Tema", song.patterns).stages[0][0] is None
+    plain = _song_with({"M": "c d"})
+    assert expand_reference("%M", plain.patterns, grid=0.5, velocity=100).events[1].start == 0.5
+    assert expand_reference("%M", plain.patterns, velocity=100).events[0].velocity == 100
+    # la tonalita': quella del punto, poi quella del brano, poi l'avviso
+    assert letters(expand_reference("%M.step(1)", plain.patterns, key="Eb").events) == ["d", "eb"]
+    meter = st.Meter(key="Eb", key_changes=[(1, "Eb"), (3, "G")])
+    assert letters(expand_reference("%M.step(1)", plain.patterns, meter=meter).events) == ["d", "eb"]
+    assert letters(expand_reference("%M.step(1)", plain.patterns, meter=meter, position=8).events) == ["d", "e"]
+    assert expand_reference("%M.step(1)", plain.patterns).warnings
+    assert all(e.key is None for _, stage in found.stages for e in stage) and all(e.key is None for e in found.events)
+    with pytest.raises(st.NotationError):
+        expand_reference("%Nessuno.retro", song.patterns)
+    info = describe_transform(".progressione")
+    assert info["name"] == "sequence" and info["signature"] == ".sequence(n,passo)" and info["example"]
+    assert describe_transform("retro")["signature"] == ".retro"
+    with pytest.raises(st.NotationError):
+        describe_transform("xyzzy")
+
+
 def test_plain_notation_file_is_a_one_track_song(tmp_path):
     path = tmp_path / "solo.txt"
     path.write_text("8: c d e f", encoding="utf-8")

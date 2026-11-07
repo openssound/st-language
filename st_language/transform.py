@@ -15,8 +15,9 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from ._i18n import tr
 from .chords import PITCH_CLASS, _canonical_quality, midi_to_pitch, pitch_to_midi
-from .notation import (DYNAMICS_TO_VELOCITY, Event, NotationError, TRANSPOSE_RANGE, _PitchState, _transpose_chord,
-                       _transpose_key_name, key_signature_alters, spell_midi)
+from .notation import (DYNAMICS_TO_VELOCITY, Event, NotationError, Pattern, TRANSPOSE_RANGE, _PitchState,
+                       _parse_tokens_exact, _transpose_chord, _transpose_key_name, expand_patterns,
+                       key_signature_alters, spell_midi)
 
 SCALE_LETTERS = "cdefgab"
 MIN_DURATION = Fraction(1, 32)        # '128, la figura piu' breve
@@ -392,6 +393,7 @@ class Transform:
     apply: Callable
     duration: Callable                    # (durata in ingresso, argomenti) -> durata
     help: str
+    example: str = ""
 
 
 def _same(duration, *_args):
@@ -400,21 +402,22 @@ def _same(duration, *_args):
 
 TRANSFORMS: Dict[str, Transform] = {t.name: t for t in (
     Transform("octave", "ottava", (Argument("n", _integer),), _do_octave, _same,
-              "Sposta di n ottave"),
+              "Sposta di n ottave", "%Tema.octave(-1)"),
     Transform("invert", "inverti", (Argument("asse", _note, required=False),), _do_invert, _same,
-              "Inversione cromatica intorno a una nota"),
+              "Inversione cromatica intorno a una nota", "%Tema.invert(e*4)"),
     Transform("step", "grado", (Argument("n", _integer),), _do_step, _same,
-              "Trasposizione diatonica: n gradi nella scala"),
+              "Trasposizione diatonica: n gradi nella scala", "%Tema.step(2)"),
     Transform("augment", "aumenta", (Argument("k", _factor),), _do_augment, lambda d, k: d * k,
-              "Durate per k"),
+              "Durate per k", "%Tema.augment(2)"),
     Transform("diminish", "diminuisci", (Argument("k", _factor),), _do_diminish, lambda d, k: d / k,
-              "Durate diviso k"),
+              "Durate diviso k", "%Tema.diminish(2)"),
     Transform("retro", "retrogrado", (), _do_retro, _same,
-              "Dalla fine all'inizio"),
+              "Dalla fine all'inizio", "%Tema.retro"),
     Transform("sequence", "progressione", (Argument("n", _integer), Argument("passo", _integer)), _do_sequence,
-              lambda d, n, _passo: d * n, "Il motivo n volte, ogni volta spostato di passo gradi"),
+              lambda d, n, _passo: d * n, "Il motivo n volte, ogni volta spostato di passo gradi",
+              "%Motivo.sequence(3,-1)"),
     Transform("vel", "vel", (Argument("x", _velocity),), _do_vel, _same,
-              "Velocity relativa (+10) o assoluta (80, mf)"),
+              "Velocity relativa (+10) o assoluta (80, mf)", "%Tema.vel(-20)"),
 )}
 _BY_NAME = {alias: t for t in TRANSFORMS.values() for alias in (t.name, t.alias)}
 
@@ -504,6 +507,67 @@ def list_transforms() -> List[dict]:
     return [{"name": t.name, "alias": t.alias, "help": tr(t.help),
              "arguments": [{"name": a.name, "required": a.required} for a in t.arguments]}
             for t in TRANSFORMS.values()]
+
+
+def describe_transform(name: str) -> dict:
+    """Una funzione, per il suggerimento e la guida: nome inglese o alias
+    italiano in ingresso; nome, alias, firma, aiuto tradotto ed esempio."""
+    transform = _BY_NAME.get(name.lower().lstrip("."))
+    if transform is None:
+        raise NotationError(tr(".{name} non esiste", name=name.lstrip(".")), name)
+    arguments = ",".join(a.name for a in transform.arguments)
+    return {"name": transform.name, "alias": transform.alias, "help": tr(transform.help),
+            "signature": f".{transform.name}({arguments})" if arguments else f".{transform.name}",
+            "example": transform.example}
+
+
+@dataclass
+class Expansion:
+    """Quello che suona un richiamo: gli eventi (dall'inizio del richiamo,
+    a 0) e la durata in quarti; 'stages' ha, dopo il pattern com'e', una
+    coppia (passo, eventi) per ogni passo della catena. Se il richiamo si
+    ripete (3%Tema.retro), stages vale per una presentazione sola."""
+    events: List[Event]
+    duration: float
+    stages: List[tuple]
+    warnings: List[str]
+
+
+def expand_reference(tok: str, patterns: Dict[str, Pattern], default_octave: int = 4, meter=None,
+                     position: float = 0.0, key: str = "", grid: float = 1.0, velocity: int = 80) -> Expansion:
+    """Gli eventi di un richiamo, con o senza funzioni, e quelli dopo ogni
+    passo, per l'anteprima delle note e la finestra Trasforma. 'grid'
+    (in quarti) e 'velocity' sono quelli del punto del richiamo; la
+    tonalita' di riferimento e' 'key' (il key= in vigore in quel punto) o,
+    con 'meter', la Tonalita: del brano a 'position' (in quarti). Solleva
+    NotationError come il parser."""
+    reference = parse_reference(tok)
+    if reference.pattern not in patterns:
+        raise NotationError(tr("Pattern '%{name}' non definito", name=reference.pattern), tok)
+    origin = _exact(position)
+    tokens = expand_patterns(["%" + reference.pattern], patterns, default_octave=default_octave)
+    events, end, _ = _parse_tokens_exact(tokens, default_octave, _exact(grid), initial_velocity=velocity,
+                                         meter=meter, origin_beat=origin, record_keys=True)
+    ctx = Context(key or (meter.key_at(origin) if meter is not None else "") or None, default_octave, tok)
+    events = [ev for ev in events if ev.kind != "repeat"]
+    stages = [(None, _without_keys(events))]
+    for step in reference.steps:
+        events, end = apply_steps(events, end, [step], ctx)
+        stages.append((step, _without_keys(events)))
+    result: List[Event] = []
+    for k in range(reference.mult):
+        for ev in stages[-1][1]:
+            ev = copy.deepcopy(ev)
+            ev.start = float(_exact(ev.start) + k * end)
+            result.append(ev)
+    return Expansion(result, float(end * reference.mult), stages, ctx.warnings)
+
+
+def _without_keys(events: List[Event]) -> List[Event]:
+    events = copy.deepcopy(events)
+    for ev in events:
+        ev.key = None
+    return events
 
 
 def _argument_text(value) -> str:
