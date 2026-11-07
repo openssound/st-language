@@ -395,6 +395,15 @@ def test_a_file_before_2_12_keeps_its_sound(body, patterns, text, durations):
     assert written == text and [n[2] for n in notes] == durations
 
 
+def test_upgrade_pattern_state_for_a_new_pattern():
+    """Trasforma in pattern: il pezzo spostato portava via anche arp=, e
+    va riscritto solo il richiamo del pattern nuovo."""
+    from st_language.notation import upgrade_pattern_state
+    new = {"N": st.Pattern("N", st.tokenize("8: 100@ arp=up c"))}
+    assert upgrade_pattern_state("%Altro %N C", new) == "%Altro %N 8: 100@ arp=up C"
+    assert upgrade_pattern_state("%N", new) == "%N"
+
+
 def test_nested_patterns_are_upgraded_too():
     assert [n[2] for n in _as_before("%A", {"A": "%B c", "B": "8: d"})[1]] == [0.5, 0.5]
     assert [n[2] for n in _as_before("%A c", {"A": "%B", "B": "8: d"})[1]] == [0.5, 0.5]

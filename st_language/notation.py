@@ -2367,9 +2367,10 @@ def validate_track_text(text: str, patterns: Dict[str, Pattern], default_octave:
 # song.upgrade_song_text), aggiungendo quello che prima usciva dal pattern.
 # ---------------------------------------------------------------------------
 
-_STATE_SLOTS = ("grid", "velocity", "swing", "shift")
+_STATE_SLOTS = ("grid", "velocity", "swing", "shift", "arp")
 _STATE_DEFAULTS = {"grid": "4:", "velocity": "80@", "swing": "swing=50", "shift": "shift=0"}
-_STATE_RES = (("grid", RE_GRID), ("velocity", RE_VELOCITY), ("swing", RE_SWING), ("shift", RE_SHIFT))
+_STATE_RES = (("grid", RE_GRID), ("velocity", RE_VELOCITY), ("swing", RE_SWING), ("shift", RE_SHIFT),
+              ("arp", RE_ARP))
 def _is_rest(tok: str) -> bool:
     return bool(RE_REST.match(tok.partition("'")[0]))
 
