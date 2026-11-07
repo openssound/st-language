@@ -114,6 +114,22 @@ CASES = [
     ("transform-canon-then-function", "%T.canon('2,12).octave(-1).vel(-10)", {"patterns": {"T": "c*4 d*4"}}),
     ("transform-canon-retro", "%T.canon('2).retro", {"patterns": {"T": "c d e"}}),
     ("transform-thirds", "%T.thirds %T.terze+2", {"patterns": {"T": "key=C 4: e*5 f*5 r c#*5"}}),
+    ("transform-arpeggio-types", "%T.arpeggio(up,8) %T.arpeggio(down,8) %T.arpeggio(updown,8) %T.arpeggio(alberti,8)",
+     {"patterns": {"T": "[c*4 e*4 g*4]'1"}}),
+    ("transform-arpeggio-grid-of-the-reference", "8: %T.arpeggio c", {"patterns": {"T": "[c*4 e*4]'2"}}),
+    ("transform-arpeggio-mixed", "%T.arpeggio(su,8)", {"patterns": {"T": "c [e*4 g*4]'2 r"}}),
+    ("arpeggio-on-a-block", "[c e g]'2.arpeggio(down,8) 2[c e].arpeggio(up,8)$fermata", {}),
+    ("arpeggio-on-a-chord", "2C.arpeggio(up,8) Cmaj7.drop2.arpeggio", {}),
+    ("arpeggio-tied", "4: [c e].arpeggio(up,8)~ [c e]", {}),
+    ("arpeggio-state", "arp=alberti,8 [c e g]'1 8: arp=up [c e]'4 arp=off [c e]", {}),
+    ("arpeggio-state-override", "arp=up,8 [c e]'4.arpeggio(off) [c e]'4.arpeggio(down) [c e]'4", {}),
+    ("arpeggio-state-ends-with-the-pattern", "%T [c e]'4", {"patterns": {"T": "arp=up,8 [c e]'4"}}),
+    ("arpeggio-velocity", "100@ [c e]'2.arpeggio(up,8)", {}),
+    ("error-arpeggio-on-a-note", "c.arpeggio", {}),
+    ("error-arpeggio-roll", "C$arp.arpeggio", {}),
+    ("error-arpeggio-type", "arp=boh C", {}),
+    ("error-arpeggio-pattern-off", "%T.arpeggio(off)", {"patterns": {"T": "C"}}),
+    ("error-arpeggio-percussion", "%T.arpeggio", {"patterns": {"T": "kick"}}),
     ("error-transform-canon-voices", "%T.canon('2,0,5)", {"patterns": {"T": "c"}}),
     ("error-transform-canon-percussion", "%T.canon('2,12)", {"patterns": {"T": "kick"}}),
     ("error-transform-thirds-chord", "%T.thirds", {"patterns": {"T": "C"}}),
@@ -346,7 +362,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "2.13", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.12", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 

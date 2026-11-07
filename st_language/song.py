@@ -71,7 +71,7 @@ class Part:
     def parsed_events(self, patterns: Dict[str, Pattern], midi_dir: Optional[str] = None,
                       meter: Optional[Meter] = None) -> List[Event]:
         return parse_track_text(self.text, patterns, default_octave=self.instrument.default_octave,
-                                midi_dir=midi_dir, meter=meter)
+                                midi_dir=midi_dir, meter=meter, instrument=self.instrument)
 
 
 @dataclass

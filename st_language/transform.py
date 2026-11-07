@@ -16,8 +16,8 @@ from typing import Callable, Dict, List, NamedTuple, Optional, Tuple
 from ._i18n import tr
 from .chords import PITCH_CLASS, _canonical_quality, midi_to_pitch, pitch_to_midi
 from .notation import (DYNAMICS_TO_VELOCITY, Event, NotationError, Pattern, TRANSPOSE_RANGE, _PitchState,
-                       _parse_tokens_exact, _transpose_chord, _transpose_key_name, expand_patterns,
-                       key_signature_alters, note_value_beats, spell_midi)
+                       _parse_tokens_exact, _transpose_chord, _transpose_key_name, arpeggio_choice,
+                       expand_patterns, grid_value_beats, key_signature_alters, note_value_beats, spell_midi)
 
 SCALE_LETTERS = "cdefgab"
 MIN_DURATION = Fraction(1, 32)        # '128, la figura piu' breve
@@ -54,6 +54,8 @@ class Context:
     token: str = ""
     semitones: int = 0                    # la trasposizione del richiamo: vale anche per il Do di ripiego
     warnings: List[str] = field(default_factory=list)
+    instrument: object = None             # sceglie le note degli accordi arpeggiati
+    grid: Fraction = Fraction(1)          # la griglia del punto del richiamo
 
 
 def _warn(ctx: Context, message: str) -> None:
@@ -381,6 +383,99 @@ def _do_thirds(events, end, ctx):
     return _parallel(events, -2, ctx), end
 
 
+# ------------------------------------------------------------------ arpeggio
+
+def _arpeggio_order(kind: str, count: int) -> List[int]:
+    """L'ordine in cui si suonano le 'count' note, dal grave all'acuto,
+    prima di ricominciare."""
+    rising = list(range(count))
+    if kind == "down":
+        return rising[::-1]
+    if kind == "updown":
+        return rising + rising[-2:0:-1]
+    if kind == "alberti" and count > 2:
+        return [0, count - 1, count // 2, count - 1]
+    return rising
+
+
+def _chord_pitches(ev: Event, instrument, key: str) -> List[Tuple[str, int]]:
+    """Le note di un accordo o di un blocco, dal grave all'acuto, come
+    suonerebbero tenute: con il voicing dello strumento."""
+    from .instruments import DEFAULT_INSTRUMENTS
+    from .midi import _resolve_event_notes
+    written = {pitch_to_midi(i["letter"], i["octave"]): (i["letter"], i["octave"])
+               for i in ev.items or () if i.get("kind") == "note"}
+    notes = _resolve_event_notes(ev, instrument or DEFAULT_INSTRUMENTS["Piano"])[0]
+    return [written.get(midi) or _spell(midi, key) for midi in sorted(set(notes))]
+
+
+def arpeggiate(ev: Event, kind: str, grid: Fraction, instrument, key: str = "") -> List[Event]:
+    """Le note dell'accordo spezzato: durano 'grid' e scorrono nell'ordine
+    del tipo fino a riempire la durata, accorciando l'ultima. Velocity,
+    swing e spostamento sono quelli dell'accordo; il primo evento prende
+    segni e testo, l'ultimo la corona."""
+    pitches = _chord_pitches(ev, instrument, key)
+    order = _arpeggio_order(kind, len(pitches))
+    start, total = _exact(ev.start), _exact(ev.duration)
+    out: List[Event] = []
+    position = Fraction(0)
+    while position < total:
+        name, octave = pitches[order[len(out) % len(order)]]
+        out.append(Event(start=float(start + position), duration=float(min(grid, total - position)), kind="note",
+                         velocity=ev.velocity, letter=name, octave=octave, voice=ev.voice, swing=ev.swing,
+                         shift=ev.shift, articulation=ev.articulation, key=key or None))
+        position += grid
+    if not out:
+        return []
+    marks = ev.decorations or []
+    out[0].decorations = [d for d in marks if d != "fermata"] or None
+    if "fermata" in marks:
+        out[-1].decorations = (out[-1].decorations or []) + ["fermata"]
+    out[0].lyric, out[0].verses = ev.lyric, ev.verses
+    if ev.slur:
+        for note in out:
+            note.slur = "continue"
+        if ev.slur == "start":
+            out[0].slur = "start"
+        if ev.slur == "stop":
+            out[-1].slur = "stop"
+    return out
+
+
+def expand_arpeggios(events: List[Event], instrument, keep_keys: bool = False) -> List[Event]:
+    """Gli accordi e i blocchi segnati dal parser (.arpeggio, arp=)
+    sostituiti dalle loro note."""
+    out: List[Event] = []
+    for ev in events:
+        if not ev.arp:
+            out.append(ev)
+            continue
+        kind, grid, key = ev.arp
+        notes = arpeggiate(ev, kind, grid, instrument, key or "")
+        if not keep_keys:
+            for note in notes:
+                note.key = None
+        out.extend(notes)
+    return out
+
+
+def _do_arpeggio(events, end, ctx, choice=("up", None)):
+    if choice is None:
+        raise NotationError(tr(".arpeggio(off) vale solo su un accordo, sotto arp="), ctx.token)
+    kind, grid = choice
+    out: List[Event] = []
+    for ev in events:
+        if ev.kind == "percussion" or (ev.kind == "block" and any(i.get("kind") == "percussion" for i in ev.items)):
+            raise NotationError(tr(".arpeggio va su un accordo o su un blocco di note"), ctx.token)
+        if ev.kind not in ("chord", "block") or ev.grace:
+            out.append(ev)
+        elif "arp" in (ev.decorations or []):
+            raise NotationError(tr("Scegli fra accordo spezzato (.arpeggio) e accordo rullato ($arp)"), ctx.token)
+        else:
+            out.extend(arpeggiate(ev, kind, grid or ctx.grid, ctx.instrument, ev.key or ctx.key or ""))
+    return out, end
+
+
 # ------------------------------------------------------------------ dinamica
 
 _VELOCITY_KINDS = ("note", "chord", "block", "percussion", "slide")
@@ -434,6 +529,10 @@ def _note(text: str, ctx_name: str, label: str):
     if not m:
         raise NotationError(tr(".{name}: {label} deve essere una nota", name=ctx_name, label=label), text)
     return m.group(1) + m.group(2), int(m.group(3)) if m.group(3) else None
+
+
+def _arpeggio_kind(text: str, _name: str, _label: str):
+    return text.lower().replace("ù", "u")
 
 
 class NoteValue(NamedTuple):
@@ -509,6 +608,9 @@ TRANSFORMS: Dict[str, Transform] = {t.name: t for t in (
               "Canone: copie sfasate e trasposte", "%Tema.canon('2,12)", single_voice=True, makes_voices=True),
     Transform("thirds", "terze", (), _do_thirds, _same,
               "Aggiunge la terza sotto, nella scala", "%Tema.thirds", single_voice=True, makes_voices=True),
+    Transform("arpeggio", "arpeggio", (Argument("tipo", _arpeggio_kind, required=False),
+                                       Argument("griglia", _arpeggio_kind, required=False)), None, _same,
+              "Gli accordi diventano arpeggi", "%Giro.arpeggio(alberti,8)", single_voice=True),
 )}
 _BY_NAME = {alias: t for t in TRANSFORMS.values() for alias in (t.name, t.alias)}
 
@@ -558,6 +660,8 @@ def _parse_step(call, tok: str) -> Step:
     texts = [t for t in (raw or "").split(",")] if raw else []
     if len(texts) > len(transform.arguments):
         raise NotationError(tr(".{name}: troppi argomenti", name=transform.name), tok)
+    if transform.name == "arpeggio":          # tipo e griglia si controllano subito
+        arpeggio_choice(texts[0] if texts else "up", texts[1] if texts[1:] else None)
     args = []
     for k, argument in enumerate(transform.arguments):
         if k < len(texts):
@@ -577,7 +681,10 @@ def apply_steps(events: List[Event], end: Fraction, steps: List[Step], ctx: Cont
             continue
         if TRANSFORMS[step.name].single_voice and len(_voices(events)) > 1:
             raise NotationError(tr(".{name} si applica a una voce sola", name=step.name), ctx.token)
-        if step.name == "invert" and step.args:
+        if step.name == "arpeggio":
+            kind = step.args[0] if step.args else "up"
+            events, end = _do_arpeggio(events, end, ctx, arpeggio_choice(kind, step.args[1] if step.args[1:] else None))
+        elif step.name == "invert" and step.args:
             name, octave = step.args[0]
             axis = pitch_to_midi(name, ctx.default_octave if octave is None else octave)
             events, end = _do_invert(events, end, ctx, axis)
@@ -629,12 +736,14 @@ class Expansion:
 
 
 def expand_reference(tok: str, patterns: Dict[str, Pattern], default_octave: int = 4, meter=None,
-                     position: float = 0.0, key: str = "", grid: float = 1.0, velocity: int = 80) -> Expansion:
+                     position: float = 0.0, key: str = "", grid: float = 1.0, velocity: int = 80,
+                     instrument=None) -> Expansion:
     """Gli eventi di un richiamo, con o senza funzioni, e quelli dopo ogni
     passo, per l'anteprima delle note e la finestra Trasforma. 'grid'
     (in quarti) e 'velocity' sono quelli del punto del richiamo; la
     tonalita' di riferimento e' 'key' (il key= in vigore in quel punto) o,
-    con 'meter', la Tonalita: del brano a 'position' (in quarti). Solleva
+    con 'meter', la Tonalita: del brano a 'position' (in quarti).
+    'instrument' sceglie le note degli accordi arpeggiati. Solleva
     NotationError come il parser."""
     reference = parse_reference(tok)
     if reference.pattern not in patterns:
@@ -642,9 +751,10 @@ def expand_reference(tok: str, patterns: Dict[str, Pattern], default_octave: int
     origin = _exact(position)
     tokens = expand_patterns(["%" + reference.pattern], patterns, default_octave=default_octave)
     events, end, _ = _parse_tokens_exact(tokens, default_octave, _exact(grid), initial_velocity=velocity,
-                                         meter=meter, origin_beat=origin, record_keys=True)
-    ctx = Context(key or (meter.key_at(origin) if meter is not None else "") or None, default_octave, tok)
-    events = [ev for ev in events if ev.kind != "repeat"]
+                                         meter=meter, origin_beat=origin, record_keys=True, instrument=instrument)
+    ctx = Context(key or (meter.key_at(origin) if meter is not None else "") or None, default_octave, tok,
+                  instrument=instrument, grid=_exact(grid))
+    events = [ev for ev in expand_arpeggios(events, instrument, keep_keys=True) if ev.kind != "repeat"]
     stages = [(None, _without_keys(events))]
     for step in reference.steps:
         events, end = apply_steps(events, end, [step], ctx)
@@ -677,6 +787,9 @@ def _argument_text(value) -> str:
     return f"{float(value):g}" if isinstance(value, Fraction) else str(value)
 
 
+_ITALIAN_WORDS = {"up": "su", "down": "giu", "updown": "sugiu"}
+
+
 def format_reference(reference: Reference, italian: bool = False) -> str:
     """Il testo del richiamo: nomi inglesi, o italiani con italian=True."""
     text = (str(reference.mult) if reference.mult > 1 else "") + "%" + reference.pattern
@@ -687,5 +800,6 @@ def format_reference(reference: Reference, italian: bool = False) -> str:
         transform = TRANSFORMS[step.name]
         text += "." + (transform.alias if italian else transform.name)
         if step.args:
-            text += "(" + ",".join(_argument_text(a) for a in step.args) + ")"
+            words = ",".join(_argument_text(a) for a in step.args)
+            text += "(" + (",".join(_ITALIAN_WORDS.get(w, w) for w in words.split(",")) if italian else words) + ")"
     return text

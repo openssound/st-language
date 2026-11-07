@@ -1,5 +1,5 @@
 {
- "spec_version": "2.13",
+ "spec_version": "2.12",
  "cases": [
   {
    "id": "notes-basic",
@@ -6184,6 +6184,826 @@
       "voice": 2
      }
     ]
+   }
+  },
+  {
+   "id": "transform-arpeggio-types",
+   "input": "%T.arpeggio(up,8) %T.arpeggio(down,8) %T.arpeggio(updown,8) %T.arpeggio(alberti,8)",
+   "patterns": {
+    "T": "[c*4 e*4 g*4]'1"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 2.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 3.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 4.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 5.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 6.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 7.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 8.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 9.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 10.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 11.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 11.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 12.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 12.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 13.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 13.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 14.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 14.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 15.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 15.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-arpeggio-grid-of-the-reference",
+   "input": "8: %T.arpeggio c",
+   "patterns": {
+    "T": "[c*4 e*4]'2"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "transform-arpeggio-mixed",
+   "input": "%T.arpeggio(su,8)",
+   "patterns": {
+    "T": "c [e*4 g*4]'2 r"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 2.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "rest",
+      "velocity": 80
+     }
+    ]
+   }
+  },
+  {
+   "id": "arpeggio-on-a-block",
+   "input": "[c e g]'2.arpeggio(down,8) 2[c e].arpeggio(up,8)$fermata",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 3.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4,
+      "decorations": [
+       "fermata"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "arpeggio-on-a-chord",
+   "input": "2C.arpeggio(up,8) Cmaj7.drop2.arpeggio",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "arpeggio-tied",
+   "input": "4: [c e].arpeggio(up,8)~ [c e]",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "arpeggio-state",
+   "input": "arp=alberti,8 [c e g]'1 8: arp=up [c e]'4 arp=off [c e]",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 3.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 4.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 0.5,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "c",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "e",
+        "octave": 4
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "arpeggio-state-override",
+   "input": "arp=up,8 [c e]'4.arpeggio(off) [c e]'4.arpeggio(down) [c e]'4",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "c",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "e",
+        "octave": 4
+       }
+      ]
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 2.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "arpeggio-state-ends-with-the-pattern",
+   "input": "%T [c e]'4",
+   "patterns": {
+    "T": "arp=up,8 [c e]'4"
+   },
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "c",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "e",
+        "octave": 4
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "arpeggio-velocity",
+   "input": "100@ [c e]'2.arpeggio(up,8)",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "e",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "c",
+      "octave": 4
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "note",
+      "velocity": 100,
+      "letter": "e",
+      "octave": 4
+     }
+    ]
+   }
+  },
+  {
+   "id": "error-arpeggio-on-a-note",
+   "input": "c.arpeggio",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-arpeggio-roll",
+   "input": "C$arp.arpeggio",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-arpeggio-type",
+   "input": "arp=boh C",
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-arpeggio-pattern-off",
+   "input": "%T.arpeggio(off)",
+   "patterns": {
+    "T": "C"
+   },
+   "expect": {
+    "error": true
+   }
+  },
+  {
+   "id": "error-arpeggio-percussion",
+   "input": "%T.arpeggio",
+   "patterns": {
+    "T": "kick"
+   },
+   "expect": {
+    "error": true
    }
   },
   {

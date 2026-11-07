@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.13** · Reference implementation: the `st_language` Python
+**Version 2.12** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -902,8 +902,8 @@ regard to case. An argument may be left out only if the table says so.
 | `.retro` | `.retrogrado` | | the events in reverse order | same |
 | `.sequence(n,step)` | `.progressione(n,step)` | n: integer ≥ 1, step: integer | the pattern n times, presentation k (from 0) moved by k × step degrees, as with `.step` | × n |
 | `.vel(x)` | `.vel(x)` | x: `+N` or `-N` (relative, limited to 1-127), `1`-`127` or a dynamic (absolute) | changes the velocity of sounding events; automations are not touched | same |
-| `.canon(delay,int,voices)` | `.canone(delay,int,voices)` | delay: a note value (`'2`, `'4.`, `'8T`); int: semitones, optional, 0; voices: 2 to 4, optional, 2 | voice k (from 0) is the pattern transposed by k × int semitones, after a rest of k × delay (2.13) | + (voices − 1) × delay |
-| `.thirds` | `.terze` | | adds a second voice with the same durations, a diatonic third below each note (2.13) | same |
+| `.canon(delay,int,voices)` | `.canone(delay,int,voices)` | delay: a note value (`'2`, `'4.`, `'8T`); int: semitones, optional, 0; voices: 2 to 4, optional, 2 | voice k (from 0) is the pattern transposed by k × int semitones, after a rest of k × delay | + (voices − 1) × delay |
+| `.thirds` | `.terze` | | adds a second voice with the same durations, a diatonic third below each note | same |
 
 A note argument is written as in the notation (`e*5`, `bb*3`); without an
 octave it takes the default octave.
@@ -929,7 +929,7 @@ and order and are not changed by those on pitch. `.retro` keeps velocity,
 marks and lyrics on their event (with a warning for lyrics), swaps the two
 ends of a slur, and keeps a grace note before its note.
 
-**More voices** (2.13). `.canon` and `.thirds` give several voices, on the
+**More voices.** `.canon` and `.thirds` give several voices, on the
 same track, numbered from the voice of the reference, as a voice block
 (section 8.4). Automations, pedal, text and chord names stay in the first
 voice of a canon; lyrics stay in the first voice of `.thirds`. The other
@@ -955,6 +955,59 @@ slides, automations and pedal in the pattern with `.retro`, a delay that is
 not a note value, voices outside 2-4, a transposed canon on percussion,
 `.thirds` on chords, blocks or percussion, `.canon` or `.thirds` on several
 voices. A function outside a pattern reference (`C.retro`) is an error.
+
+### 8.13 Arpeggios
+
+An arpeggio turns a chord into a **broken chord**: its notes in succession
+on a grid (2.12). `$arp` (section 6.11) is different: a rolled chord, whose
+notes enter one after the other and then sound together.
+
+| Form | Example | Applies to |
+| --- | --- | --- |
+| on a pattern | `%Giro.arpeggio(alberti,8)` | every chord and block of the pattern |
+| on a chord or block | `Cmaj7.arpeggio(up,8)`, `Cmaj7.drop2.arpeggio(up)`, `[c e g].arpeggio(down)` | that chord or block |
+| state command | `arp=alberti,8` … `arp=off` | the chords and blocks that follow |
+
+All three take a **type** and a **grid**, the first optional (`up`), the
+second optional (the grid unit in force, at the reference for a pattern and
+at each chord otherwise). The grid is written as a grid command without the
+colon: `8`, `16`, `8T`.
+
+| Type | Alias | Order, from the lowest note |
+| --- | --- | --- |
+| `up` | `su` | low to high, repeated |
+| `down` | `giu` | high to low, repeated |
+| `updown` | `sugiu` | up and down, without repeating the ends |
+| `alberti` | `alberti` | low, high, middle, high (with two notes: low, high) |
+
+The notes are those the chord would sound, after the voicing for the
+track's instrument (section 9.3), the bass of a slash chord being the
+lowest; those of a block are its notes. A chord of duration D becomes notes
+of the grid's duration that run through the order until they fill D; the
+last is shortened if D is not a multiple. A tied chord is arpeggiated as one
+chord. The notes have the chord's velocity, swing and shift. The chord's
+marks go on the first note, except `$fermata`, which goes on the last; its
+lyric goes on the first.
+
+**On a chord or block.** `.arpeggio` comes after the voicing style and
+before the marks: `2Cmaj7.drop2.arpeggio(up,8)$fermata`. The name
+`arpeggio` is reserved: no voicing style may have it.
+
+**State command.** `arp=type` or `arp=type,grid`; `arp=off` removes it. It
+is state like `swing=`: it lasts until `arp=off` or `reset:`, a voice
+inherits it, and what a pattern writes ends with it (section 8.2). It
+applies only to chords and blocks. On percussion it has no effect, with a
+warning. A chord with `$arp` under `arp=` stays rolled.
+
+**Precedence.** What is written on a chord wins over `arp=`:
+`.arpeggio(down)` changes it, `.arpeggio(off)` keeps the chord held. `off`
+is not allowed on a pattern. On a pattern, chords already arpeggiated
+inside it are single notes and stay as they are.
+
+**Errors.** `.arpeggio` on a note, percussion or a block with percussion;
+`.arpeggio` with `$arp` on the same chord; an unknown type; an invalid grid;
+a space inside the parentheses; on a pattern, several voices, percussion, or
+`off`.
 
 ---
 
@@ -1190,7 +1243,7 @@ ignored (free text).
 
 | Line | Meaning |
 | --- | --- |
-| `ST: 2.13` | version of the language the file is written in |
+| `ST: 2.12` | version of the language the file is written in |
 | `Tempo: 120 BPM` | tempo (also with decimals: `Tempo: 101.4 BPM`) |
 | `Tempo: 1: 120, 5: 140` | tempo per bar (bar: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | meter |
@@ -1463,16 +1516,15 @@ version if it gives the same result for every case.
 
 ## Appendix A: changes
 
-**2.13** — pattern transformations with several voices: `.canon` and
-`.thirds` (section 8.12). A file that uses them declares `ST: 2.13`.
-
 **2.12** — what a pattern writes (grid unit, velocity, swing, shift) ends
 with it, at each repetition (section 8.2). This is a change to the
 meaning of valid text, the first one made on purpose; files that declare
 an older version, or none, keep their sound (section 12.1), and
 `st-language upgrade` converts them. Pattern transformations: `.octave`,
 `.invert`, `.step`, `.augment`, `.diminish`, `.retro`, `.sequence` and
-`.vel` (section 8.12). A file that uses them declares `ST: 2.12`.
+`.vel`, with `.canon` and `.thirds` for several voices (section 8.12).
+Arpeggios: `.arpeggio` on patterns, chords and blocks, and the state command
+`arp=` (section 8.13). A file that uses patterns declares `ST: 2.12`.
 
 **2.11.1** — library only, the language is unchanged: more instrument
 names in Italian, French and Spanish (section 9.4), such as

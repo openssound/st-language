@@ -151,7 +151,7 @@ def tokenize_spans(text: str) -> List[Tuple[str, int, int]]:
         attaccato ('[c e g]'2), i segni ('[c e g]$accent'), la forcella
         ('[c e g]<'), la legatura di valore ('[c e g]~') e quella di
         portamento ('[c e g](')."""
-        if k < n and text[k] in "'$":
+        if k < n and text[k] in "'$.":
             return _plain_end(k)
         if k < n and text[k] in "<>" and (k + 1 >= n or text[k + 1] not in "<>"):
             k += 1
@@ -572,6 +572,27 @@ def split_marks(value: str) -> Tuple[str, str, bool, str, List[str]]:
     return value, hairpin, tie, slur, decorations
 
 
+def grid_value_beats(text: str) -> Fraction:
+    """Durata in quarti di una griglia scritta senza i due punti: 8, 16, 8T."""
+    m = RE_GRID.match(text + ":")
+    if not m or int(m.group(1)) <= 0:
+        raise NotationError(tr("Griglia dell'arpeggio non valida: '{grid}'", grid=text), text)
+    beats = Fraction(4, int(m.group(1)))
+    return beats * TUPLET_SCALE[m.group(2)] if m.group(2) else beats
+
+
+def arpeggio_choice(kind: str, grid: Optional[str]) -> Optional[Tuple[str, Optional[Fraction]]]:
+    """(tipo, durata di ogni nota o None per la griglia in vigore) di
+    'tipo,griglia'; None per 'off'."""
+    if kind.lower() == "off":
+        return None
+    name = ARPEGGIO_TYPES.get(kind.lower().replace("ù", "u"))
+    if name is None:
+        raise NotationError(tr("Tipo di arpeggio sconosciuto: '{kind}'. Ammessi: up, down, updown, alberti",
+                               kind=kind), kind)
+    return name, grid_value_beats(grid) if grid else None
+
+
 def note_value_beats(value: str) -> Fraction:
     """Durata in quarti di un valore di nota come "'8." (vedi RE_NOTE_VALUE)."""
     m = re.match(r"^'(\d+)([TQSD]?)(\.{0,2})$", value)
@@ -650,6 +671,14 @@ SWING_RANGE = (50, 80)
 # millisecondi le note che seguono, senza cambiare il ritmo scritto;
 # 'shift=0' torna a tempo.
 RE_SHIFT = re.compile(r"^shift=(-?\d+)$")
+
+# Arpeggio (2.12): l'accordo spezzato in ritmo. Sul pattern e' una funzione
+# (vedi transform), su un accordo o un blocco un suffisso, 'Cmaj7.arpeggio(up,8)',
+# e per un tratto un comando di stato: 'arp=alberti,16' ... 'arp=off'.
+RE_ARP = re.compile(r"^arp=([^,\s]+)(?:,(\S+))?$")
+RE_ARPEGGIO_SUFFIX = re.compile(r"^(.+?)\.arpeggio(?:\(([^()]*)\))?(.*)$", re.IGNORECASE | re.DOTALL)
+ARPEGGIO_TYPES = {"up": "up", "su": "up", "down": "down", "giu": "down", "updown": "updown", "sugiu": "updown",
+                  "alberti": "alberti"}
 SHIFT_RANGE = (-500, 500)
 
 # Ancora di battuta: 'bar=N' porta il cursore all'inizio della battuta N
@@ -730,6 +759,9 @@ class Event:
     # La tonalita' dell'evento dentro un pattern trasformato (vedi transform):
     # c'e' solo mentre le funzioni lavorano.
     key: Optional[str] = None
+    # L'accordo o il blocco da arpeggiare (tipo, durata di ogni nota,
+    # tonalita'): c'e' solo finche' il parser non lo sostituisce con le note.
+    arp: Optional[tuple] = None
 
 
 @dataclass
@@ -874,6 +906,9 @@ class PitchRewriter:
             m = re.search(r"([+-]\d+)$", tok)
             return ((tok[:m.start()] if m else tok)
                     + _offset_suffix(int(m.group(1) if m else 0) + self.semitones))
+        m = RE_ARPEGGIO_SUFFIX.match(tok)
+        if m:
+            return self(m.group(1)) + tok[m.end(1):]
         if self.semitones:
             # Pattern e file MIDI richiamati: si trasportano col suffisso +N/-N
             # (le note del pattern restano com'erano, altri lo usano).
@@ -1574,11 +1609,16 @@ def swing_time(beat: float, swing: Optional[Tuple[float, float]]) -> float:
 
 
 def parse_tokens(tokens: List[str], default_octave: int = 4, meter: Optional["Meter"] = None,
-                 origin_beat: float = 0) -> List[Event]:
+                 origin_beat: float = 0, instrument=None) -> List[Event]:
     """'origin_beat' e' dove i token cominciano nel brano (serve solo alle
-    ancore bar=N); i tempi degli eventi restano relativi all'inizio."""
-    return _parse_tokens_exact(tokens, default_octave, meter=meter,
-                               origin_beat=Fraction(origin_beat))[0]
+    ancore bar=N); i tempi degli eventi restano relativi all'inizio.
+    'instrument' sceglie le note di un accordo arpeggiato (di base il Piano)."""
+    events = _parse_tokens_exact(tokens, default_octave, meter=meter, origin_beat=Fraction(origin_beat),
+                                 instrument=instrument)[0]
+    if any(ev.arp for ev in events):
+        from .transform import expand_arpeggios
+        events = expand_arpeggios(events, instrument)
+    return events
 
 
 def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
@@ -1594,7 +1634,9 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                          initial_shift: Optional[int] = None,
                          meter: Optional["Meter"] = None,
                          origin_beat: Fraction = Fraction(0),
-                         record_keys: bool = False
+                         record_keys: bool = False,
+                         instrument=None,
+                         initial_arp: Optional[tuple] = None
                          ) -> Tuple[List[Event], Fraction, Fraction]:
     """Come parse_tokens, ma ritorna anche la posizione finale esatta (in
     beat, Fraction) e la griglia attiva alla fine. Griglia e posizione sono
@@ -1650,7 +1692,8 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
     shift = initial_shift
     pitch = initial_pitch.copy() if initial_pitch is not None else _PitchState(default_octave)
     saved_pitch: List[_PitchState] = []      # modo delle altezze fuori dai pattern
-    saved_state: List[tuple] = []            # griglia, velocity, swing e spostamento fuori dai pattern
+    saved_state: List[tuple] = []            # griglia, velocity, swing, spostamento e arp= fuori dai pattern
+    arp = initial_arp                        # arp= in vigore: (tipo, durata di ogni nota o None)
     # Automazioni: valore corrente di ogni controllo e rampe aperte
     # ({nome: (inizio, valore di partenza, curva)}), indipendenti fra loro.
     controls: Dict[str, float] = dict(initial_controls or CONTROL_DEFAULTS)
@@ -1776,7 +1819,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
         """Interpreta il pattern fra i segni xf e xe, ne applica i passi e
         aggiunge gli eventi al cursore; ritorna l'indice dopo xe."""
         nonlocal cursor
-        from .transform import Context, apply_steps, parse_reference
+        from .transform import Context, apply_steps, expand_arpeggios, parse_reference
         depth, end = 1, index + 1
         while depth:
             depth += {f"{_MARK}xe": -1}.get(tokens[end], 1 if tokens[end].startswith(f"{_MARK}xf:") else 0)
@@ -1792,10 +1835,13 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             tokens[index + 1:end - 1], default_octave, grid_beats, lenient, None,
             initial_velocity=velocity, voice=voice, extras=sub_extras, pending_lyrics=[],
             initial_controls=controls, initial_swing=swing, initial_pitch=pitch, initial_shift=shift,
-            meter=meter, origin_beat=origin_beat + cursor, record_keys=True)
+            meter=meter, origin_beat=origin_beat + cursor, record_keys=True, instrument=instrument,
+            initial_arp=arp)
+        sub_events = expand_arpeggios(sub_events, instrument, keep_keys=True)
         key = pitch.key_name or (meter.key_at(origin_beat + cursor) if meter is not None else "")
         total = pitch.semitones + int(semitones)
-        context = Context(_transpose_key_name(key, total) if key else None, default_octave, chain, total)
+        context = Context(_transpose_key_name(key, total) if key else None, default_octave, chain, total,
+                          instrument=instrument, grid=grid_beats)
         steps = parse_reference("%x" + chain).steps
         result, length = apply_steps(sub_events, sub_end, steps, context)
         control_ends = []
@@ -1818,6 +1864,27 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
             if found:
                 extras.setdefault("transform_issues", {}).setdefault(index, found[0])
         return end
+
+    def _mark_arpeggio(ev: Event, written, decorations: List[str], index: int) -> None:
+        """Segna l'accordo o il blocco da arpeggiare: quello scritto sul
+        token (None = off), altrimenti arp=. Le note si scrivono dopo, quando
+        le legature hanno dato all'accordo la sua durata intera."""
+        choice = arp if written is False else written
+        percussive = ev.kind == "percussion" or (
+            ev.kind == "block" and any(item["kind"] == "percussion" for item in ev.items))
+        if written is not False and (ev.kind not in ("chord", "block") or percussive):
+            raise NotationError(tr(".arpeggio va su un accordo o su un blocco di note"), tokens[index])
+        if percussive and choice and extras is not None:
+            extras.setdefault("transform_issues", {}).setdefault(index, tr("arp= non ha effetto sulle percussioni"))
+        if ev.kind not in ("chord", "block") or percussive or choice is None or ev.grace:
+            return
+        if "arp" in decorations:
+            if written is not False:
+                raise NotationError(tr("Scegli fra accordo spezzato (.arpeggio) e accordo rullato ($arp)"),
+                                    tokens[index])
+            return
+        key = _transpose_key_name(pitch.key_name, pitch.semitones) if pitch.key_name else None
+        ev.arp = (choice[0], choice[1] or grid_beats, key)
 
     skip_until = 0
     for index, tok in enumerate(tokens):
@@ -1845,11 +1912,11 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                     pitch = saved_pitch.pop()
                 continue
             if tok == f"{_MARK}save":
-                saved_state.append((grid_beats, velocity, swing, shift))
+                saved_state.append((grid_beats, velocity, swing, shift, arp))
                 continue
             if tok == f"{_MARK}restore":
                 if saved_state:
-                    grid_beats, velocity, swing, shift = saved_state.pop()
+                    grid_beats, velocity, swing, shift, arp = saved_state.pop()
                 continue
 
             if tok.startswith(_MARK):
@@ -1886,7 +1953,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 if pending_ramp:
                     raise NotationError(tr("reset: dentro una rampa di velocity o di tempo: chiudi prima la rampa"),
                                         tok)
-                grid_beats, velocity, swing, shift = Fraction(1), 80, None, None
+                grid_beats, velocity, swing, shift, arp = Fraction(1), 80, None, None, None
                 pitch.set_relative(False)
                 pitch.alters, pitch.key_name, pitch.local = {}, "", 0
                 last_state_kind = "reset"
@@ -1968,7 +2035,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                         pending_verses=(sung, verse_pos) if k == 0 else None,
                         initial_controls=controls, initial_swing=swing, initial_pitch=pitch,
                         initial_shift=shift, meter=meter, origin_beat=origin_beat + cursor,
-                        record_keys=record_keys)
+                        record_keys=record_keys, instrument=instrument, initial_arp=arp)
                     for ev in sub_events:
                         ev.start += float(cursor)
                         if ev.kind == "control":
@@ -2081,6 +2148,11 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 swing = None if percent == 50 else (0.5 if m.group(1) else 1.0, percent / 100)
                 continue
 
+            m = RE_ARP.match(tok)
+            if m:
+                arp = arpeggio_choice(m.group(1), m.group(2))
+                continue
+
             m = RE_SHIFT.match(tok)
             if m:
                 ms = int(m.group(1))
@@ -2132,6 +2204,14 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
 
             # Da qui solo token che occupano tempo: col valore di nota
             # esplicito (c'8.) durano quello invece dell'unita' di griglia.
+            written_arp = False                  # .arpeggio sul token: vale al posto di arp=
+            if re.search(r"\.arpeggio\([^)]*$", tok, re.IGNORECASE):
+                raise NotationError(tr("Niente spazi negli argomenti di una funzione: scrivi .sequence(3,-1)"), tok)
+            m = RE_ARPEGGIO_SUFFIX.match(tok)
+            if m:
+                kind, _, grid_text = (m.group(2) or "up").partition(",")
+                written_arp = arpeggio_choice(kind, grid_text)
+                tok = m.group(1) + m.group(3)
             tok, value = split_note_value(tok)
             value, hairpin, tie, slur, decorations = split_marks(value)
             for deco in decorations:
@@ -2202,9 +2282,10 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 if first_note is not None:       # rel: dopo il blocco si riparte dalla sua prima nota
                     pitch.ref = (first_note["letter"][0], first_note["octave"])
                 dur = unit * mult
-                _sounding(Event(start=float(cursor), duration=float(dur), kind="block",
-                                velocity=velocity, items=items, grace=grace), dur, hairpin, tie, slur, note_start,
-                          tokens[index], decorations)
+                block = Event(start=float(cursor), duration=float(dur), kind="block",
+                              velocity=velocity, items=items, grace=grace)
+                _mark_arpeggio(block, written_arp, decorations, index)
+                _sounding(block, dur, hairpin, tie, slur, note_start, tokens[index], decorations)
                 cursor += dur
                 continue
 
@@ -2227,6 +2308,7 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
                 ev = Event(start=start, duration=duration, kind="percussion", velocity=velocity,
                            name=atom["name"])
             ev.grace = grace
+            _mark_arpeggio(ev, written_arp, decorations, index)
             _sounding(ev, dur, hairpin, tie, slur, note_start, tokens[index], decorations)
             cursor += dur
         except (NotationError, ValueError):
@@ -2256,14 +2338,16 @@ def _parse_tokens_exact(tokens: List[str], default_octave: int = 4,
 
 def parse_track_text(text: str, patterns: Dict[str, Pattern], default_octave: int = 4,
                       midi_dir: Optional[str] = None, meter: Optional["Meter"] = None,
-                      origin_beat: float = 0) -> List[Event]:
+                      origin_beat: float = 0, instrument=None) -> List[Event]:
     """Punto di ingresso completo: tokenizza, espande pattern (%) e riferimenti
     MIDI (&), quindi interpreta lo Stato Corrente. 'meter' (vedi Meter) serve
     alle ancore di battuta 'bar=N', e cosi' 'origin_beat': dove il testo
-    comincia nel brano (per esempio un box non all'inizio della traccia)."""
+    comincia nel brano (per esempio un box non all'inizio della traccia).
+    'instrument' sceglie le note degli accordi arpeggiati."""
     raw_tokens = tokenize(text)
     expanded = expand_patterns(raw_tokens, patterns, midi_dir=midi_dir, default_octave=default_octave)
-    return parse_tokens(expanded, default_octave=default_octave, meter=meter, origin_beat=origin_beat)
+    return parse_tokens(expanded, default_octave=default_octave, meter=meter, origin_beat=origin_beat,
+                        instrument=instrument)
 
 
 def validate_track_text(text: str, patterns: Dict[str, Pattern], default_octave: int = 4,

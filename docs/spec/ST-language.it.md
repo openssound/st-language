@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.13** · Implementazione di riferimento: la libreria Python
+**Versione 2.12** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -930,8 +930,8 @@ tabella lo dice.
 | `.retro` | `.retrogrado` | | gli eventi in ordine inverso | uguale |
 | `.sequence(n,passo)` | `.progressione(n,passo)` | n: intero ≥ 1, passo: intero | il pattern n volte, la presentazione k (da 0) spostata di k × passo gradi, come con `.step` | × n |
 | `.vel(x)` | `.vel(x)` | x: `+N` o `-N` (relativa, limitata a 1-127), `1`-`127` o una dinamica (assoluta) | cambia la velocity degli eventi che suonano; le automazioni non cambiano | uguale |
-| `.canon(ritardo,int,voci)` | `.canone(ritardo,int,voci)` | ritardo: un valore di nota (`'2`, `'4.`, `'8T`); int: semitoni, facoltativo, 0; voci: da 2 a 4, facoltativo, 2 | la voce k (da 0) e' il pattern trasposto di k × int semitoni, dopo una pausa di k × ritardo (2.13) | + (voci − 1) × ritardo |
-| `.thirds` | `.terze` | | aggiunge una seconda voce con le stesse durate, una terza diatonica sotto ogni nota (2.13) | uguale |
+| `.canon(ritardo,int,voci)` | `.canone(ritardo,int,voci)` | ritardo: un valore di nota (`'2`, `'4.`, `'8T`); int: semitoni, facoltativo, 0; voci: da 2 a 4, facoltativo, 2 | la voce k (da 0) e' il pattern trasposto di k × int semitoni, dopo una pausa di k × ritardo | + (voci − 1) × ritardo |
+| `.thirds` | `.terze` | | aggiunge una seconda voce con le stesse durate, una terza diatonica sotto ogni nota | uguale |
 
 Una nota come argomento si scrive come nella notazione (`e*5`, `bb*3`);
 senza ottava prende l'ottava predefinita.
@@ -959,7 +959,7 @@ velocity, segni e testo sul loro evento (con un avviso per il testo),
 scambia i due estremi di una legatura di portamento e tiene un abbellimento
 prima della sua nota.
 
-**Piu' voci** (2.13). `.canon` e `.thirds` danno piu' voci, sulla stessa
+**Piu' voci.** `.canon` e `.thirds` danno piu' voci, sulla stessa
 traccia, numerate dalla voce del riferimento, come un blocco di voci
 (sezione 8.4). Automazioni, pedale, indicazioni e sigle restano nella prima
 voce di un canone; il testo cantato resta nella prima voce di `.thirds`. Le
@@ -986,6 +986,60 @@ nel pattern, `tempo=` nel pattern con `.augment`, `.diminish`, `.retro`,
 canone trasposto sulle percussioni, `.thirds` su accordi, blocchi o
 percussioni, `.canon` o `.thirds` su piu' voci. Una funzione fuori da un
 riferimento a un pattern (`C.retro`) e' un errore.
+
+### 8.13 Arpeggi
+
+Un arpeggio trasforma un accordo in un **accordo spezzato**: le sue note in
+successione su una griglia (2.12). `$arp` (sezione 6.11) e' un'altra cosa:
+l'accordo rullato, con le note che entrano una dopo l'altra e poi suonano
+insieme.
+
+| Forma | Esempio | Si applica a |
+| --- | --- | --- |
+| su un pattern | `%Giro.arpeggio(alberti,8)` | tutti gli accordi e i blocchi del pattern |
+| su un accordo o un blocco | `Cmaj7.arpeggio(up,8)`, `Cmaj7.drop2.arpeggio(up)`, `[c e g].arpeggio(down)` | quell'accordo o quel blocco |
+| comando di stato | `arp=alberti,8` … `arp=off` | gli accordi e i blocchi che seguono |
+
+Tutte e tre prendono un **tipo** e una **griglia**, il primo facoltativo
+(`up`), la seconda facoltativa (l'unita' di griglia in vigore, nel punto
+del riferimento per un pattern e su ogni accordo altrimenti). La griglia si
+scrive come un comando di griglia senza i due punti: `8`, `16`, `8T`.
+
+| Tipo | Alias | Ordine, dalla nota piu' bassa |
+| --- | --- | --- |
+| `up` | `su` | dal grave all'acuto, ripetuto |
+| `down` | `giu` | dall'acuto al grave, ripetuto |
+| `updown` | `sugiu` | sale e scende, senza ripetere gli estremi |
+| `alberti` | `alberti` | grave, acuto, centrale, acuto (con due note: grave, acuto) |
+
+Le note sono quelle che l'accordo suonerebbe, dopo il voicing per lo
+strumento della traccia (sezione 9.3), con il basso di un accordo slash come
+nota piu' bassa; quelle di un blocco sono le sue. Un accordo di durata D
+diventa note lunghe quanto la griglia che scorrono nell'ordine fino a
+riempire D; l'ultima si accorcia se D non e' un multiplo. Un accordo legato
+si arpeggia come un accordo solo. Le note hanno velocity, swing e
+spostamento dell'accordo. I segni dell'accordo vanno sulla prima nota,
+tranne `$fermata`, che va sull'ultima; il testo cantato sulla prima.
+
+**Su un accordo o un blocco.** `.arpeggio` viene dopo lo stile di voicing e
+prima dei segni: `2Cmaj7.drop2.arpeggio(up,8)$fermata`. Il nome `arpeggio`
+e' riservato: nessuno stile di voicing puo' chiamarsi cosi'.
+
+**Comando di stato.** `arp=tipo` o `arp=tipo,griglia`; `arp=off` lo toglie.
+E' uno stato come `swing=`: dura fino ad `arp=off` o `reset:`, una voce lo
+eredita, e quello che un pattern scrive finisce con lui (sezione 8.2). Vale
+solo per accordi e blocchi. Sulle percussioni non ha effetto, con un avviso.
+Un accordo con `$arp` sotto `arp=` resta rullato.
+
+**Precedenze.** Quello che e' scritto sull'accordo vale piu' di `arp=`:
+`.arpeggio(down)` lo cambia, `.arpeggio(off)` tiene l'accordo intero. `off`
+non e' ammesso su un pattern. Su un pattern, gli accordi gia' arpeggiati al
+suo interno sono note singole e restano come sono.
+
+**Errori.** `.arpeggio` su una nota, su una percussione o su un blocco con
+percussioni; `.arpeggio` con `$arp` sullo stesso accordo; un tipo
+sconosciuto; una griglia non valida; uno spazio fra le parentesi; su un
+pattern, piu' voci, percussioni o `off`.
 
 ---
 
@@ -1232,7 +1286,7 @@ libero).
 
 | Riga | Significato |
 | --- | --- |
-| `ST: 2.13` | versione del linguaggio in cui e' scritto il file |
+| `ST: 2.12` | versione del linguaggio in cui e' scritto il file |
 | `Tempo: 120 BPM` | tempo (anche coi decimali: `Tempo: 101.4 BPM`) |
 | `Tempo: 1: 120, 5: 140` | tempo per battuta (battuta: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | metrica |
@@ -1527,17 +1581,16 @@ caso.
 
 ## Appendice A: modifiche
 
-**2.13** — trasformazioni dei pattern a piu' voci: `.canon` e `.thirds`
-(sezione 8.12). Un file che le usa dichiara `ST: 2.13`.
-
 **2.12** — quello che un pattern scrive (griglia, velocity, swing,
 spostamento) finisce con lui, a ogni ripetizione (sezione 8.2). Cambia il
 significato di un testo valido, la prima volta che succede di proposito; i
 file che dichiarano una versione piu' vecchia, o nessuna, conservano il
 loro suono (sezione 12.1), e `st-language upgrade` li converte.
 Trasformazioni dei pattern: `.octave`, `.invert`, `.step`, `.augment`,
-`.diminish`, `.retro`, `.sequence` e `.vel` (sezione 8.12). Un file che le
-usa dichiara `ST: 2.12`.
+`.diminish`, `.retro`, `.sequence`, `.vel`, con `.canon` e `.thirds` per piu'
+voci (sezione 8.12). Arpeggi: `.arpeggio` su pattern, accordi e blocchi, e il
+comando di stato `arp=` (sezione 8.13). Un file che usa i pattern dichiara
+`ST: 2.12`.
 
 **2.11.1** — solo la libreria, il linguaggio non cambia: altri nomi di
 strumenti in italiano, francese e spagnolo (sezione 9.4), come

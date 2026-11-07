@@ -625,7 +625,7 @@ def test_transforms_properties():
             after = st.parse(chain, song.patterns)
             assert float(duration_after(step, length)) == pytest.approx(max(e.start + e.duration for e in after))
     assert set(TRANSFORMS) == {"octave", "invert", "step", "augment", "diminish", "retro", "sequence", "vel",
-                               "canon", "thirds"}
+                               "canon", "thirds", "arpeggio"}
 
 
 def test_transforms_syntax_next_to_other_tokens():
@@ -826,12 +826,161 @@ def test_canon_and_thirds_properties():
 
 
 def test_canon_and_thirds_reach_the_exports(tmp_path):
-    song = st.read_song("ST: 2.13\nTonalita: C\n\nPattern %T:\n  c e g c\n\nTraccia A [Piano]:\n"
+    song = st.read_song("ST: 2.12\nTonalita: C\n\nPattern %T:\n  c e g c\n\nTraccia A [Piano]:\n"
                         "  %T.canon('2,12) | %T.thirds |\n")
     midi = st.to_midi(song, str(tmp_path / "t.mid"))
     xml = st.to_musicxml(song, str(tmp_path / "t.musicxml"))
     assert os.path.getsize(midi) > 0 and "<voice>2</voice>" in open(xml, encoding="utf-8").read()
     assert os.path.exists(st.to_abc(song, str(tmp_path / "t.abc")))
+
+
+def _arp(text, patterns=None, **options):
+    song = _song_with(patterns or {})
+    return [(e.letter, e.duration) for e in st.parse_track_text(text, song.patterns, **options) if e.kind == "note"]
+
+
+@pytest.mark.parametrize("kind, letters", [
+    ("up", "c e g c e g c e"), ("su", "c e g c e g c e"),
+    ("down", "g e c g e c g e"), ("giu", "g e c g e c g e"), ("giù", "g e c g e c g e"),
+    ("updown", "c e g e c e g e"), ("sugiu", "c e g e c e g e"),
+    ("alberti", "c g e g c g e g"),
+])
+def test_arpeggio_types(kind, letters):
+    patterns = {"T": "[c*4 e*4 g*4]'1"}
+    assert [n for n, _d in _arp(f"%T.arpeggio({kind},8)", patterns)] == letters.split()
+    assert [n for n, _d in _arp(f"[c*4 e*4 g*4]'1.arpeggio({kind},8)")] == letters.split()
+    assert [n for n, _d in _arp(f"arp={kind},8 [c*4 e*4 g*4]'1")] == letters.split()
+
+
+def test_arpeggio_details():
+    # due note, una nota, l'ultima che si accorcia, la griglia in vigore
+    assert [n for n, _d in _arp("[c e]'2.arpeggio(alberti,8)")] == ["c", "e", "c", "e"]
+    assert [n for n, _d in _arp("[e]'4.arpeggio(updown,8)")] == ["e", "e"]
+    assert _arp("[c e]'4..arpeggio(up,4)") == [("c", 1.0), ("e", 0.5)]
+    assert [d for _n, d in _arp("16: 8[c e].arpeggio")] == [0.25] * 8
+    assert [d for _n, d in _arp("arp=up 8: [c e]'4 16: [c e]'8")] == [0.5, 0.5, 0.25, 0.25]
+    assert [d for _n, d in _arp("%T.arpeggio c", {"T": "[c e]'2"})] == [1, 1, 1]
+    assert [d for _n, d in _arp("8: %T.arpeggio", {"T": "[c e]'2"})] == [0.5] * 4
+    assert [round(d, 3) for _n, d in _arp("[c e]'4.arpeggio(up,8T)")] == [0.333, 0.333, 0.333]
+    # il tempo non cambia: la nota dopo e' dove sarebbe stata
+    assert st.parse("[c e]'2.arpeggio(up,8) f")[-1].start == 2
+    # legato: un accordo solo, l'arpeggio continua oltre la stanghetta
+    assert [n for n, _d in _arp("4: [c e].arpeggio(up,4)~ | [c e] | ")] == ["c", "e"]
+    assert [n for n, _d in _arp("4: 2[c e].arpeggio(up,4)~ | 2[c e] |")] == ["c", "e", "c", "e"]
+
+
+def test_arpeggio_notes_come_from_the_voicing_of_the_instrument():
+    from st_language.chords import parse_chord_symbol, pitch_to_midi, voice_chord
+    from st_language.instruments import instrument_for
+    for name in ("Piano", "Guitar", "Bass"):
+        instrument = instrument_for(name)
+        notes = voice_chord(parse_chord_symbol("Am7"), 3, instrument)
+        events = st.parse_track_text("8: 16Am7*3.arpeggio(up)", {}, instrument=instrument)
+        played = [pitch_to_midi(e.letter, e.octave) for e in events if e.kind == "note"]
+        assert sorted(set(played)) == sorted(set(notes)) and played[:len(notes)] == sorted(notes)
+    # il basso e' la nota piu' bassa, lo stile sceglie le note, la tonalita' la grafia
+    assert _arp("C/E.arpeggio(up,4)")[0][0] == "e"
+    close = [n for n, _d in _arp("4Cmaj7.close.arpeggio(up,4)")]
+    assert close == ["c", "e", "g", "b"]
+    assert [n for n, _d in _arp("key=Eb 4Cm.close.arpeggio(up,4)")][:2] == ["c", "eb"]
+    # un brano usa lo strumento della traccia
+    song = st.read_song("ST: 2.12\n\nTraccia B [Bass]:\n  8: 8C.arpeggio(up)\n")
+    part = song.tracks[0]
+    played = {(e.letter, e.octave) for e in part.parsed_events(song.patterns, meter=song.meter()) if e.kind == "note"}
+    assert played == {(e.letter, e.octave) for e in st.parse_track_text("8: 8C.arpeggio(up)", {}, instrument=part.instrument,
+                                                                        default_octave=part.instrument.default_octave)
+                      if e.kind == "note"}
+
+
+def test_arpeggio_keeps_marks_velocity_and_state():
+    events = [e for e in st.parse('100@ swing=66 shift=5 [c e]\'2.arpeggio(up,8)$fermata$accent "la"') if e.kind == "note"]
+    assert {e.velocity for e in events} == {100} and all(e.swing and e.shift == 5 for e in events)
+    assert events[0].decorations == ["accent"] and events[-1].decorations == ["fermata"]
+    assert events[0].lyric == "la" and events[1].lyric is None
+    slur = [(e.letter, e.slur) for e in st.parse("c( [d e]'4.arpeggio(up,8) f)") if e.kind == "note"]
+    assert slur == [("c", "start"), ("d", "continue"), ("e", "continue"), ("f", "stop")]
+    # arp= finisce con il pattern, con reset:, con arp=off; una voce lo eredita ma non lo cambia fuori
+    assert [n for n, _d in _arp("%T [c e]'4", {"T": "arp=up,8 [c e]'4"})] == ["c", "e"]
+    assert [n for n, _d in _arp("arp=up,8 reset: [c e]'4")] == []
+    assert [n for n, _d in _arp("arp=up,8 { [c e]'4 ; arp=off [c e]'4 } [c e]'4")] == ["c", "e", "c", "e"]
+    # il pattern eredita arp= dal punto del richiamo
+    assert [n for n, _d in _arp("arp=up,8 %T", {"T": "[c e]'4"})] == ["c", "e"]
+    # quello scritto sull'accordo vale piu' di arp=
+    assert [n for n, _d in _arp("arp=up,8 [c e]'4.arpeggio(off)")] == []
+    assert [n for n, _d in _arp("arp=up,8 [c e]'4.arpeggio(down,8)")] == ["e", "c"]
+    # $arp sotto arp= resta rullato; un pattern gia' arpeggiato resta com'e'
+    assert [e.kind for e in st.parse("arp=up,8 C$arp") if e.kind in ("chord", "note")] == ["chord"]
+    assert [n for n, _d in _arp("%T.arpeggio(down,8)", {"T": "arp=up,8 [c e]'4 [d f]'4"})] == ["c", "e", "d", "f"]
+    # note, pause e percussioni in un pattern misto non cambiano
+    assert [e.kind for e in st.parse("%T.arpeggio(up,8)", _song_with({"T": "c [d e]'4 r"}).patterns)] == [
+        "note", "note", "note", "rest"]
+    # dopo .arpeggio le altre funzioni lavorano sulle note
+    assert [n for n, _d in _arp("%T.arpeggio(up,8).retro", {"T": "[c*4 e*4]'4"})] == ["e", "c"]
+    assert [n for n, _d in _arp("%T.arpeggio(up,8).step(1)", {"T": "key=C [c*4 e*4]'4"})] == ["d", "f"]
+
+
+@pytest.mark.parametrize("text, message", [
+    ("c.arpeggio", "accordo o su un blocco"),
+    ("kick.arpeggio", "accordo o su un blocco"),
+    ("[c kick].arpeggio", "accordo o su un blocco"),
+    ("C$arp.arpeggio", "accordo rullato"),
+    ("C.arpeggio(boh)", "sconosciuto"),
+    ("C.arpeggio(up,x)", "Griglia"),
+    ("C.arpeggio(up, 8)", "Niente spazi"),
+    ("arp=boh C", "sconosciuto"),
+    ("%A.arpeggio(off)", "vale solo su un accordo"),
+    ("%A.arpeggio(boh)", "sconosciuto"),
+    ("%A.arpeggio(up,8,3)", "troppi argomenti"),
+    ("%K.arpeggio", "accordo o su un blocco"),
+    ("%V.arpeggio", "una voce sola"),
+    ("%A.canon('2).arpeggio", "una voce sola"),
+    ("%R.arpeggio", "accordo rullato"),
+])
+def test_arpeggio_errors(text, message):
+    song = _song_with({"A": "C", "K": "kick", "V": "{ C ; e }", "R": "C$arp"})
+    st.set_language("it")
+    try:
+        ok, error = st.validate(text, song.patterns)
+    finally:
+        st.set_language(None)
+    assert not ok and message in error
+
+
+def test_arpeggio_with_the_rest_of_the_library(tmp_path):
+    from st_language.notation import compute_token_spans
+    from st_language.transform import expand_reference, format_reference, parse_reference
+    song = _song_with({"G": "2C 2Am", "D": "arp=up kick"})
+    # la durata e' quella degli accordi, in tutte le forme
+    assert compute_token_spans("%G.arpeggio(up,8) c", song.patterns)[1][2] == 4
+    assert compute_token_spans("2C.arpeggio(up,8) c", {})[1][2] == 2
+    assert [w.message for w in st.check("4: 2C.arpeggio(up,8) 2C | c", {})] == []
+    assert any("arp=" in w.message for w in st.check("arp=up kick", {}))
+    # l'anteprima usa lo strumento e la griglia del punto
+    found = expand_reference("%G.arpeggio(up)", song.patterns, grid=0.5)
+    assert found.duration == 2 and {e.duration for e in found.events} == {0.5}
+    assert [s.name if s else None for s, _ in found.stages] == [None, "arpeggio"]
+    assert all(e.arp is None for e in found.events)
+    assert format_reference(parse_reference("%G.arpeggio(updown,8)"), italian=True) == "%G.arpeggio(sugiu,8)"
+    assert format_reference(parse_reference("%G.arpeggio(alberti)")) == "%G.arpeggio(alberti)"
+    # la trasposizione del testo non tocca il suffisso, e arp= passa
+    assert st.transpose_tokens(["Cmaj7.arpeggio(up,8)$fermata", "[c e].arpeggio(down)", "arp=up", "%G.arpeggio"], 2, 4) == [
+        "Dmaj7.arpeggio(up,8)$fermata", "[d*4 f#*4].arpeggio(down)", "arp=up", "%G.arpeggio+2"]
+    assert all(e.arp is None for e in st.parse("arp=up,8 C"))
+    full = st.read_song("ST: 2.12\n\nPattern %G:\n  4: 2C 2Am\n\nTraccia A [Piano]:\n  %G.arpeggio(alberti,8) arp=up,16 2F arp=off G\n")
+    assert os.path.getsize(st.to_midi(full, str(tmp_path / "a.mid"))) > 0
+    assert os.path.exists(st.to_musicxml(full, str(tmp_path / "a.musicxml")))
+    assert os.path.exists(st.to_abc(full, str(tmp_path / "a.abc")))
+
+
+def test_arpeggio_state_and_pattern_give_the_same_midi(tmp_path):
+    """arp= e .arpeggio sugli stessi accordi: stesso MIDI."""
+    head = "ST: 2.12\n\nPattern %Giro:\n  4: 4Cmaj7 | 4Am7 |\n\nTraccia A [Piano]:\n"
+    state = st.read_song(head.replace("%Giro:\n  4: 4Cmaj7 | 4Am7 |", "%Vuoto:\n  c") + "  8: arp=alberti 8Cmaj7 | 8Am7 | arp=off 2C |\n")
+    pattern = st.read_song(head + "  8: %Giro.arpeggio(alberti,8) 2C |\n")
+    a, b = tmp_path / "a.mid", tmp_path / "b.mid"
+    st.to_midi(state, str(a))
+    st.to_midi(pattern, str(b))
+    assert a.read_bytes() == b.read_bytes()
 
 
 def test_plain_notation_file_is_a_one_track_song(tmp_path):
