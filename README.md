@@ -11,6 +11,14 @@ symbols, D.C./D.S. with Coda and Fine, several lyric verses and
 transposing parts. It is the notation engine of
 [SoundText](https://github.com/openssound/soundtext), usable on its own.
 
+▶ **Learn the language with the video courses** (subtitles in English, Italian, French and Spanish):
+
+- [ST-Language for Beginners](https://youtu.be/0iHSWe9qKrg) (12 min): from the first note to a whole song.
+- [ST-Language for Musicians](https://youtu.be/a9ZX_ZVFX0g) (14 min): note values, articulation, swing,
+  chords and voicings, arpeggios, drums, expression, form and lyrics.
+- [ST-Language for Composers](https://youtu.be/R6Ot2KcTKUU) (17 min): one theme turned into a whole piece with
+  patterns, inversion, sequences, canons, orchestration and automations.
+
 ```
 // a blues riff
 Tempo: 96 BPM
