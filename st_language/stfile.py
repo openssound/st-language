@@ -11,7 +11,7 @@ import re
 from typing import List, Optional, Tuple
 
 from ._i18n import tr
-from .instruments import InstrumentProfile
+from .instruments import InstrumentProfile, instrument_for
 
 
 # Versione del linguaggio con cui e' scritto il file: "ST: 2.12" (riga
@@ -155,8 +155,9 @@ RE_AUDIO_INPUT = re.compile(r"(?:ingresso|input)\s*=\s*(\w+)")
 RE_AUDIO_CHANNELS = re.compile(r"(?:canali|channels)\s*=\s*(\d+(?:\+\d+)*)")
 
 # Forma corta "Strumento:" / "Strumento N:": il nome di uno strumento
-# conosciuto (anche con cifre, come i GM "Lead8basslead" o "Pad8sweep"),
-# indice facoltativo - vedi short_track_header.
+# conosciuto, predefinito, dichiarato, General MIDI o alias (anche con
+# cifre, come i GM "Lead8basslead" o "Pad8sweep"), indice facoltativo -
+# vedi short_track_header.
 RE_TRACK_HDR = re.compile(r"^([A-Za-z]\w*?)\s*(\d*)\s*:$")
 _RE_TRACK_HDR_SPACED = re.compile(r"^([A-Za-z]\w*)(?:\s+(\d+))?\s*:$")
 
@@ -164,11 +165,23 @@ _RE_TRACK_HDR_SPACED = re.compile(r"^([A-Za-z]\w*)(?:\s+(\d+))?\s*:$")
 def short_track_header(line: str, instrument_names) -> Optional[Tuple[str, str]]:
     """(strumento, indice) di un'intestazione corta di traccia ("Piano:",
     "Piano 2:", "Lead8basslead 2:"), None se la riga non lo e' o se lo
-    strumento non e' fra instrument_names. L'indice va dopo uno spazio:
-    "Guitar2:" e' lo strumento "Guitar2", non Guitar con indice 2."""
+    strumento non e' fra instrument_names ne' un nome General MIDI o un
+    alias. L'indice va dopo uno spazio: "Guitar2:" e' lo strumento
+    "Guitar2", non Guitar con indice 2. I comandi "rel:", "abs:" e
+    "reset:" non sono mai intestazioni."""
     m = _RE_TRACK_HDR_SPACED.match(line)
-    if m and m.group(1) in instrument_names:
+    if m and line not in _NOTATION_COMMAND_LINES and (
+            m.group(1) in instrument_names or instrument_for(m.group(1)).resolved):
         return m.group(1), m.group(2) or ""
+    return None
+
+
+def unrecognized_track_header(line: str, instrument_names) -> Optional[str]:
+    """Il nome di una riga che ha la forma di un'intestazione corta
+    ("Pianoo:") ma non e' uno strumento noto; None altrimenti."""
+    m = _RE_TRACK_HDR_SPACED.match(line)
+    if m and line not in _NOTATION_COMMAND_LINES and short_track_header(line, instrument_names) is None:
+        return m.group(1)
     return None
 
 # Formato esplicito con parentesi quadre, usato quando il nome della traccia

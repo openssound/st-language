@@ -195,6 +195,7 @@
  "{source}: errori di sintassi, niente esportazione (vedi st-language check)": "{source} : erreurs de syntaxe, rien n'est exporté (voir st-language check)",
  "{source}: gia' aggiornato": "{source} : déjà à jour",
  "{value} quarti": "{value} noires",
+ "«{name}:» non e' uno strumento noto: la traccia si ignora": "«{name}:» n'est pas un instrument connu : la piste est ignorée",
  "«{name}» non e' uno strumento noto: suona come pianoforte": "«{name}» n'est pas un instrument connu : il joue comme un piano",
  "⚠  Avviso: {msg}": "⚠  Avertissement : {msg}",
  "⚠  Avviso: {msg} (e altri {n})": "⚠  Avertissement : {msg} (et {n} autres)"

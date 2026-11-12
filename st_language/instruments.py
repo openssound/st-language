@@ -417,6 +417,16 @@ def unknown_instrument_message(name: str) -> str:
     return message
 
 
+def unrecognized_header_message(name: str) -> str:
+    """L'avviso per un'intestazione corta ("Pianoo:") con un corpo sotto
+    che non nomina uno strumento noto: la traccia non si legge."""
+    message = tr("«{name}:» non e' uno strumento noto: la traccia si ignora", name=name)
+    suggestion = suggest_instrument(name)
+    if suggestion:
+        message += ". " + tr("Forse intendevi «{suggestion}»?", suggestion=suggestion)
+    return message
+
+
 def resolve_instrument_type(type_name: str, name: str) -> InstrumentProfile:
     """Costruisce un InstrumentProfile a partire da un identificatore di tipo
     testuale (es. 'electric_bass', 'drum_kit', 'trumpet'), usato dal formato

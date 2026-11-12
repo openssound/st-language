@@ -1379,3 +1379,36 @@ def test_midi_time_signature_keeps_the_bar_length_when_it_can(meter, written):
     from st_language.midi import midi_time_signature
     result = midi_time_signature(*meter)
     assert (f"{result[0]}/{2 ** result[1]}" if result else None) == written
+
+
+# Intestazione corta con un nome General MIDI o un alias: e' una traccia,
+# come nella forma esplicita "Traccia Nome [Flute]:".
+@pytest.mark.parametrize("header, program", [("Flute:", 73), ("Violin:", 40), ("Organ:", 16), ("Flauto:", 73)])
+def test_short_header_takes_general_midi_names(header, program):
+    song = st.read_song(f"Tempo: 96 BPM\n\nBass:\n  4: c |\n\n{header}\n  4: c d e f |\n")
+    assert [p.name for p in song.tracks] == ["Bass", header[:-1]]
+    assert song.tracks[1].instrument.gm_program == program
+    assert song.file_warnings == []
+
+
+def test_short_header_with_index_and_general_midi_name():
+    song = st.read_song("Violin 2:\n  4: c |\n")
+    assert song.get_track("Violin 2").instrument.gm_program == 40
+
+
+def test_unknown_short_header_is_ignored_with_a_warning():
+    song = st.read_song("Bass:\n  4: c |\n\nPianoo:\n  4: c d e f |\n")
+    assert [p.name for p in song.tracks] == ["Bass"]
+    assert [line for line, _ in song.file_warnings] == [4]
+    assert "Pianoo" in song.file_warnings[0][1]
+
+
+def test_unknown_short_header_without_body_gives_no_warning():
+    song = st.read_song("Foo:\n\nPiano:\n  4: c |\n")
+    assert song.file_warnings == []
+
+
+def test_notation_commands_are_not_track_headers():
+    song = st.read_song("Flute:\n  rel:\n  4: c d e f |\n")
+    assert [p.name for p in song.tracks] == ["Flute"]
+    assert song.tracks[0].text.startswith("rel:")

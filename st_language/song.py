@@ -22,14 +22,15 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import Dict, List, Optional
 
-from .instruments import DEFAULT_INSTRUMENTS, InstrumentProfile, instrument_for, unknown_instrument_message
+from .instruments import (DEFAULT_INSTRUMENTS, InstrumentProfile, instrument_for, unknown_instrument_message,
+                          unrecognized_header_message)
 from ._i18n import tr
 from .notation import (Event, Meter, NotationError, Pattern, COMMENT_MARK, parse_track_text, tokenize,
                        upgrade_midi_refs, upgrade_pattern_state)
 from .stfile import (
     RE_AMBIENTE, RE_AUDIO_HDR, RE_BOX_HDR, RE_EFFECTS_HDR, RE_INSTRUMENT_HDR, RE_KEY, RE_MASTER,
     RE_MASTER_CHAIN_HDR, RE_METRICA, RE_METRICA_LIST_HDR, RE_MIXER_HDR, RE_PATTERN_HDR, RE_SYNTH_HDR,
-    RE_TEMPO, RE_TEMPO_LIST_HDR, RE_TRACK_HDR, RE_TRACK_HDR_EXPLICIT, short_track_header,
+    RE_TEMPO, RE_TEMPO_LIST_HDR, RE_TRACK_HDR, RE_TRACK_HDR_EXPLICIT, short_track_header, unrecognized_track_header,
     RE_CONVERSION_HDR, conversion_blocks, parse_conversion_body, is_block_header,
     RE_PICKUP, RE_ST_VERSION, LANGUAGE_VERSION, parse_bpm, parse_pickup, instrument_blocks,
     _extract_box_blocks, _extract_named_blocks, _parse_bar_value_list, _parse_instrument_body,
@@ -253,7 +254,9 @@ def read_song(text: str, name: str = "ST") -> Song:
         body = ("\n" if mode in ("track", "pattern") else " ").join(buffer).strip()
         if mode in ("track", "pattern"):
             body = upgrade_midi_refs(body)      # &Nome delle versioni prima della 2.6
-        if mode == "pattern" and current_name:
+        if mode == "unrecognized" and body:
+            song.file_warnings.append((current_line, unrecognized_header_message(current_name)))
+        elif mode == "pattern" and current_name:
             song.add_pattern(current_name, body)
         elif mode == "track" and current_name:
             if current_instrument == AUDIO_INSTRUMENT_NAME:
@@ -372,6 +375,12 @@ def read_song(text: str, name: str = "ST") -> Song:
             instr, idx = header
             current_name = f"{instr} {idx}".strip() if idx else instr
             current_instrument, mode, current_line = instr, "track", number
+            continue
+        unknown = unrecognized_track_header(line, _instrument_names(song))
+        if unknown:
+            if mode:
+                flush()
+            current_name, mode, current_line = unknown, "unrecognized", number
             continue
         if mode:
             buffer.append(line)
