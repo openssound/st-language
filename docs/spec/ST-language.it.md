@@ -1342,7 +1342,7 @@ italiane, che ogni versione legge.
 | --- | --- |
 | `Pattern %Nome:` | i token del pattern |
 | `Traccia Nome [Strumento]:` | testo della traccia |
-| `Piano:`, `Piano 2:` (il nome di uno strumento conosciuto: predefinito, dichiarato con `Strumento Nome:`, General MIDI o alias; indice facoltativo) | testo della traccia `Piano` / `Piano 2`; una riga `Nome:` con un corpo sotto il cui nome non e' uno strumento conosciuto (`Pianoo:`) non apre una traccia e da' un avviso |
+| `Piano:`, `Piano 2:` (il nome di uno strumento conosciuto: predefinito, dichiarato con `Strumento Nome:`, General MIDI o alias, scritto per intero; indice facoltativo) | testo della traccia `Piano` / `Piano 2`; una riga `Nome:` con un corpo sotto il cui nome non e' uno strumento conosciuto (`Pianoo:`) non apre una traccia e da' un avviso |
 | `Box Traccia "Nome" \|quarto:` | un box della traccia `Traccia` che comincia a `quarto` |
 | `Strumento Nome:` | definizione di strumento (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`, facoltativo `trasposizione=-2`, sezione 9.4); un blocco senza `program=` non definisce nulla |
 | `Mixer Traccia:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) di una traccia; i lettori ignorano le chiavi che non conoscono |
@@ -1580,6 +1580,12 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.12.2** — l'intestazione corta di traccia accetta anche i nomi General
+MIDI e gli alias scritti per intero (`Flute:`, `Violin:`, `Flauto:`), come
+la forma `Traccia Nome [Strumento]:`; prima la traccia si perdeva senza
+avviso. Una riga `Nome:` che apre un blocco e non nomina uno strumento
+conosciuto da' un avviso (sezione 12.2).
 
 **2.12.1** — solo la libreria, il linguaggio non cambia: `expand_to_text` e
 `events_to_text` (richiami ed eventi scritti come testo),

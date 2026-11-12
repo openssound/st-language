@@ -33,7 +33,7 @@ from .song import (  # noqa: F401
 )
 from .notation import find_references  # noqa: F401
 
-__version__ = "2.12.1"
+__version__ = "2.12.2"
 
 __all__ = [
     "BarIssue", "Clip", "Event", "Meter", "NotationError", "Part", "Pattern", "Song", "check", "check_bar_lines",

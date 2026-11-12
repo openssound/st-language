@@ -1412,3 +1412,34 @@ def test_notation_commands_are_not_track_headers():
     song = st.read_song("Flute:\n  rel:\n  4: c d e f |\n")
     assert [p.name for p in song.tracks] == ["Flute"]
     assert song.tracks[0].text.startswith("rel:")
+
+
+# Una parola che e' solo dentro un nome General MIDI ("verse" in "Reverse
+# Cymbal") non e' uno strumento per l'intestazione corta.
+@pytest.mark.parametrize("label", ["Verse", "Rock", "Grand", "Bright", "Clean", "Section"])
+def test_short_header_does_not_take_partial_general_midi_names(label):
+    song = st.read_song(f"{label}:\n  4: c d e f |\n\nPiano:\n  4: c |\n")
+    assert [p.name for p in song.tracks] == ["Piano"]
+    assert [line for line, _ in song.file_warnings] == [1]
+    assert label in song.file_warnings[0][1]
+
+
+def test_explicit_header_still_takes_partial_general_midi_names():
+    song = st.read_song("Track Solo [Rock]:\n  4: c |\n")
+    assert song.get_track("Solo").instrument.gm_program == 18
+    assert song.file_warnings == []
+
+
+def test_unknown_name_inside_a_track_body_stays_a_grammar_error():
+    song = st.read_song("Piano:\n  4: c d |\n  Pianoo:\n  4: e f |\n")
+    assert song.get_track("Piano").text == "4: c d |\nPianoo:\n4: e f |"
+    assert song.file_warnings == []
+    with pytest.raises(st.NotationError):
+        song.get_track("Piano").parsed_events(song.patterns)
+
+
+def test_unknown_name_inside_a_pattern_or_a_mixer_block_gives_no_warning():
+    song = st.read_song("Pattern %A:\n  4: c d\n  Foo:\n  4: e\n\nPiano:\n  %A |\n\n"
+                        "Mixer Piano:\n  volume=80\n  Foo:\n  pan=0\n")
+    assert song.patterns["A"].tokens == ["4:", "c", "d", "Foo:", "4:", "e"]
+    assert song.file_warnings == []

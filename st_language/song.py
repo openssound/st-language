@@ -368,7 +368,8 @@ def read_song(text: str, name: str = "ST") -> Song:
             current_name, current_instrument, mode = m.group(1).strip(), m.group(2), "track"
             current_line = number
             continue
-        header = short_track_header(line, _instrument_names(song))
+        names = _instrument_names(song)
+        header = short_track_header(line, names)
         if header:
             if mode:
                 flush()
@@ -376,10 +377,10 @@ def read_song(text: str, name: str = "ST") -> Song:
             current_name = f"{instr} {idx}".strip() if idx else instr
             current_instrument, mode, current_line = instr, "track", number
             continue
-        unknown = unrecognized_track_header(line, _instrument_names(song))
+        # Solo dove comincia un blocco: dentro un corpo la riga resta li',
+        # e chi legge la notazione la segnala come errore.
+        unknown = None if mode else unrecognized_track_header(line, names)
         if unknown:
-            if mode:
-                flush()
             current_name, mode, current_line = unknown, "unrecognized", number
             continue
         if mode:

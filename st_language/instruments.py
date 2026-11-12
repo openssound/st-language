@@ -394,6 +394,16 @@ def _gm_program_for(key: str) -> Optional[int]:
     return None
 
 
+def is_instrument_name(name: str) -> bool:
+    """Se name e' il nome intero di uno strumento: un predefinito, un alias
+    o un nome General MIDI. Le corrispondenze parziali di _gm_program_for
+    ("verse" dentro "Reverse Cymbal") qui non valgono: lo usa l'intestazione
+    corta di traccia, dove una riga "Verse:" e' un'etichetta, non una traccia."""
+    key = normalize_instrument_name(name)
+    return (name in DEFAULT_INSTRUMENTS or key in PERCUSSION_TYPE_ALIASES or key in INSTRUMENT_TYPE_ALIASES
+            or any(norm == key for _p, norm in _gm_keys()))
+
+
 def suggest_instrument(name: str) -> Optional[str]:
     """Il nome noto piu' simile a name (alias, predefiniti, nomi General
     MIDI), per l'avviso su uno strumento sconosciuto; None se non ce n'e'

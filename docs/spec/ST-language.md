@@ -1294,7 +1294,7 @@ version reads.
 | --- | --- |
 | `Pattern %Name:` | the pattern's tokens |
 | `Traccia Name [Instrument]:` | track text |
-| `Piano:`, `Piano 2:` (a known instrument name: default, declared with `Strumento Name:`, General MIDI or alias; optional index) | text of the track `Piano` / `Piano 2`; a `Name:` line with a body under it whose name is not a known instrument (`Pianoo:`) opens no track and gives a warning |
+| `Piano:`, `Piano 2:` (a known instrument name: default, declared with `Strumento Name:`, General MIDI or alias, written in full; optional index) | text of the track `Piano` / `Piano 2`; a `Name:` line with a body under it whose name is not a known instrument (`Pianoo:`) opens no track and gives a warning |
 | `Box Track "Name" \|beat:` | a box of the track `Track` starting at `beat` |
 | `Strumento Name:` | instrument definition (`program=40 percussione=no ottava=3 range=36-96 poly=si voicing=spread`, optionally `trasposizione=-2`, section 9.4); a block without `program=` defines nothing |
 | `Mixer Track:` | `volume` (0-200), `pan` (-1…1), `mute`, `solo` (`si`/`no`) of a track; readers ignore the keys they do not know |
@@ -1515,6 +1515,12 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.12.2** — the short track header also takes General MIDI names and
+aliases written in full (`Flute:`, `Violin:`, `Flauto:`), like the form
+`Traccia Name [Instrument]:`; before, the track was lost without a
+warning. A `Name:` line that opens a block and does not name a known
+instrument gives a warning (section 12.2).
 
 **2.12.1** — library only, the language is unchanged: `expand_to_text` and
 `events_to_text` (references and events written as text),

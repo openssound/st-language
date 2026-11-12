@@ -11,7 +11,7 @@ import re
 from typing import List, Optional, Tuple
 
 from ._i18n import tr
-from .instruments import InstrumentProfile, instrument_for
+from .instruments import InstrumentProfile, is_instrument_name
 
 
 # Versione del linguaggio con cui e' scritto il file: "ST: 2.12" (riga
@@ -166,12 +166,13 @@ def short_track_header(line: str, instrument_names) -> Optional[Tuple[str, str]]
     """(strumento, indice) di un'intestazione corta di traccia ("Piano:",
     "Piano 2:", "Lead8basslead 2:"), None se la riga non lo e' o se lo
     strumento non e' fra instrument_names ne' un nome General MIDI o un
-    alias. L'indice va dopo uno spazio: "Guitar2:" e' lo strumento
-    "Guitar2", non Guitar con indice 2. I comandi "rel:", "abs:" e
-    "reset:" non sono mai intestazioni."""
+    alias, scritto per intero ("Verse:" non e' "Reverse Cymbal"). L'indice
+    va dopo uno spazio: "Guitar2:" e' lo strumento "Guitar2", non Guitar
+    con indice 2. I comandi "rel:", "abs:" e "reset:" non sono mai
+    intestazioni."""
     m = _RE_TRACK_HDR_SPACED.match(line)
     if m and line not in _NOTATION_COMMAND_LINES and (
-            m.group(1) in instrument_names or instrument_for(m.group(1)).resolved):
+            m.group(1) in instrument_names or is_instrument_name(m.group(1))):
         return m.group(1), m.group(2) or ""
     return None
 
