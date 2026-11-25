@@ -74,7 +74,7 @@ CHORD_QUALITIES = {
 # scorciatoia di digitazione: l'editor la sostituisce automaticamente con '♭' non appena viene
 # digitata subito dopo una lettera nota (vedi gui/voicing_picker.py), per evitare
 # l'ambiguita' visiva tra la 'b' di alterazione e la 'b' lettera-nota (Si).
-CHORD_RE = re.compile(r"^([A-G])([#b♭]?)([A-Za-z0-9#°]*)$")
+CHORD_RE = re.compile(r"^([A-G])([#♯b♭]?)([A-Za-z0-9#°]*)$")
 
 
 @dataclass
@@ -121,7 +121,7 @@ SCALE_TYPES = ("diatonica", "pentatonica", "blues")
 # minore (naturale), es. 'C', 'F#', 'Ebm', 'Am' - stessa convenzione usata da
 # mido per i messaggi meta 'key_signature' del MIDI, cosi' import/export non
 # richiedono alcuna conversione di formato.
-KEY_RE = re.compile(r"^([A-Ga-g])([#b♭]?)(m?)$")
+KEY_RE = re.compile(r"^([A-Ga-g])([#♯b♭]?)(m?)$")
 
 
 def parse_key_signature(key: str) -> Tuple[int, bool]:
@@ -133,7 +133,7 @@ def parse_key_signature(key: str) -> Tuple[int, bool]:
         raise ValueError(tr("Tonalita' non valida: '{key}'", key=key))
     letter, accidental, minor_suffix = m.groups()
     pc = PITCH_CLASS[letter.upper()]
-    if accidental == "#":
+    if accidental in ("#", "♯"):
         pc += 1
     elif accidental in ("b", "♭"):
         pc -= 1
@@ -169,7 +169,7 @@ def _letter_semitones(letter: str) -> int:
     dell'ottava sotto), 'b#' -> 12 (il Do dell'ottava sopra)."""
     semitones = PITCH_CLASS[letter[0].upper()]
     if len(letter) > 1:
-        if letter[1] == "#":
+        if letter[1] in ("#", "♯"):
             semitones += 1
         elif letter[1] in ("b", "♭"):
             semitones -= 1

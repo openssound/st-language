@@ -9,6 +9,7 @@ Comandi da terminale della libreria ST-language.
     st-language mtxt brano.mtxt         converte un file MTXT in MIDI
     st-language events brano.st         gli eventi (JSON), per verifiche
     st-language upgrade brano.st        converte un file di prima della 2.12
+    st-language accidentals brano.st    riscrive bemolli e diesis (--style symbols|ascii)
 
 Un file senza tracce (solo notazione, anche '-' = standard input) e' un
 brano di una traccia: --instrument ne sceglie lo strumento, --tempo e
@@ -103,13 +104,15 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
     parser = argparse.ArgumentParser(prog="st-language" if command is None else None,
                                      description="ST-language " + __version__)
     if command is None:
-        parser.add_argument("command", choices=["check", "midi", "musicxml", "abc", "mtxt", "events", "upgrade"])
+        parser.add_argument("command", choices=["check", "midi", "musicxml", "abc", "mtxt", "events", "upgrade", "accidentals"])
     parser.add_argument("files", nargs="+", help=tr("file .st o di sola notazione ('-' = standard input)"))
     parser.add_argument("-o", "--output", help=tr("file di uscita (con un solo file in ingresso)"))
     parser.add_argument("--instrument", default="Piano", help=tr("strumento per i file di sola notazione"))
     parser.add_argument("--tempo", type=tempo, help=tr("tempo in BPM (sostituisce quello del file)"))
     parser.add_argument("--time", dest="time_sig", help=tr("metrica, es. 3/4 (sostituisce quella del file)"))
     parser.add_argument("--lang", help=tr("lingua dei messaggi: it, en, fr, es"))
+    parser.add_argument("--style", choices=["symbols", "ascii"], default="symbols",
+                        help=tr("per 'accidentals': ♭ ♯ (symbols) o b # (ascii)"))
     parser.add_argument("--all-tracks", action="store_true", help=tr("esporta anche le tracce in Mute"))
     parser.add_argument("--version", action="version", version=__version__)
     args = parser.parse_args(argv)
@@ -124,6 +127,9 @@ def main(argv: Optional[List[str]] = None, command: Optional[str] = None) -> int
             continue
         if command == "upgrade":
             status = max(status, _upgrade(source, args.output))
+            continue
+        if command == "accidentals":
+            status = max(status, _accidentals(source, args.output, args.style))
             continue
         try:
             song = _read(source, args.instrument, args.tempo, args.time_sig)
@@ -191,6 +197,38 @@ def _upgrade(source: str, out: Optional[str]) -> int:
         path = out or source
         with open(path, "w", encoding="utf-8", newline="") as f:
             f.write(upgraded)
+    except OSError as e:
+        print(f"{source}: {e}", file=sys.stderr)
+        return 2
+    print(path)
+    return 0
+
+
+def _accidentals(source: str, out: Optional[str], style: str) -> int:
+    """st-language accidentals file.st: bemolli e diesis scritti con i simboli
+    (♭ ♯) o con le lettere (b #), stesso suono. Senza -o riscrive il file,
+    tenendo l'originale in .bak; con i simboli la riga 'ST:' va a 2.13."""
+    from .accidentals import declare_language_version, normalize_accidentals
+    try:
+        if source == "-":
+            text = sys.stdin.read()
+        else:
+            with open(source, encoding="utf-8", newline="") as f:
+                text = f.read()
+        result = normalize_accidentals(text, style)
+        if style == "symbols":
+            result = declare_language_version(result)
+        if source == "-" and not out:
+            sys.stdout.write(result)
+            return 0
+        if result == text and not out:
+            print(tr("{source}: gia' scritto cosi'", source=source))
+            return 0
+        if not out:
+            os.replace(source, source + ".bak")
+        path = out or source
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(result)
     except OSError as e:
         print(f"{source}: {e}", file=sys.stderr)
         return 2

@@ -1,5 +1,5 @@
 {
- "spec_version": "2.12",
+ "spec_version": "2.13",
  "cases": [
   {
    "id": "notes-basic",
@@ -4184,6 +4184,440 @@
       "kind": "percussion",
       "velocity": 80,
       "name": "kick"
+     }
+    ]
+   }
+  },
+  {
+   "id": "percussion-abbreviations",
+   "input": "bd sn hh oh cr rd 2bd [bd hh] [sn cp]",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "kick"
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "snare"
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "hihat"
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "hihat_open"
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "crash"
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "ride"
+     },
+     {
+      "start": 6.0,
+      "duration": 2.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "kick"
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "percussion",
+        "name": "kick"
+       },
+       {
+        "kind": "percussion",
+        "name": "hihat"
+       }
+      ]
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "percussion",
+        "name": "snare"
+       },
+       {
+        "kind": "percussion",
+        "name": "clap"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "percussion-abbreviations-in-groups",
+   "input": "8: 2(bd hh sn hh) 4(sd)",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 0.0,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "kick"
+     },
+     {
+      "start": 0.5,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "hihat"
+     },
+     {
+      "start": 1.0,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "snare"
+     },
+     {
+      "start": 1.5,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "hihat"
+     },
+     {
+      "start": 2.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 2.0,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "kick"
+     },
+     {
+      "start": 2.5,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "hihat"
+     },
+     {
+      "start": 3.0,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "snare"
+     },
+     {
+      "start": 3.5,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "hihat"
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     },
+     {
+      "start": 4.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "start"
+     },
+     {
+      "start": 4.0,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "snare"
+     },
+     {
+      "start": 4.5,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 2
+     },
+     {
+      "start": 4.5,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "snare"
+     },
+     {
+      "start": 5.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 3
+     },
+     {
+      "start": 5.0,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "snare"
+     },
+     {
+      "start": 5.5,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "again",
+      "value": 4
+     },
+     {
+      "start": 5.5,
+      "duration": 0.5,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "snare"
+     },
+     {
+      "start": 6.0,
+      "duration": 0.0,
+      "kind": "repeat",
+      "velocity": 80,
+      "name": "end"
+     }
+    ]
+   }
+  },
+  {
+   "id": "flats-are-not-abbreviations",
+   "input": "ab bb cb db eb fb gb cow",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "ab",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "bb",
+      "octave": 4
+     },
+     {
+      "start": 2.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "cb",
+      "octave": 4
+     },
+     {
+      "start": 3.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "db",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "eb",
+      "octave": 4
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "fb",
+      "octave": 4
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "gb",
+      "octave": 4
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "percussion",
+      "velocity": 80,
+      "name": "cowbell"
+     }
+    ]
+   }
+  },
+  {
+   "id": "sharp-symbol",
+   "input": "c♯ d♯*5 2e♯ f♯*3 [c♯ e♯ g♯] c♯*4>d♯*4 F♯m7 C/F♯ G♯7 key=F♯ f g",
+   "expect": {
+    "events": [
+     {
+      "start": 0.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "c#",
+      "octave": 4
+     },
+     {
+      "start": 1.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "d#",
+      "octave": 5
+     },
+     {
+      "start": 2.0,
+      "duration": 2.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "e#",
+      "octave": 4
+     },
+     {
+      "start": 4.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 3
+     },
+     {
+      "start": 5.0,
+      "duration": 1.0,
+      "kind": "block",
+      "velocity": 80,
+      "items": [
+       {
+        "kind": "note",
+        "letter": "c#",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "e#",
+        "octave": 4
+       },
+       {
+        "kind": "note",
+        "letter": "g#",
+        "octave": 4
+       }
+      ]
+     },
+     {
+      "start": 6.0,
+      "duration": 1.0,
+      "kind": "slide",
+      "velocity": 80,
+      "letter": "c#",
+      "octave": 4,
+      "slide_points": [
+       [
+        "d#",
+        4
+       ]
+      ],
+      "slide_segment_durations": [
+       1.0,
+       0.0
+      ]
+     },
+     {
+      "start": 7.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "F#m7",
+      "octave": 4
+     },
+     {
+      "start": 8.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "C",
+      "bass": "F#",
+      "octave": 4
+     },
+     {
+      "start": 9.0,
+      "duration": 1.0,
+      "kind": "chord",
+      "velocity": 80,
+      "symbol": "G#7",
+      "octave": 4
+     },
+     {
+      "start": 10.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "f#",
+      "octave": 4
+     },
+     {
+      "start": 11.0,
+      "duration": 1.0,
+      "kind": "note",
+      "velocity": 80,
+      "letter": "g#",
+      "octave": 4
      }
     ]
    }

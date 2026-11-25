@@ -57,6 +57,7 @@ st-language abc song.st            # -> song.abc (ABC 2.1)
 st-language mtxt song.st           # -> song.mtxt (MTXT 1.0, one event per line)
 st-language mtxt take.mtxt         # MTXT -> take.mid
 st-language upgrade song.st        # a file from before 2.12 -> 2.12, same sound (keeps song.st.bak)
+st-language accidentals song.st      # b and # -> ♭ and ♯ (--style ascii for the other way), same sound
 st-language events song.st         # the events as JSON
 echo "4: c d e f | 2g 2g" | st2mid - -o melody.mid --instrument Trumpet
 ```

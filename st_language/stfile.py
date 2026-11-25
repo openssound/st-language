@@ -18,7 +18,7 @@ from .instruments import InstrumentProfile, is_instrument_name
 # facoltativa in cima; i lettori piu' vecchi la ignorano).
 RE_ST_VERSION = re.compile(r"^ST:\s*(\d+)\.(\d+)$")
 # La versione del linguaggio che questo lettore conosce (vedi la specifica).
-LANGUAGE_VERSION = (2, 12)
+LANGUAGE_VERSION = (2, 13)
 
 # "Levare: 1" (o "Pickup:"): la battuta in levare, in quarti (anche "1.5" o
 # "1/2"); la battuta 1 e' la prima intera.
@@ -63,7 +63,7 @@ RE_MASTER = re.compile(r"^Master:\s*(\d+)$", re.IGNORECASE)
 # "Tonalita: Am" persiste la tonalita' del brano (vedi core.chords.parse_key_signature).
 RE_KEY = re.compile(r"^(?:Tonalita|Tonalità|Key):\s*(.+)$", re.IGNORECASE)
 # 2.7: la tonalita' per battuta, come Tempo e Metrica: "Tonalita: 1: C, 17: G".
-_KEY_VALUE = r"[A-G][#b♭]?m?"
+_KEY_VALUE = r"[A-G][#♯b♭]?m?"
 RE_KEY_LIST_HDR = re.compile(rf"^(?:Tonalita|Tonalità|Key):\s*(\d+\s*:\s*{_KEY_VALUE}(?:\s*,\s*\d+\s*:\s*{_KEY_VALUE})*)$",
                              re.IGNORECASE)
 RE_BAR_KEY = re.compile(rf"(\d+)\s*:\s*({_KEY_VALUE})")

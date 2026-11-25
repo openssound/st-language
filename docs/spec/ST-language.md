@@ -1,6 +1,6 @@
 # ST-language Specification
 
-**Version 2.12** · Reference implementation: the `st_language` Python
+**Version 2.13** · Reference implementation: the `st_language` Python
 library (this repository) · Italian version: [ST-language.it.md](ST-language.it.md)
 
 © 2026 Sergio Scolaro. This specification is licensed under the
@@ -257,9 +257,17 @@ the changes made inside it end:
 
 ## 5. Pitch
 
-A note is a letter `a`-`g` with an optional accidental: `#` (sharp),
+A note is a letter `a`-`g` with an optional accidental: `#` or `♯` (sharp),
 `b` or `♭` (flat), `n` or `♮` (natural).
 `b` alone is the note B; `bb` is B-flat.
+
+**Accidental symbols** (2.13). `#` and `♯` mean the same, and so do `b`
+and `♭`, everywhere an accidental is written: notes, chords (root and
+bass after `/`), `key=`, harmony symbols (`$Bb7`) and `Tonalita:`. A
+text can be rewritten from one form to the other without changing how it
+sounds; an accidental inside a chord quality (`C7#9`, `Cm7b5`) is an
+extension, not a note, and stays as written. A file that uses `♯`
+declares `ST: 2.13`; `♭` was already read by every version.
 
 **Key.** `key=K` (K a key as in `key=G`, `key=Bb`, `key=F#m`) gives
 every following note **without** an accidental the accidental of K:
@@ -318,7 +326,9 @@ and octave. How the chord becomes notes is described in section 9.
 ### 6.3 Percussion
 
 `kick`, `2snare`: a drum sound (kind `percussion`) from the table of
-section 9.5.
+section 9.5. Every name also has one or two abbreviations (`bd`, `hh`,
+`sn`; section 9.5), which are read as the long name: events and exports
+always carry the long name.
 
 ### 6.4 Rests
 
@@ -1120,6 +1130,41 @@ pitch; the transposition only changes the written part of the score.
 | guiro_short | 73 | guiro_long | 74 | cuica_mute | 78 |
 | cuica_open | 79 | triangle_mute | 80 | triangle | 81 |
 
+**Abbreviations** (2.13). Each name above can be written with one of the
+abbreviations in the table, anywhere the long name is valid: percussion
+tracks, patterns, blocks `[bd hh]`, grace notes. A reader turns them into
+the long name when it reads. An abbreviation is never a single letter,
+never reads as a note (`ab`, `bb`, `cb`, `db`, `eb`, `fb`, `gb` stay
+flats: the cowbell is `cow`) and never equals an existing name. A file
+that uses them declares `ST: 2.13`.
+
+| Name | Abbreviations | Name | Abbreviations |
+| --- | --- | --- | --- |
+| kick | `bd`, `kk` | bongo_hi | `bh` |
+| snare | `sn`, `sd` | bongo_low | `bl` |
+| hihat | `hh` | conga_mute | `cm` |
+| hihat_open | `oh`, `hho` | conga_open | `co` |
+| tom1 | `t1` | conga_low | `cl` |
+| tom2 | `t2` | timbale_hi | `th` |
+| floor | `ft` | timbale_low | `tl` |
+| crash | `cr` | cabasa | `cab` |
+| ride | `rd` | maracas | `mr` |
+| kick2 | `bd2` | claves | `cv` |
+| rimshot | `rs` | woodblock_hi | `wbh` |
+| clap | `cp` | woodblock_low | `wbl` |
+| snare2 | `sn2`, `sd2` | side_stick | `ss` |
+| hihat_pedal | `ph`, `hhp` | vibraslap | `vs` |
+| tom_lowmid | `mt` | agogo_hi | `ah` |
+| tom_hi | `ht` | agogo_low | `al` |
+| tom_highfloor | `hf` | whistle_short | `ws` |
+| china | `ch` | whistle_long | `wl` |
+| ride_bell | `rb` | guiro_short | `gs` |
+| tambourine | `tb` | guiro_long | `gl` |
+| splash | `sp` | cuica_mute | `qm` |
+| cowbell | `cow` | cuica_open | `qo` |
+| crash2 | `cr2` | triangle_mute | `tm` |
+| ride2 | `rd2` | triangle | `tri` |
+
 ---
 
 ## 10. Errors and warnings
@@ -1243,7 +1288,7 @@ ignored (free text).
 
 | Line | Meaning |
 | --- | --- |
-| `ST: 2.12` | version of the language the file is written in |
+| `ST: 2.13` | version of the language the file is written in |
 | `Tempo: 120 BPM` | tempo (also with decimals: `Tempo: 101.4 BPM`) |
 | `Tempo: 1: 120, 5: 140` | tempo per bar (bar: bpm, …; `1: 96.5, 2: 98.25`) |
 | `Metrica: 3/4` | meter |
@@ -1515,6 +1560,14 @@ version if it gives the same result for every case.
 ---
 
 ## Appendix A: changes
+
+**2.13** — abbreviations of the drum names (`bd`, `hh`, `sn`, section 9.5)
+and the sharp symbol `♯`, accepted wherever `#` is (section 5). The
+library gains `PERCUSSION_ALIASES`, `normalize_accidentals`, an
+`accidentals=` option on the functions that write text (`"symbols"` or
+`"ascii"`), `language_version` and the command `st-language accidentals`.
+Files that use `♯` or an abbreviation declare `ST: 2.13`; every other file
+is unchanged.
 
 **2.12.2** — the short track header also takes General MIDI names and
 aliases written in full (`Flute:`, `Violin:`, `Flauto:`), like the form

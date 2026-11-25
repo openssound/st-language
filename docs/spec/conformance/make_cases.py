@@ -89,6 +89,11 @@ CASES = [
     ("chords-octave-voicing-bass", "C*3 Cmaj7.drop2 G7/B C/E*3 C7*3", {}),
     ("blocks", "[c e g] 2[c*3 g*3] [kick snare] [C e*5]", {}),
     ("percussion", "kick snare hihat hihat_open crash ride 2kick", {}),
+    # --- 2.13: abbreviazioni delle percussioni e simbolo del diesis
+    ("percussion-abbreviations", "bd sn hh oh cr rd 2bd [bd hh] [sn cp]", {}),
+    ("percussion-abbreviations-in-groups", "8: 2(bd hh sn hh) 4(sd)", {}),
+    ("flats-are-not-abbreviations", "ab bb cb db eb fb gb cow", {}),
+    ("sharp-symbol", "c♯ d♯*5 2e♯ f♯*3 [c♯ e♯ g♯] c♯*4>d♯*4 F♯m7 C/F♯ G♯7 key=F♯ f g", {}),
     ("slides", "c*4>d*4 2c*4>d*4>c*4 c*4>2d*4 8: c*4>d*4", {}),
     ("slides-hold-and-chains", "2c*4>3d*4 c*4>d*4>c*4 2c*4>2d*4>3c*4 c*4>0d*4", {}),
     # --- struttura
@@ -362,7 +367,7 @@ def main():
         case["expect"] = run_case(text, options)
         cases.append(case)
     with open(os.path.join(HERE, "cases.json"), "w", encoding="utf-8") as f:
-        json.dump({"spec_version": "2.12", "cases": cases}, f, ensure_ascii=False, indent=1)
+        json.dump({"spec_version": "2.13", "cases": cases}, f, ensure_ascii=False, indent=1)
         f.write("\n")
     print(f"{len(cases)} casi")
 

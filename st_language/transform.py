@@ -25,11 +25,11 @@ MIN_DURATION = Fraction(1, 32)        # '128, la figura piu' breve
 CANON_VOICES = (2, 4)
 GROUPS = {"pitch": "Altezze", "rhythm": "Ritmo", "order": "Ordine", "voices": "Piu' voci",
           "chords": "Accordi e dinamica"}
-_ACCIDENTALS = {"": 0, "#": 1, "b": -1, "♭": -1}
+_ACCIDENTALS = {"": 0, "#": 1, "♯": 1, "b": -1, "♭": -1}
 
 RE_TRANSFORM_REFERENCE = re.compile(r"^(\d*)%(\w+?)(?=[.+-])")
-RE_NOTE_ARGUMENT = re.compile(r"^([a-g])([#b♭]?)(?:\*(\d+))?$")
-RE_ROOT = re.compile(r"^([A-G])([#b♭]?)(.*)$")
+RE_NOTE_ARGUMENT = re.compile(r"^([a-g])([#♯b♭]?)(?:\*(\d+))?$")
+RE_ROOT = re.compile(r"^([A-G])([#♯b♭]?)(.*)$")
 
 
 @dataclass

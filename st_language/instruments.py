@@ -83,6 +83,70 @@ PERCUSSION_MAP = {
     "triangle": 81,       # Open Triangle
 }
 
+# 2.13: abbreviazioni dei nomi delle percussioni (abbreviazione -> nome
+# lungo). Valgono dovunque vale il nome lungo; la lettura le converte subito
+# nel nome lungo, quindi gli eventi, le esportazioni e il resto della libreria
+# non le vedono mai. Regole (le controlla tests/test_percussion_aliases.py):
+# nessuna e' una lettera sola, nessuna coincide con una nota o un accordo
+# ('ab', 'bb', 'cb', 'db', 'eb', 'fb', 'gb' restano bemolli: il campanaccio
+# e' 'cow') e nessuna coincide con un nome esistente.
+PERCUSSION_ALIASES = {
+    "bd": "kick", "kk": "kick",
+    "bd2": "kick2",
+    "sn": "snare", "sd": "snare",
+    "sn2": "snare2", "sd2": "snare2",
+    "rs": "rimshot",
+    "ss": "side_stick",
+    "cp": "clap",
+    "hh": "hihat",
+    "oh": "hihat_open", "hho": "hihat_open",
+    "ph": "hihat_pedal", "hhp": "hihat_pedal",
+    "ht": "tom_hi",
+    "t1": "tom1",
+    "mt": "tom_lowmid",
+    "t2": "tom2",
+    "hf": "tom_highfloor",
+    "ft": "floor",
+    "cr": "crash",
+    "cr2": "crash2",
+    "rd": "ride",
+    "rd2": "ride2",
+    "rb": "ride_bell",
+    "ch": "china",
+    "sp": "splash",
+    "tb": "tambourine",
+    "cow": "cowbell",
+    "vs": "vibraslap",
+    "bh": "bongo_hi", "bl": "bongo_low",
+    "cm": "conga_mute", "co": "conga_open", "cl": "conga_low",
+    "th": "timbale_hi", "tl": "timbale_low",
+    "ah": "agogo_hi", "al": "agogo_low",
+    "cab": "cabasa",
+    "mr": "maracas",
+    "ws": "whistle_short", "wl": "whistle_long",
+    "gs": "guiro_short", "gl": "guiro_long",
+    "cv": "claves",
+    "wbh": "woodblock_hi", "wbl": "woodblock_low",
+    "qm": "cuica_mute", "qo": "cuica_open",
+    "tm": "triangle_mute", "tri": "triangle",
+}
+
+
+def percussion_name(name: str) -> str:
+    """Il nome lungo di una percussione: se 'name' e' un'abbreviazione
+    ('bd', 'hh', 'sn') il nome che sta per, altrimenti 'name' com'e'."""
+    return PERCUSSION_ALIASES.get(name, name)
+
+
+def percussion_short_name(name: str) -> str:
+    """La prima abbreviazione di una percussione ('kick' -> 'bd'), o il nome
+    com'e' se non ne ha."""
+    for short, long in PERCUSSION_ALIASES.items():
+        if long == name:
+            return short
+    return name
+
+
 DRUM_MIDI_CHANNEL = 9  # canale 10 (0-indexed) riservato alle percussioni GM
 
 

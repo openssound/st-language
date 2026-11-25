@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import List, Dict, NamedTuple, Optional, Tuple
 
-from .instruments import PERCUSSION_MAP
+from .instruments import PERCUSSION_MAP, percussion_name
 from ._i18n import tr
 
 
@@ -98,9 +98,23 @@ def strip_comments(text: str) -> str:
 _PLAIN_STOP = (BAR_CHECK, LYRIC_QUOTE)
 
 
+def _canonical_sharps(tok: str) -> str:
+    """Il token con '♯' scritto '#' (2.13), fuori dai testi cantati e dai
+    nomi di file fra virgolette: dentro la libreria il diesis e' uno solo."""
+    if "♯" not in tok:
+        return tok
+    parts = tok.split(LYRIC_QUOTE)
+    return LYRIC_QUOTE.join(part.replace("♯", "#") if k % 2 == 0 else part for k, part in enumerate(parts))
+
+
 def tokenize_spans(text: str) -> List[Tuple[str, int, int]]:
     """Come tokenize, ma con la posizione di ogni token nel testo:
-    lista di (token, inizio, fine)."""
+    lista di (token, inizio, fine). Il diesis '♯' e' dato come '#': le
+    posizioni restano quelle del testo (stessa lunghezza)."""
+    return [(_canonical_sharps(tok), start, end) for tok, start, end in _tokenize_spans_raw(text)]
+
+
+def _tokenize_spans_raw(text: str) -> List[Tuple[str, int, int]]:
     text = strip_comments(text)
     tokens = []
     i, n = 0, len(text)
@@ -344,7 +358,7 @@ RE_REST = re.compile(r"^(\d*)r$")
 # Alterazione: anche 'n' (o '♮', bequadro) per togliere quella della
 # tonalita' (key=, vedi _PitchState). Ottava: '*n' esplicita, oppure nel
 # modo relativo (rel:) '*+' e '*-' per salire o scendere di un'ottava.
-RE_NOTE = re.compile(r"^(\d*)([a-g])([#b♭n♮]?)(\*\d+|\*\++|\*-+)?([!x_])?$")
+RE_NOTE = re.compile(r"^(\d*)([a-g])([#♯b♭n♮]?)(\*\d+|\*\++|\*-+)?([!x_])?$")
 # Suffisso opzionale '.stile' (es. Cmaj7.drop2) per forzare il voicing:
 # vedi core.chords.ALL_VOICINGS per l'elenco degli stili validi. La classe
 # di caratteri della qualita' include '#' per accordi come '7#9' e '°' per
@@ -358,8 +372,8 @@ RE_NOTE = re.compile(r"^(\d*)([a-g])([#b♭n♮]?)(\*\d+|\*\++|\*-+)?([!x_])?$")
 # una 'x' finale e' il modificatore (Cmaj7x = Cmaj7 stoppato), non parte
 # della qualita' (nessuna qualita' finisce con 'x').
 RE_CHORD = re.compile(
-    r"^(\d*)([A-G])([#b♭]?)([A-Za-z0-9#°]*?)(?:\.([A-Za-z0-9]+))?"
-    r"(?:/([A-G][#b♭]?))?(?:\*(\d+))?([!x_])?$"
+    r"^(\d*)([A-G])([#♯b♭]?)([A-Za-z0-9#°]*?)(?:\.([A-Za-z0-9]+))?"
+    r"(?:/([A-G][#♯b♭]?))?(?:\*(\d+))?([!x_])?$"
 )
 RE_PERC = re.compile(r"^(\d*)([a-z][a-z_0-9]*)$")
 # Portamento/slide tra due o piu' note: c*4>d*4,
@@ -368,9 +382,9 @@ RE_PERC = re.compile(r"^(\d*)([a-z][a-z_0-9]*)$")
 # moltiplicatore di durata (es. 2c*4>3d*4, vedi _slide_segment_durations
 # per la semantica): il gruppo catturato e' l'intera catena grezza, da
 # ripassare a RE_SLIDE_POINT tappa per tappa dopo lo split su '>'.
-_SLIDE_POINT_PATTERN = r"\d*[a-g][#b♭n♮]?(?:\*\d+|\*\++|\*-+)?"
+_SLIDE_POINT_PATTERN = r"\d*[a-g][#♯b♭n♮]?(?:\*\d+|\*\++|\*-+)?"
 RE_SLIDE = re.compile(rf"^({_SLIDE_POINT_PATTERN}(?:>{_SLIDE_POINT_PATTERN})+)$")
-RE_SLIDE_POINT = re.compile(r"^(\d*)([a-g])([#b♭n♮]?)(\*\d+|\*\++|\*-+)?$")
+RE_SLIDE_POINT = re.compile(r"^(\d*)([a-g])([#♯b♭n♮]?)(\*\d+|\*\++|\*-+)?$")
 
 
 def _check_pitch_range(letter: str, octave: int, tok: str) -> None:
@@ -390,18 +404,18 @@ RE_PITCH_MODE = re.compile(r"^(rel|abs):$")
 # trasposizione (quella di transpose=), modo delle altezze e tonalita'
 # (vedi la specifica, sezione 7.9). Le automazioni restano dove sono.
 RESET_TOKEN = "reset:"
-RE_KEY_MODE = re.compile(r"^key=(?:([A-G][#b♭]?m?)|off)$")
+RE_KEY_MODE = re.compile(r"^key=(?:([A-G][#♯b♭]?m?)|off)$")
 _LETTER_FIFTHS = {"f": -1, "c": 0, "g": 1, "d": 2, "a": 3, "e": 4, "b": 5}
 
 
 def key_signature_alters(name: str) -> Dict[str, str]:
     """Le alterazioni della tonalita' (es. 'G' -> {'f': '#'}, 'Dm' ->
     {'b': 'b'}): lettera nota -> '#' o 'b'."""
-    m = re.match(r"^([A-G])([#b♭]?)(m?)$", name)
+    m = re.match(r"^([A-G])([#♯b♭]?)(m?)$", name)
     if not m:
         raise NotationError(tr("Tonalita' non valida: '{key}'", key=name))
     letter, accidental, minor = m.groups()
-    fifths = _LETTER_FIFTHS[letter.lower()] + (7 if accidental == "#" else -7 if accidental else 0)
+    fifths = _LETTER_FIFTHS[letter.lower()] + (7 if accidental in ("#", "♯") else -7 if accidental else 0)
     fifths -= 3 if minor else 0
     if not -7 <= fifths <= 7:
         raise NotationError(tr("Tonalita' con troppe alterazioni: '{key}' (usa quella enarmonica)", key=name))
@@ -659,7 +673,7 @@ RE_DECORATIONS = re.compile(r"((?:\$[a-z]+)+)$")
 # Indicazione di testo sopra il pentagramma: $"rit.", $"dolce".
 RE_TEXT = re.compile(r'^\$"(.*)"$', re.DOTALL)
 # Sigla d'accordo senza suono (2.7): $Am7, $G7/B (scritta sopra il pentagramma).
-RE_HARMONY = re.compile(r"^\$([A-G][#b♭]?[A-Za-z0-9#°]*)(?:/([A-G][#b♭]?))?$")
+RE_HARMONY = re.compile(r"^\$([A-G][#♯b♭]?[A-Za-z0-9#°]*)(?:/([A-G][#♯b♭]?))?$")
 
 # Swing: 'swing=N' sposta la seconda croma di ogni coppia, 'swing16=N' la
 # seconda semicroma; N e' la percentuale della coppia data alla prima nota
@@ -797,7 +811,7 @@ def spell_midi(midi: int, alters: Dict[str, str], prefer_flat: bool = False) -> 
             octave = (midi - pc) // 12 - 1
             if letter == "c" and accidental == "b":
                 octave += 1          # do bemolle: l'ottava della lettera e' quella sopra
-            elif letter == "b" and accidental == "#":
+            elif letter == "b" and accidental in ("#", "♯"):
                 octave -= 1
             return letter, octave
     name, octave = midi_to_pitch(midi)
@@ -995,21 +1009,32 @@ def _offset_suffix(semitones: int) -> str:
     return f"{semitones:+d}" if semitones else ""
 
 
-def transpose_tokens(tokens: List[str], semitones: int, default_octave: int) -> List[str]:
-    """I token trasposti di 'semitones' (vedi PitchRewriter)."""
-    if semitones == 0:
-        return tokens
-    rewriter = PitchRewriter(semitones, default_octave)
-    return [rewriter(tok) for tok in tokens]
+def transpose_tokens(tokens: List[str], semitones: int, default_octave: int,
+                     accidentals: Optional[str] = None) -> List[str]:
+    """I token trasposti di 'semitones' (vedi PitchRewriter). 'accidentals'
+    ('symbols' o 'ascii'): come si scrivono bemolli e diesis nei token."""
+    if semitones != 0:
+        rewriter = PitchRewriter(semitones, default_octave)
+        tokens = [rewriter(tok) for tok in tokens]
+    if accidentals is not None:
+        from .accidentals import check_style, normalize_track_text
+        style = check_style(accidentals)
+        tokens = [normalize_track_text(tok, style) for tok in tokens]
+    return tokens
 
 
-def relative_text(text: str, default_octave: int, key: Optional[str] = None) -> str:
+def relative_text(text: str, default_octave: int, key: Optional[str] = None,
+                  accidentals: Optional[str] = None) -> str:
     """Il testo riscritto con le ottave relative (rel:) e, se data, la
     tonalita' (key=): stesse note, impaginazione e commenti come prima."""
     rewriter = PitchRewriter(0, default_octave, to_relative=True, to_key=key or "")
     body = rewrite_tokens(text, rewriter)
     header = "rel:" + (f" key={key}" if key else "")
-    return header + " " + body.lstrip()
+    result = header + " " + body.lstrip()
+    if accidentals is not None:
+        from .accidentals import check_style, normalize_track_text
+        result = normalize_track_text(result, check_style(accidentals))
+    return result
 
 
 def map_nested_tokens(tok: str, fn) -> str:
@@ -1542,6 +1567,7 @@ def _parse_atom(tok: str, default_octave: int, pitch: Optional[_PitchState] = No
     m = RE_PERC.match(tok)
     if m:
         mult, name = m.groups()
+        name = percussion_name(name)
         if name not in PERCUSSION_MAP:
             raise NotationError(
                 tr("Evento percussivo sconosciuto: '{name}'. Ammessi: {0}", ', '.join(PERCUSSION_MAP), name=name),

@@ -194,14 +194,29 @@ def _sorted_events(events: List[Event]) -> List[Event]:
 
 
 def events_to_text(events: List[Event], default_octave: int = 4, key: str = "", grid: Optional[float] = None,
-                   velocity: Optional[int] = None) -> str:
+                   velocity: Optional[int] = None, accidentals: Optional[str] = None) -> str:
     """Gli eventi come testo ST, dal quarto 0: rileggendolo si riottengono
     gli stessi eventi (le pause non conservano la velocity, che non suona).
     Piu' voci diventano un blocco { ; }. 'key' e' la tonalita' in vigore
     dove il testo verra' scritto (key= non si scrive: le alterazioni la
     seguono); 'grid' (in quarti) e 'velocity' quelle gia' in vigore, che non
     si riscrivono. Una durata che nessuna figura esprime si scrive come
-    multiplo della griglia che la divide: non servono legature."""
+    multiplo della griglia che la divide: non servono legature. 'accidentals'
+    ('symbols' o 'ascii') sceglie come si scrivono bemolli e diesis: senza,
+    con le lettere 'b' e '#'."""
+    text = _events_to_text(events, default_octave, key, grid, velocity)
+    return _in_style(text, accidentals)
+
+
+def _in_style(text: str, accidentals: Optional[str]) -> str:
+    if accidentals is None:
+        return text
+    from .accidentals import check_style, normalize_track_text
+    return normalize_track_text(text, check_style(accidentals))
+
+
+def _events_to_text(events: List[Event], default_octave: int = 4, key: str = "", grid: Optional[float] = None,
+                    velocity: Optional[int] = None) -> str:
     events = [ev for ev in events if ev.kind not in _SKIPPED]
     alters = key_signature_alters(key) if key else {}
     sorted_all = _sorted_events(events)
@@ -463,7 +478,7 @@ def _sound(text: str, patterns: Dict[str, Pattern], default_octave: int, midi_di
 
 
 def expand_to_text(text: str, patterns: Dict[str, Pattern], default_octave: int = 4, midi_dir: Optional[str] = None,
-                   state: str = "", key: str = "") -> str:
+                   state: str = "", key: str = "", accidentals: Optional[str] = None) -> str:
     """Il testo con i richiami (%Nome, &"file", con o senza funzioni) scritti
     per esteso, senza segni interni, che suona come l'originale: dopo ogni
     pattern lo stato torna quello di prima, rel:, key= e transpose= finiscono
@@ -473,7 +488,13 @@ def expand_to_text(text: str, patterns: Dict[str, Pattern], default_octave: int 
     context_prefix_before; senza, quello iniziale (griglia di un quarto,
     velocity 80). 'key': la tonalita' del brano, per le funzioni sulla scala.
     Se il risultato non suonasse uguale solleva NotationError: il testo non
-    cambia mai in silenzio."""
+    cambia mai in silenzio. 'accidentals' ('symbols' o 'ascii'): come si
+    scrivono bemolli e diesis nel risultato; senza, com'e'."""
+    return _in_style(_expand_to_text(text, patterns, default_octave, midi_dir, state, key), accidentals)
+
+
+def _expand_to_text(text: str, patterns: Dict[str, Pattern], default_octave: int = 4, midi_dir: Optional[str] = None,
+                    state: str = "", key: str = "") -> str:
     parse_track_text(state + text, patterns, default_octave=default_octave, midi_dir=midi_dir)   # gli errori di sempre
     if "%" not in text and "&" not in text:
         return text

@@ -1,6 +1,6 @@
 # Specifica di ST-language
 
-**Versione 2.12** · Implementazione di riferimento: la libreria Python
+**Versione 2.13** · Implementazione di riferimento: la libreria Python
 `st_language` (questo repository) · Versione inglese, di riferimento in
 caso di differenze: [ST-language.md](ST-language.md)
 
@@ -261,9 +261,17 @@ finiscono i cambi fatti dentro:
 
 ## 5. Altezze
 
-Una nota e' una lettera `a`-`g` con un'alterazione facoltativa: `#`
+Una nota e' una lettera `a`-`g` con un'alterazione facoltativa: `#` o `♯`
 (diesis), `b` o `♭` (bemolle),
 `n` o `♮` (bequadro). `b` da sola e' la nota Si; `bb` e' Si bemolle.
+
+**Simboli delle alterazioni** (2.13). `#` e `♯` valgono lo stesso, e cosi'
+`b` e `♭`, dovunque si scrive un'alterazione: note, accordi (fondamentale e
+basso dopo `/`), `key=`, sigle (`$Bb7`) e `Tonalita:`. Un testo si riscrive
+dall'una all'altra forma senza cambiare come suona; un'alterazione nella
+qualita' di un accordo (`C7#9`, `Cm7b5`) e' un'estensione e non la nota, e
+resta com'e'. Un file che usa `♯` dichiara `ST: 2.13`; il `♭` lo leggevano
+gia' tutte le versioni.
 
 **Tonalita'.** `key=K` (K una tonalita' come in `key=G`, `key=Bb`,
 `key=F#m`) da' a ogni nota successiva **senza** alterazione
@@ -324,7 +332,9 @@ sezione 9.
 ### 6.3 Percussioni
 
 `kick`, `2snare`: un suono di batteria (tipo `percussion`) dalla tabella
-della sezione 9.5.
+della sezione 9.5. Ogni nome ha anche una o due abbreviazioni (`bd`, `hh`,
+`sn`; sezione 9.5), lette come il nome lungo: gli eventi e le esportazioni
+portano sempre il nome lungo.
 
 ### 6.4 Pause
 
@@ -1158,6 +1168,41 @@ scritta della partitura.
 | guiro_short | 73 | guiro_long | 74 | cuica_mute | 78 |
 | cuica_open | 79 | triangle_mute | 80 | triangle | 81 |
 
+**Abbreviazioni** (2.13). Ogni nome della tabella si puo' scrivere con una
+delle abbreviazioni qui sotto, dovunque vale il nome lungo: tracce di
+percussione, pattern, blocchi `[bd hh]`, abbellimenti. Chi legge le
+trasforma nel nome lungo. Un'abbreviazione non e' mai una lettera sola, non
+si legge mai come una nota (`ab`, `bb`, `cb`, `db`, `eb`, `fb`, `gb` restano
+bemolli: il campanaccio e' `cow`) e non coincide con un nome esistente. Un
+file che le usa dichiara `ST: 2.13`.
+
+| Nome | Abbreviazioni | Nome | Abbreviazioni |
+| --- | --- | --- | --- |
+| kick | `bd`, `kk` | bongo_hi | `bh` |
+| snare | `sn`, `sd` | bongo_low | `bl` |
+| hihat | `hh` | conga_mute | `cm` |
+| hihat_open | `oh`, `hho` | conga_open | `co` |
+| tom1 | `t1` | conga_low | `cl` |
+| tom2 | `t2` | timbale_hi | `th` |
+| floor | `ft` | timbale_low | `tl` |
+| crash | `cr` | cabasa | `cab` |
+| ride | `rd` | maracas | `mr` |
+| kick2 | `bd2` | claves | `cv` |
+| rimshot | `rs` | woodblock_hi | `wbh` |
+| clap | `cp` | woodblock_low | `wbl` |
+| snare2 | `sn2`, `sd2` | side_stick | `ss` |
+| hihat_pedal | `ph`, `hhp` | vibraslap | `vs` |
+| tom_lowmid | `mt` | agogo_hi | `ah` |
+| tom_hi | `ht` | agogo_low | `al` |
+| tom_highfloor | `hf` | whistle_short | `ws` |
+| china | `ch` | whistle_long | `wl` |
+| ride_bell | `rb` | guiro_short | `gs` |
+| tambourine | `tb` | guiro_long | `gl` |
+| splash | `sp` | cuica_mute | `qm` |
+| cowbell | `cow` | cuica_open | `qo` |
+| crash2 | `cr2` | triangle_mute | `tm` |
+| ride2 | `rd2` | triangle | `tri` |
+
 ---
 
 ## 10. Errori e avvisi
@@ -1580,6 +1625,14 @@ caso.
 ---
 
 ## Appendice A: modifiche
+
+**2.13** — abbreviazioni dei nomi delle percussioni (`bd`, `hh`, `sn`,
+sezione 9.5) e simbolo del diesis `♯`, accettato dove si accetta `#`
+(sezione 5). La libreria aggiunge `PERCUSSION_ALIASES`,
+`normalize_accidentals`, l'opzione `accidentals=` nelle funzioni che
+scrivono testo (`"symbols"` o `"ascii"`), `language_version` e il comando
+`st-language accidentals`. I file che usano `♯` o un'abbreviazione
+dichiarano `ST: 2.13`; ogni altro file resta com'e'.
 
 **2.12.2** — l'intestazione corta di traccia accetta anche i nomi General
 MIDI e gli alias scritti per intero (`Flute:`, `Violin:`, `Flauto:`), come

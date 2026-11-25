@@ -32,8 +32,12 @@ from .song import (  # noqa: F401
     Clip, Part, Song, load_song, read_song, song_from_notation, text_to_song, upgrade_song_text,
 )
 from .notation import find_references  # noqa: F401
+from .accidentals import (  # noqa: F401
+    declare_language_version, language_version, normalize_accidentals, normalize_track_text,
+)
+from .instruments import PERCUSSION_ALIASES, percussion_name, percussion_short_name  # noqa: F401
 
-__version__ = "2.12.2"
+__version__ = "2.13.0"
 
 __all__ = [
     "BarIssue", "Clip", "Event", "Meter", "NotationError", "Part", "Pattern", "Song", "check", "check_bar_lines",
@@ -41,7 +45,9 @@ __all__ = [
     "mtxt_to_midi", "set_language", "set_translator", "song_from_notation", "text_to_song", "to_abc",
     "to_midi", "to_musicxml", "to_mtxt", "tokenize", "transpose_tokens", "upgrade_song_text", "validate",
     "expand_to_text", "events_to_text", "find_references",
-    "validate_track_text",
+    "validate_track_text", "normalize_accidentals", "normalize_track_text", "language_version",
+    "declare_language_version",
+    "PERCUSSION_ALIASES", "percussion_name", "percussion_short_name",
 ]
 
 
